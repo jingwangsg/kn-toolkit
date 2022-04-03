@@ -125,7 +125,6 @@ alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 timestamp=$(date)
 alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 alias tc='conda activate torch'
-alias cvd='CUDA_VISIBLE_DEVICES'
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
@@ -147,3 +146,8 @@ export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\
 export WANDB_DIR="/export/home/kningtg/.wandb"
 export TMPDIR="/export/home/kningtg/.tmp"
 export TMUX_TMPDIR="/export/home/kningtg/.tmp"
+
+# https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
+gpu() {
+  export CUDA_VISIBLE_DEVICES="$1"
+}
