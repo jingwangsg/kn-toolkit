@@ -1,4 +1,4 @@
-rm -rf ~/.bashrc
-ln -s .bashrc ~/.bashrc
-rm -rf ~/server_utils
-ln -s server_utils ~/server_utils
+rm -rf -r ~/.bashrc
+cp .bashrc ~/.bashrc
+rm -rf -r ~/server_utils
+cp -r server_utils ~/server_utils
