@@ -91,4 +91,7 @@ if __name__ == "__main__":
     df = pd.DataFrame.from_dict(gpu_dict, orient="index", columns=["mem_rest", "info"])
     df.sort_values(by=["mem_rest"], ascending=False, inplace=True)
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    	print(df.iloc[:, :args.n_gpu])
+        if args.n_gru == -1:
+            print(df)
+        else:
+            print(df.iloc[:args.n_gpu, :])
