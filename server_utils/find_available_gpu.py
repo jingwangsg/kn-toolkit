@@ -30,7 +30,7 @@ def map_async(iterable, func,
 def read_args():
     args = argparse.ArgumentParser()
     args.add_argument("-m", "--mem_thre", default="0", type=str)
-    args.add_argument("--n_gpu", default=999, type=int)
+    args.add_argument("-n", "--n_gpu", default=30, type=int)
     return args.parse_args()
 
 def query_node(node_idx, partition_name, info, mem_thre):
@@ -90,4 +90,5 @@ if __name__ == "__main__":
     # print(gpu_dict)
     df = pd.DataFrame.from_dict(gpu_dict, orient="index", columns=["mem_rest", "info"])
     df.sort_values(by=["mem_rest"], ascending=False, inplace=True)
-    print(df.iloc[:, :args.n_gpu])
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    	print(df.iloc[:, :args.n_gpu])
