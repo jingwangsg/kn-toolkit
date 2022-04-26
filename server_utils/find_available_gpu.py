@@ -29,8 +29,8 @@ def map_async(iterable, func,
 
 def read_args():
     args = argparse.ArgumentParser()
-    args.add_argument("-m", "--mem_thre", default="1024*8", type=str)
-    args.add_argument("--n_gpu", default=20, type=int)
+    args.add_argument("-m", "--mem_thre", default="0", type=str)
+    args.add_argument("--n_gpu", default=999, type=int)
     return args.parse_args()
 
 def query_node(node_idx, partition_name, info, mem_thre):
