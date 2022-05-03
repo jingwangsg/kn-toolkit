@@ -38,7 +38,7 @@ def query_node(node_idx, partition_name, info, mem_thre):
     # print(f"node_idx:{node_idx} | partition: {partition_name}")
     cmd = f"""
     module load cuda90/toolkit/9.0.176 && \
-    timeout 2 srun -p {partition_name} -w node{node_idx} \
+    timeout 5 srun -p {partition_name} -w node{node_idx} \
     nvidia-smi --query-gpu=memory.free\
     --format=csv,nounits,noheader
     """
