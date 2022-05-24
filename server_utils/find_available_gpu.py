@@ -32,32 +32,42 @@ def read_args():
     return args.parse_args()
 
 
-def query_node(node_idx, partition_name, info, mem_thre):
+def query_node(node_idx, partition_name, info, mem_thre, delay):
     ret = []
 
     # print(f"node_idx:{node_idx} | partition: {partition_name}")
     cmd = f"""
     module load cuda90/toolkit/9.0.176 && \
-    timeout 5 srun -p {partition_name} -w node{node_idx} \
-    nvidia-smi --query-gpu=memory.free\
+    timeout {delay} srun -p {partition_name} -w node{node_idx} \
+    nvidia-smi --query-gpu=memory.free,memory.total\
     --format=csv,nounits,noheader
     """
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.stdout != "":
         lines = result.stdout.split("\n")
-        lines = [line for line in lines if line.isnumeric()]
         for idx, line in enumerate(lines):
-            mem_rest = int(line)
-            if mem_rest > mem_thre:
-                ret.append((f"node_{node_idx}_gpu_{idx}", [mem_rest, info]))
+            if line == "":
+                continue
+            try:
+                mem_rest, mem_total = line.split(",")
+                mem_rest, mem_total = int(mem_rest.strip()), int(mem_total.strip())
+                if mem_rest > mem_thre:
+                    ret.append(
+                        (f"node_{node_idx}_gpu_{idx}", [mem_rest, mem_total, info])
+                    )
+            except:
+                pass
+    if ret == []:
+        print(f"node{node_idx} not available!")
+
     return ret
 
 
-def query_node_wrap(args, mem_thre):
-    return query_node(*args, mem_thre=mem_thre)
+def query_node_wrap(args, mem_thre, delay):
+    return query_node(*args, mem_thre=mem_thre, delay=delay)
 
 
-def find_gpu(mem_thre):
+def find_gpu(mem_thre, delay=5):
 
     gpu_dict = {}
 
@@ -69,28 +79,31 @@ def find_gpu(mem_thre):
     for server_info in server_infos:
         node_idx, partition_name, info = server_info.split(",")
         info = info.strip()
-        if partition_name == "NA" or node_idx == "01" or node_idx == "02":
+        if partition_name == "NA":
             continue
         func_args_list += [(node_idx, partition_name, info)]
 
-    query_node_func = partial(query_node_wrap, mem_thre=mem_thre)
+    query_node_func = partial(query_node_wrap, mem_thre=mem_thre, delay=delay)
     # ipdb.set_trace()
 
     rets = map_async(func_args_list, query_node_func, num_process=len(func_args_list))
+    # rets = [query_node_func(x) for x in func_args_list]
     flat_ret = []
     for ret in rets:
         flat_ret += ret
     gpu_dict = dict(flat_ret)
 
-    return gpu_dict
+    df = pd.DataFrame.from_dict(
+        gpu_dict, orient="index", columns=["mem_rest", "mem_total", "info"]
+    )
+    return df
 
 
 if __name__ == "__main__":
     args = read_args()
     mem_thre = eval(args.mem_thre)
-    gpu_dict = find_gpu(mem_thre)
+    df = find_gpu(mem_thre)
     # print(gpu_dict)
-    df = pd.DataFrame.from_dict(gpu_dict, orient="index", columns=["mem_rest", "info"])
     df.sort_values(by=["mem_rest"], ascending=False, inplace=True)
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
         if args.n_gpu == -1:

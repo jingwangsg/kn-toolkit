@@ -1,4 +1,3 @@
-from ast import arg
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -13,6 +12,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 import smtplib
+import logging
 
 device = None
 
@@ -22,10 +22,11 @@ import cmd
 def read_args():
     global M10
     args = argparse.ArgumentParser()
-    args.add_argument("--interval", type=float, default=0.1)
+    args.add_argument("-i", "--interval", type=float, default=0.1)
     # args.add_argument("--tensor_size", type=int, default=1, help="x 1000M")
     args.add_argument("-m", "--mem_lim", type=float, default=np.inf, help="(G)")
     args.add_argument("-g", "--gpu_id", type=int, default=0)
+    args.add_argument("-p", "--protect", action="store_true")
     args.add_argument("-s", "--send_email", action="store_true")
     return args.parse_args()
 
@@ -66,16 +67,11 @@ def get_pid_info():
     return captured_mem
 
 
-def send_email(args):
+def send_email(hostname, gpu_id, gpu_info):
     username = "scsegpu@163.com"
     password = "XTTCUQCCXXEYIVBG"
     from_addr = "scsegpu@163.com"
     to_addr = "knjingwang@gmail.com"
-    hostname = subprocess.run(
-        "hostname", shell=True, capture_output=True, text=True
-    ).stdout
-    gpu_id = args.gpu_id
-    gpu_info = get_gpu_info(gpu_id)
 
     subject = f"[SG] {hostname} GPU#{gpu_id}:{gpu_info['name']}"
     text = (
@@ -110,7 +106,7 @@ def scrumble_gpu():
     hostname = subprocess.run(
         "hostname", shell=True, capture_output=True, text=True
     ).stdout
-    print(pd.DataFrame.from_dict(gpu_info, orient="index").to_string(header=False))
+    # print(pd.DataFrame.from_dict(gpu_info, orient="index").to_string(header=False))
 
     mem_total = gpu_info["mem_total"]
 
@@ -150,25 +146,30 @@ def scrumble_gpu():
                 pbar.update(0)
                 cnt += 1
             except:
+                print("protecting")
+                if args.protect:
+                    while get_gpu_info(gpu_id)["mem_used"] - get_pid_info() > 100:
+                        time.sleep(interval)
                 time.sleep(interval)
+                print("continue")
 
-    del tensor_list
+    # del tensor_list
     # tensor_list.append(torch.randn(2631579*1200).to(device))
-    print("-" * 10 + f" Capture Memory: {captured_mem:7d} Mb " + "-" * 10)
+
+    hostname = subprocess.run(
+        "hostname", shell=True, capture_output=True, text=True
+    ).stdout
+    gpu_id = args.gpu_id
+    gpu_info = get_gpu_info(gpu_id)
+
     if args.send_email:
-        send_email(args)
+        send_email(hostname, gpu_id, gpu_info)
 
-    mode = input("shell/python:")
+    print(f"[SG] {hostname.strip()} GPU#{gpu_id}:{gpu_info['name']}")
+    print("-" * 10 + f" Capture Memory: {captured_mem:7d} Mb " + "-" * 10)
 
-    if mode == "s":
-        while True:
-            cmd = input("$")
-            if cmd == "EOF" or cmd == "q":
-                quit()
-            else:
-                subprocess.run(cmd, shell=True)
-    else:
-        ipdb.set_trace()
+    while True:
+        pass
 
 
 if __name__ == "__main__":
