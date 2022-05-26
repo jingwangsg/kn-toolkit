@@ -122,9 +122,11 @@ alias lsq="python ~/server_utils/list_task.py"
 alias fg="conda activate torch && python ~/server_utils/find_available_gpu.py"
 alias sg="conda activate torch && cd ~/server_utils && python ./train_model.py"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
+alias nvp="conda activate torch && nvidia-htop.py -l -c"
 timestamp=$(date)
 alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 alias tc='conda activate torch'
+alias aner="conda activate decouplener"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
