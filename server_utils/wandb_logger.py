@@ -1,5 +1,5 @@
 import wandb
-from find_available_gpu import find_gpu
+from server_utils.query_cluster import find_gpu
 import pandas as pd
 import time
 import matplotlib.pyplot as plt

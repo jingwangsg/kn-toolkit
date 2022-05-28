@@ -4,7 +4,7 @@ import pandas as pd
 from functools import partial
 from pathos.multiprocessing import Pool
 from tqdm.contrib.concurrent import thread_map
-import time
+from time import time
 from tqdm import tqdm
 import ipdb
 import io
@@ -37,22 +37,32 @@ class GPUCluster:
         self.server_info = server_info
         self.timeout = timeout
 
-    @staticmethod
-    def query_single_node(inputs):
+    def _check_node(self, node_idx):
+        cmd = f"sinfo --nodes=node{node_idx:02d} -N --noheader"
+        result = subprocess.run(cmd, text=True, capture_output=True, shell=True)
+        return result
+
+    def _query_single_node(self, inputs):
         node_idx, partition, cmd, timeout = inputs
 
-        if partition == "nan":
-            print(f"[FAIL] node{node_idx:02d} | N/A")
+        result = self._check_node(node_idx)
+        if "alloc" not in result.stdout:
+            if result.stdout:
+                print(f"node{node_idx:02d} {result.stdout.split()[-1]}")
+            else:
+                print(f"node{node_idx:02d} N/A")
             return None
 
-        cmd_with_timeout = f"""
-        module load cuda90/toolkit/9.0.176 && \
-        timeout {timeout} srun -p {partition} -w node{node_idx:02d} --export ALL {cmd}
-        """
+        prefix = f"module load cuda90/toolkit/9.0.176 && timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL --mem=128 "
+
+        cmd_with_timeout = prefix + cmd
+
+        # print(cmd_with_timeout)
 
         result = subprocess.run(
             cmd_with_timeout, shell=True, capture_output=True, text=True
         )
+        # print(cmd_with_timeout)
 
         if not result.stdout and (
             "revoke" in result.stderr or "error" in result.stderr
@@ -68,7 +78,9 @@ class GPUCluster:
             for _, row in self.server_info.iterrows()
         ]
 
-        node_stdout = map_async(iterable=inputs_list, func=self.query_single_node)
+        st = time()
+        node_stdout = map_async(iterable=inputs_list, func=self._query_single_node)
+        print(f"query costs {time()-st}(s)")
         return node_stdout
 
     def find_gpu_available(self):
@@ -147,7 +159,7 @@ def read_args():
     args.add_argument("-n", "--n_gpu", default=20, type=int)
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
-    args.add_argument("--timeout", default=20, type=int)
+    args.add_argument("--timeout", default=100, type=int)
     args.add_argument("--fresh", action="store_true")
     return args.parse_args()
 
@@ -237,7 +249,7 @@ def main():
 def update_server_list(server_info_fn):
     df = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
 
-    out = subprocess.run(
+    out = subprocess.Popen(
         'scontrol show nodes | grep -E "Partitions|NodeName"',
         shell=True,
         text=True,
