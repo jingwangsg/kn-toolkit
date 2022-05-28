@@ -146,12 +146,12 @@ def scrumble_gpu():
                 pbar.update(0)
                 cnt += 1
             except:
-                print("protecting")
                 if args.protect:
+                    print("protecting")
                     while get_gpu_info(gpu_id)["mem_used"] - get_pid_info() > 100:
                         time.sleep(interval)
+                    print("continue")
                 time.sleep(interval)
-                print("continue")
 
     # del tensor_list
     # tensor_list.append(torch.randn(2631579*1200).to(device))
