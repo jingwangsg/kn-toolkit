@@ -53,7 +53,7 @@ class GPUCluster:
                 print(f"node{node_idx:02d} N/A")
             return None
 
-        prefix = f"module load cuda90/toolkit/9.0.176 && timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL --mem=128 "
+        prefix = f"module load cuda90/toolkit/9.0.176 && timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL "
 
         cmd_with_timeout = prefix + cmd
 
@@ -159,7 +159,7 @@ def read_args():
     args.add_argument("-n", "--n_gpu", default=20, type=int)
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
-    args.add_argument("--timeout", default=100, type=int)
+    args.add_argument("--timeout", default=10, type=int)
     args.add_argument("--fresh", action="store_true")
     return args.parse_args()
 
