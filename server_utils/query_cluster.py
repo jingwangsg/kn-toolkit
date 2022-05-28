@@ -54,7 +54,9 @@ class GPUCluster:
             cmd_with_timeout, shell=True, capture_output=True, text=True
         )
 
-        if not result.stdout and "revoke" in result.stderr:
+        if not result.stdout and (
+            "revoke" in result.stderr or "error" in result.stderr
+        ):
             print(f"[FAIL] node{node_idx:02d} | {result.stderr}")
             # pass
 
