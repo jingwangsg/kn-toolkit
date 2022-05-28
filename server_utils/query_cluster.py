@@ -249,7 +249,7 @@ def main():
 def update_server_list(server_info_fn):
     df = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
 
-    out = subprocess.Popen(
+    out = subprocess.run(
         'scontrol show nodes | grep -E "Partitions|NodeName"',
         shell=True,
         text=True,
