@@ -47,7 +47,7 @@ class GPUCluster:
 
         cmd_with_timeout = f"""
         module load cuda90/toolkit/9.0.176 && \
-        timeout {timeout} srun -p {partition} -w node{node_idx:02d} --export ALL --mem=0 {cmd}
+        timeout {timeout} srun -p {partition} -w node{node_idx:02d} --export ALL {cmd}
         """
 
         result = subprocess.run(
@@ -147,7 +147,7 @@ def read_args():
     args.add_argument("-n", "--n_gpu", default=20, type=int)
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
-    args.add_argument("--timeout", default=10, type=int)
+    args.add_argument("--timeout", default=20, type=int)
     args.add_argument("--fresh", action="store_true")
     return args.parse_args()
 
