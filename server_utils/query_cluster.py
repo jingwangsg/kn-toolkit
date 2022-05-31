@@ -46,7 +46,7 @@ class GPUCluster:
         node_idx, partition, cmd, timeout = inputs
 
         result = self._check_node(node_idx)
-        if "alloc" not in result.stdout:
+        if "alloc" not in result.stdout and "idle" not in result.stdout:
             if result.stdout:
                 print(f"node{node_idx:02d} {result.stdout.split()[-1]}")
             else:
