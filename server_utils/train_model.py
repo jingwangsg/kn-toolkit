@@ -136,6 +136,7 @@ def scrumble_gpu():
             tensor_size = 26315790
             if mem_free > 3000:
                 tensor_size = (get_gpu_info(gpu_id)["mem_free"] // 1000 - 1) * 263157900
+
             if mem_free < 100:
                 tensor_size = 10000
 
@@ -145,12 +146,13 @@ def scrumble_gpu():
                 pbar.n = captured_mem
                 pbar.update(0)
                 cnt += 1
-            except:
+
                 if args.protect:
-                    print("protecting")
-                    while get_gpu_info(gpu_id)["mem_used"] - get_pid_info() > 100:
-                        time.sleep(interval)
-                    print("continue")
+                    # stop after creating first tensor
+                    print(f"protecting gpu#{gpu_id}")
+                    while True:
+                        time.sleep(100000000)
+            except:
                 time.sleep(interval)
 
     # del tensor_list
