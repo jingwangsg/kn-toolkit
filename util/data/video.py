@@ -3,7 +3,7 @@ import numpy as np
 
 def visual_feature_sampling(visual_feature, max_num_clips, padding=True):
     """
-    visual_feature: num_frame x dim
+    visual_feature: [num_frame, dim]
     """
     num_clips, dim = visual_feature.shape
     if num_clips <= max_num_clips:

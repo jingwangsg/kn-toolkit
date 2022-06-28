@@ -1,5 +1,5 @@
 from .file import save_pickle
-from .logger import get_logger
+from .general.logger import get_logger
 
 log = get_logger(__name__)
 
