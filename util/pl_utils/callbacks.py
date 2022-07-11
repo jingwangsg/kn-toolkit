@@ -7,6 +7,10 @@ class CaptureOutput(pl.Callback):
         self.ins = []
         self.outs = []
 
+    def on_training_epoch_start(self, trainer, pl_module):
+        self.ins = []
+        self.outs = []
+
     def on_validation_epoch_start(
         self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"
     ) -> None:
@@ -18,6 +22,18 @@ class CaptureOutput(pl.Callback):
     ) -> None:
         self.ins = []
         self.outs = []
+
+    def on_training_batch_end(
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        outputs,
+        batch,
+        batch_idx: int,
+        dataloader_idx: int,
+    ) -> None:
+        self.ins.append(batch)
+        self.outs.append(outputs)
 
     def on_validation_batch_end(
         self,
@@ -41,4 +57,4 @@ class CaptureOutput(pl.Callback):
         dataloader_idx: int,
     ):
         self.ins.append(batch)
-        self.out.append(outputs)
+        self.outs.append(outputs)
