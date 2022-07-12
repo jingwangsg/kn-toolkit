@@ -53,7 +53,7 @@ class GPUCluster:
                 print(f"node{node_idx:02d} N/A")
             return None
 
-        prefix = f"module load cuda90/toolkit/9.0.176 && timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL "
+        prefix = f"timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL "
 
         cmd_with_timeout = prefix + cmd
 
@@ -285,7 +285,7 @@ def update_server_list(server_info_fn):
 
 if __name__ == "__main__":
     args = read_args()
-    server_info_fn = "/export/home/kningtg/server_utils/server_list.csv"
+    server_info_fn = "/export/home2/kningtg/server_utils/server_list.csv"
     if args.fresh:
         update_server_list(server_info_fn)
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)

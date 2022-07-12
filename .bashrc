@@ -131,14 +131,14 @@ alias aner="conda activate decouplener"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home/kningtg/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+__conda_setup="$('/export/home2/kningtg/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/export/home/kningtg/anaconda3/etc/profile.d/conda.sh" ]; then
-        . "/export/home/kningtg/anaconda3/etc/profile.d/conda.sh"
+    if [ -f "/export/home2/kningtg/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "/export/home2/kningtg/anaconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/export/home/kningtg/anaconda3/bin:$PATH"
+        export PATH="/export/home2/kningtg/anaconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup
@@ -146,9 +146,9 @@ unset __conda_setup
 
 # export PS1="[\u@\h \W]\n\$"
 export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\$"
-export WANDB_DIR="/export/home/kningtg/.wandb"
-export SLURM_TMPDIR="/export/home/kningtg/.tmp"
-export TMUX_TMPDIR="/export/home/kningtg/.tmp"
+export WANDB_DIR="/export/home2/kningtg/.wandb"
+export SLURM_TMPDIR="/export/home2/kningtg/.tmp"
+export TMUX_TMPDIR="/export/home2/kningtg/.tmp"
 
 # https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
 gpu() {
@@ -158,48 +158,3 @@ ca() {
     conda activate "$1"
 }
 
-export _HYDRA_OLD_COMP=$(complete -p python 2> /dev/null)
-hydra_bash_completion()
-{
-    words=($COMP_LINE)
-    if [ "${words[0]}" == "python" ]; then
-        if (( ${#words[@]} < 2 )); then
-            return
-        fi
-        file_path=$(pwd)/${words[1]}
-        if [ ! -f "$file_path" ]; then
-            return
-        fi
-        grep "@hydra.main" $file_path -q
-        helper="${words[0]} ${words[1]}"
-    else
-        helper="${words[0]}"
-        true
-    fi
-
-    EXECUTABLE=($(command -v $helper))
-    if [ "$HYDRA_COMP_DEBUG" == "1" ]; then
-        printf "EXECUTABLE_FIRST='${EXECUTABLE[0]}'\n"
-    fi
-    if ! [ -x "${EXECUTABLE[0]}" ]; then
-        false
-    fi
-
-    if [ $? == 0 ]; then
-        choices=$( COMP_POINT=$COMP_POINT COMP_LINE=$COMP_LINE $helper -sc query=bash)
-        word=${words[$COMP_CWORD]}
-
-        if [ "$HYDRA_COMP_DEBUG" == "1" ]; then
-            printf "\n"
-            printf "COMP_LINE='$COMP_LINE'\n"
-            printf "COMP_POINT='$COMP_POINT'\n"
-            printf "Word='$word'\n"
-            printf "Output suggestions:\n"
-            printf "\t%s\n" ${choices[@]}
-        fi
-        COMPREPLY=($( compgen -o nospace -o default -W "$choices" -- "$word" ));
-    fi
-}
-
-COMP_WORDBREAKS=${COMP_WORDBREAKS//=}
-COMP_WORDBREAKS=$COMP_WORDBREAKS complete -o nospace -o default -F hydra_bash_completion python
