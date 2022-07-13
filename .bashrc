@@ -158,6 +158,8 @@ ca() {
     conda activate "$1"
 }
 am() {
-    git commit -am "$1"
+    cmd=$(git commit -am "$@")
+    echo $cmd
+    $cmd
 }
 
