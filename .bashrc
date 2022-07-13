@@ -157,4 +157,7 @@ gpu() {
 ca() {
     conda activate "$1"
 }
+am() {
+    git commit -am "$1"
+}
 
