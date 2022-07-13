@@ -30,5 +30,5 @@ if __name__ == "__main__":
     #     shell=True,
     # )
     print(
-        f"srun -p {partition} -w {node_args} --export ALL --mem=0 --exclusive --pty bash"
+        f"srun -p {partition} -w {node_args} --export ALL --mem=0 --pty bash"
     )
