@@ -2,13 +2,11 @@ class Registry:
     def __init__(self):
         self._cls_dict = dict()
 
-    def register(self, name):
-        if isinstance(name, str):
-            name = [name]
-
+    def register(self, name=None):
         def decorator(cls):
-            for cur_name in name:
-                self._cls_dict[cur_name] = cls
+            # if name is None:
+            #     name = cls.__name__
+            self._cls_dict[name] = cls
             return cls
 
         return decorator

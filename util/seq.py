@@ -3,20 +3,27 @@ import torch
 from typing import List
 import numpy as np
 
+
 def replace_char(s):
-    s = s.replace(",", " ").replace("/", " ").replace('"', " ").replace("-", " ").replace(";", " ").replace(".", " ").replace("&", " ").replace("?", " ").replace("!", " ").replace("(", " ").replace(")", " ")
+    s = (
+        s.replace(",", " ").replace("/", " ").replace('"', " ").replace(
+            "-",
+            " ").replace(";", " ").replace(".", " ").replace("&", " ").replace(
+                "?", " ").replace("!", " ").replace("(",
+                                                    " ").replace(")", " "))
+    s = s.strip()
     return s
+
 
 def get_word_mask(range_i, n_position, p=0.15):
 
-    ret_mask = np.zeros((n_position,))
+    ret_mask = np.zeros((n_position, ))
 
     if p == 0:
         return ret_mask
 
-    word_mask = [
-        (idx, 1.0) if np.random.uniform(0, 1) < p else (idx, 0.0) for idx in range_i
-    ]
+    word_mask = [(idx, 1.0) if np.random.uniform(0, 1) < p else (idx, 0.0)
+                 for idx in range_i]
     for idx, v in word_mask:
         ret_mask[idx] = v
     num_mask = [v for idx, v in word_mask]

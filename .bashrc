@@ -1,3 +1,4 @@
+
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
@@ -128,6 +129,7 @@ timestamp=$(date)
 alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 alias tc='conda activate torch'
 alias aner="conda activate decouplener"
+alias tree="$HOME/deb/usr/bin/tree"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
@@ -158,8 +160,13 @@ ca() {
     conda activate "$1"
 }
 am() {
-    cmd=$(git commit -am "$@")
-    echo $cmd
-    $cmd
+    git commit -am "$@"
+    git push
 }
 
+ROOTDIR=${ZZROOT:-$HOME/app}
+export PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$ROOTDIR/lib/share/pkgconfig:$PATH"
+export LD_LIBRARY_PATH="$ROOTDIR/lib"
+export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+export LIBRARY_PATH="$CUDA_HOME/lib64:$LIBRARY_PATH"

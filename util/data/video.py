@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 def visual_feature_sampling(visual_feature, max_num_clips, padding=True):
@@ -23,3 +24,18 @@ def visual_feature_sampling(visual_feature, max_num_clips, padding=True):
             new_visual_feature.append(visual_feature[s_idx])
     new_visual_feature = np.asarray(new_visual_feature)
     return new_visual_feature
+
+
+def average_to_fixed_length(visual_input, num_sample_clips):
+    num_clips = visual_input.shape[0]
+    idxs = torch.arange(0, num_sample_clips + 1, 1.0) / num_sample_clips * num_clips
+    idxs = torch.min(torch.round(idxs).long(), torch.tensor(num_clips - 1))
+    new_visual_input = []
+    for i in range(num_sample_clips):
+        s_idx, e_idx = idxs[i].item(), idxs[i + 1].item()
+        if s_idx < e_idx:
+            new_visual_input.append(torch.mean(visual_input[s_idx:e_idx], dim=0))
+        else:
+            new_visual_input.append(visual_input[s_idx])
+    new_visual_input = torch.stack(new_visual_input, dim=0)
+    return new_visual_input

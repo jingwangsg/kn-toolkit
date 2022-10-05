@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+from ..general.detach import detach_collections
 
 
 class CaptureOutput(pl.Callback):
@@ -32,6 +33,8 @@ class CaptureOutput(pl.Callback):
         batch_idx: int,
         dataloader_idx: int,
     ) -> None:
+        detach_collections(batch)
+        detach_collections(outputs)
         self.ins.append(batch)
         self.outs.append(outputs)
 
@@ -44,6 +47,9 @@ class CaptureOutput(pl.Callback):
         batch_idx: int,
         dataloader_idx: int,
     ) -> None:
+        detach_collections(batch)
+        detach_collections(outputs)
+
         self.ins.append(batch)
         self.outs.append(outputs)
 
@@ -56,5 +62,8 @@ class CaptureOutput(pl.Callback):
         batch_idx: int,
         dataloader_idx: int,
     ):
+        detach_collections(batch)
+        detach_collections(outputs)
+
         self.ins.append(batch)
         self.outs.append(outputs)
