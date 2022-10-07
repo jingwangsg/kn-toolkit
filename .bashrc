@@ -1,4 +1,3 @@
-
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
@@ -8,6 +7,7 @@ case $- in
     *i*) ;;
       *) return;;
 esac
+
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -169,4 +169,4 @@ export PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$
 export LD_LIBRARY_PATH="$ROOTDIR/lib"
 export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
-export LIBRARY_PATH="$CUDA_HOME/lib64:$LIBRARY_PATH"
+# export LIBRARY_PATH="$CUDA_HOME/lib64:$LIBRARY_PATH"
