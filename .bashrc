@@ -128,23 +128,12 @@ alias nvp="conda activate torch && nvidia-htop.py -c"
 timestamp=$(date)
 alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 alias tc='conda activate torch'
-alias aner="conda activate decouplener"
-alias tree="$HOME/deb/usr/bin/tree"
-
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home2/kningtg/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
-else
-    if [ -f "/export/home2/kningtg/anaconda3/etc/profile.d/conda.sh" ]; then
-        . "/export/home2/kningtg/anaconda3/etc/profile.d/conda.sh"
-    else
-        export PATH="/export/home2/kningtg/anaconda3/bin:$PATH"
-    fi
-fi
-unset __conda_setup
-# <<< conda initialize <<<
+# alias aner="conda activate decouplener"
+alias tf2="conda activate tf2"
+knkill() {
+    conda activate torch
+    python $HOME/server_utils/kill.py $1
+}
 
 # export PS1="[\u@\h \W]\n\$"
 export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\$"
@@ -170,3 +159,19 @@ export LD_LIBRARY_PATH="$ROOTDIR/lib"
 export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
 # export LIBRARY_PATH="$CUDA_HOME/lib64:$LIBRARY_PATH"
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/export/home2/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/export/home2/kningtg/miniconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
+
