@@ -55,7 +55,7 @@ class GPUCluster:
                 print(f"node{node_idx:02d} {result.stdout.split()[-1]}")
             else:
                 print(f"node{node_idx:02d} N/A")
-            return None
+            return node_idx, None
 
         prefix = f"timeout {timeout} srun -N 1 -n 1 -c 1 -p {partition} -w node{node_idx:02d} --export ALL "
 
@@ -70,7 +70,7 @@ class GPUCluster:
             print(f"[FAIL] node{node_idx:02d} | {result.stderr}")
             # pass
 
-        return result.stdout
+        return node_idx, result.stdout
 
     def query_all_node(self, cmd):
         inputs_list = [
@@ -91,14 +91,14 @@ class GPUCluster:
 
         df_list = []
 
-        for node_idx, node_out in enumerate(node_stdouts):
+        for node_idx, node_out in node_stdouts:
             if not node_out:
                 continue
 
             cur_df = pd.read_csv(io.StringIO(node_out), dtype=str).reset_index()
             cur_df.rename(columns={"index": "gpu.id"}, inplace=True, errors="raise")
             cur_df["gpu.id"] = cur_df["gpu.id"].astype(str)
-            cur_df["gpu.id"] = f"node{node_idx+1:02d}_gpu#" + cur_df["gpu.id"]
+            cur_df["gpu.id"] = f"node{node_idx:02d}_gpu#" + cur_df["gpu.id"]
 
             cur_df[" memory.free [MiB]"] = cur_df[" memory.free [MiB]"].astype(int)
             cur_df[" memory.total [MiB]"] = cur_df[" memory.total [MiB]"].astype(int)
@@ -120,7 +120,7 @@ class GPUCluster:
 
         item_list = []
 
-        for node_idx, node_out in enumerate(node_stdouts):
+        for node_idx, node_out in node_stdouts:
             if not node_out:
                 continue
 
@@ -136,7 +136,7 @@ class GPUCluster:
                     continue
 
                 item = {
-                    "partition": self.server_info.loc[node_idx, "partition"],
+                    "partition": self.server_info[server_info_fn["node_idx"] == node_idx]["partition"],
                     "gpu.id": f"node{node_idx+1:02d}_#" + split_line[0],
                     "gpu.occupied": split_line[3],
                     "PID": split_line[1],
