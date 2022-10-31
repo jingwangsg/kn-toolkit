@@ -14,7 +14,7 @@ if __name__ == "__main__":
     server_list = pd.read_csv(
         "~/server_utils/server_list.csv", header=None
     )
-    server_list.set_axis(["no", "partition"], axis=1, inplace=True)
+    server_list = server_list.set_axis(["no", "partition"], axis=1, copy=False)
 
     server_nos = [int(no) for no in args.server_nos.split(",")]
 
