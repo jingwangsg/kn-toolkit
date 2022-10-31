@@ -9,6 +9,8 @@ from tqdm import tqdm
 import ipdb
 import io
 
+from collections import OrderedDict
+
 
 def map_async(iterable, func, num_process=30, desc: object = ""):
     p = Pool(num_process)
@@ -29,9 +31,7 @@ def map_async(iterable, func, num_process=30, desc: object = ""):
 
 class GPUCluster:
     def __init__(self, server_info_fn, timeout):
-        server_info = pd.read_csv(
-            server_info_fn, names=["node_idx", "partition", "gpu_type"]
-        )
+        server_info = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
         server_info["partition"] = server_info["partition"].astype(str)
         server_info["gpu_type"] = server_info["gpu_type"].astype(str)
         self.server_info = server_info
@@ -46,7 +46,11 @@ class GPUCluster:
         node_idx, partition, cmd, timeout = inputs
 
         result = self._check_node(node_idx)
-        if "alloc" not in result.stdout and "idle" not in result.stdout and "mix" not in result.stdout:
+        if (
+            "alloc" not in result.stdout
+            and "idle" not in result.stdout
+            and "mix" not in result.stdout
+        ):
             if result.stdout:
                 print(f"node{node_idx:02d} {result.stdout.split()[-1]}")
             else:
@@ -59,14 +63,10 @@ class GPUCluster:
 
         # print(cmd_with_timeout)
 
-        result = subprocess.run(
-            cmd_with_timeout, shell=True, capture_output=True, text=True
-        )
+        result = subprocess.run(cmd_with_timeout, shell=True, capture_output=True, text=True)
         # print(cmd_with_timeout)
 
-        if not result.stdout and (
-            "revoke" in result.stderr or "error" in result.stderr
-        ):
+        if not result.stdout and ("revoke" in result.stderr or "error" in result.stderr):
             print(f"[FAIL] node{node_idx:02d} | {result.stderr}")
             # pass
 
@@ -84,7 +84,9 @@ class GPUCluster:
         return node_stdout
 
     def find_gpu_available(self):
-        gpu_query_cmd = "nvidia-smi --query-gpu=gpu_name,memory.free,memory.total --format=csv,nounits"
+        gpu_query_cmd = (
+            "nvidia-smi --query-gpu=gpu_name,memory.free,memory.total --format=csv,nounits"
+        )
         node_stdouts = self.query_all_node(gpu_query_cmd)
 
         df_list = []
@@ -270,11 +272,15 @@ def update_server_list(server_info_fn):
         # print(item)
         if "Partitions" not in item:
             continue
-        
+
         if item["NodeName"] == "fileserver":
             continue
 
-        item_list += [item]
+        ordered_item = OrderedDict(
+            [("node_idx", item["NodeName"][-2:]), ("partition", item["Partitions"])]
+        )
+
+        item_list += [ordered_item]
 
     df = pd.DataFrame(item_list)
     df.to_csv(server_info_fn, index=False, header=False)
@@ -290,9 +296,7 @@ if __name__ == "__main__":
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)
 
     if args.task == "usage":
-        df = gpu_cluster.find_gpu_usage(
-            username=args.user, cmd_include=args.command_include
-        )
+        df = gpu_cluster.find_gpu_usage(username=args.user, cmd_include=args.command_include)
         print(df.to_markdown(index=False))
     elif args.task == "available":
         df = gpu_cluster.find_gpu_available()
