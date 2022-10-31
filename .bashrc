@@ -137,9 +137,9 @@ knkill() {
 
 # export PS1="[\u@\h \W]\n\$"
 export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\$"
-export WANDB_DIR="/export/home2/kningtg/.wandb"
-export SLURM_TMPDIR="/export/home2/kningtg/.tmp"
-export TMUX_TMPDIR="/export/home2/kningtg/.tmp"
+export WANDB_DIR="$HOME/.wandb"
+export SLURM_TMPDIR="$HOME/.tmp"
+export TMUX_TMPDIR="$HOME/.tmp"
 
 # https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
 gpu() {
@@ -162,14 +162,14 @@ export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home2/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+__conda_setup="$('$HOME/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh"
+    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "$HOME/miniconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/export/home2/kningtg/miniconda3/bin:$PATH"
+        export PATH="$HOME/miniconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup

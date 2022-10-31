@@ -1,4 +1,4 @@
-rm -rf -r ~/.bashrc
+rm -rf ~/.bashrc
 cp .bashrc ~/.bashrc
-rm -rf -r ~/server_utils
+rm -rf ~/server_utils
 cp -r server_utils ~

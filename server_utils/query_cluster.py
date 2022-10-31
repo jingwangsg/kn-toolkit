@@ -160,7 +160,7 @@ def read_args():
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
     args.add_argument("--timeout", default=100, type=int)
-    args.add_argument("--fresh", action="store_true")
+    args.add_argument("--update", action="store_true")
     return args.parse_args()
 
 
@@ -247,7 +247,7 @@ def main():
 
 
 def update_server_list(server_info_fn):
-    df = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
+    item_list = []
 
     out = subprocess.run(
         'scontrol show nodes | grep -E "Partitions|NodeName"',
@@ -268,25 +268,24 @@ def update_server_list(server_info_fn):
             item[k] = v
 
         # print(item)
+        if "Partitions" not in item:
+            continue
+        
         if item["NodeName"] == "fileserver":
             continue
 
-        node_idx = int(item["NodeName"][4:])
+        item_list += [item]
 
-        old_val = df.loc[node_idx - 1, "partition"]
-        new_val = item["Partitions"]
-        df.loc[node_idx - 1, "partition"] = new_val
-
-        if old_val != new_val:
-            print(f"update node#{node_idx:02d} from {old_val} => {new_val}")
-
-        df.to_csv(server_info_fn, index=False, header=False)
+    df = pd.DataFrame(item_list)
+    df.to_csv(server_info_fn, index=False, header=False)
+    print(df)
+    print("==================updated===================")
 
 
 if __name__ == "__main__":
     args = read_args()
-    server_info_fn = "/export/home2/kningtg/server_utils/server_list.csv"
-    if args.fresh:
+    server_info_fn = "~/server_utils/server_list.csv"
+    if args.update:
         update_server_list(server_info_fn)
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)
 

@@ -12,7 +12,7 @@ def read_args():
 if __name__ == "__main__":
     args = read_args()
     server_list = pd.read_csv(
-        "/export/home2/kningtg/server_utils/server_list.csv", header=None
+        "~/server_utils/server_list.csv", header=None
     )
     server_list.set_axis(["no", "partition", "gpu"], axis=1, inplace=True)
 

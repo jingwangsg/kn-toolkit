@@ -8,7 +8,7 @@ def parse_args():
 
 def kill(args):
     lines = subprocess.run(
-        "ps -u kningtg | grep {args.type}", capture_output=True, text=True, shell=True
+        f"ps -u kningtg | grep {args.type}", capture_output=True, text=True, shell=True
     ).stdout.strip()
     print(lines)
     if lines == "":
