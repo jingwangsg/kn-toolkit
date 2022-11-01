@@ -139,7 +139,7 @@ class GPUCluster:
                     "partition": self.server_info[self.server_info["node_idx"] == node_idx][
                         "partition"
                     ].item(),
-                    "gpu.id": f"node{node_idx+1:02d}_#" + split_line[0],
+                    "gpu.id": f"node{node_idx:02d}_#" + split_line[0],
                     "gpu.occupied": split_line[3],
                     "PID": split_line[1],
                     "user": username,
