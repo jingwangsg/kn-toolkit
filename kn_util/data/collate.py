@@ -40,9 +40,11 @@ def general_pad(
     else:
         return ret_mask
 
-def fix_float32():
+def fix_to_float32():
     pass
 
 
 def stack_list_to_tensor():
     pass
+
+def collect_features_from_sample_list():

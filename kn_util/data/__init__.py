@@ -1,6 +1,3 @@
-import importlib
-import os
-from util.general import import_modules
-
-cur_dir = os.path.dirname(__file__)
-import_modules(cur_dir, "util.data")
+from .collate import *
+from .video import *
+from .vocab import *

@@ -139,3 +139,5 @@ class Registry:
     def get_object(cls, name):
         assert name in cls.mapping["object"], f"no {name} found in [object]"
         return cls.mapping["object"][name]
+
+global_registry = Registry()
