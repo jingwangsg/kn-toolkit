@@ -1,4 +1,6 @@
 from .logger import get_logger
+from omegaconf import OmegaConf
+import copy
 
 # class Registry:
 #     def __init__(self):
@@ -26,6 +28,7 @@ class Registry:
     """mini version of https://github.com/facebookresearch/mmf/blob/main/mmf/common/registry.py"""
 
     mapping = dict()
+    mapping["object"] = dict()
 
     @classmethod
     def register_cls(cls, name, domain):
@@ -48,7 +51,15 @@ class Registry:
     def build(cls, _name, _domain, **kwargs):
         assert _name in cls.mapping[_domain], f"no {_name} found in [{_domain}]"
         return cls.mapping[_domain][_name](**kwargs)
-
+    
+    @classmethod
+    def build_from_cfg(cls, _cfg, domain):
+        cfg = copy.deepcopy(_cfg)
+        OmegaConf.resolve(cfg)
+        cfg_dict = OmegaConf.to_container(cfg)
+        type = cfg_dict.pop("type")  # type: ignore
+        return cls.build(type, domain, **cfg_dict)  # type: ignore
+    
     @classmethod
     def register_optimizer(cls, _name):
         return cls.register_cls(_name, "optimizer")
@@ -124,8 +135,6 @@ class Registry:
 
     @classmethod
     def register_object(cls, name, obj):
-        if "object" not in cls.mapping:
-            cls.mapping["object"] = dict()
         if name in cls.mapping["object"]:
             if id(obj) != id(cls.mapping["object"][name]):
                 raise Exception(f"conflict at [object]{name}")
@@ -136,8 +145,8 @@ class Registry:
         cls.mapping["object"][name] = obj
     
     @classmethod
-    def get_object(cls, name):
-        assert name in cls.mapping["object"], f"no {name} found in [object]"
-        return cls.mapping["object"][name]
+    def get_object(cls, name, default_val=None):
+        # assert name in cls.mapping["object"], f"no {name} found in [object]"
+        return cls.mapping["object"].get(name, default_val)
 
 global_registry = Registry()
