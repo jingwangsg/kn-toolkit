@@ -10,10 +10,11 @@ def general_pad(
 ):
     assert axis is not None
     assert fill_value is not None
-    to_length = 0
+    to_length = None
     if to_length is not None:
         to_length = to_length
     else:
+        to_length = 0
         for arr in arr_list:
             to_length = np.maximum(to_length, arr.shape[axis])
 
@@ -34,14 +35,14 @@ def general_pad(
             full_arr = np.zeros(to_shape, dtype=bool)
             full_arr[sub_slices] = True
             flatten_slices = tuple(
-                [slice(0, arr.shape[_]) if _ == axis else 0 for _ in range(shape_dim)]
+                [slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)]
             )
             ret_mask += [full_arr[flatten_slices]]
 
     if return_mask:
         return ret_arr, ret_mask
     else:
-        return ret_mask
+        return ret_arr
 
 
 def fix_tensor_to_float32(feature_dict):

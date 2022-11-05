@@ -38,7 +38,7 @@ class Registry:
                     raise Exception(f"conflict at [{domain}]{name}")
             else:
                 """only log at first import"""
-                log.info(f"[{domain}]{inp_cls.__name__} registered as {name}")
+                log.info(f"[{domain}] {inp_cls.__name__} registered as {name}")
             cls.mapping[domain][name] = inp_cls
             return inp_cls
 
@@ -63,7 +63,7 @@ class Registry:
 
     @classmethod
     def build_scheduler(cls, _name, **kwargs):
-        cls.build(_name, "scheduler", **kwargs)
+        return cls.build(_name, "scheduler", **kwargs)
 
     @classmethod
     def register_model(cls, _name):
@@ -71,7 +71,7 @@ class Registry:
 
     @classmethod
     def build_model(cls, _name, **kwargs):
-        cls.build(_name, "model", **kwargs)
+        return cls.build(_name, "model", **kwargs)
 
     @classmethod
     def register_datamodule(cls, _name):
@@ -79,7 +79,7 @@ class Registry:
 
     @classmethod
     def build_datamodule(cls, _name, **kwargs):
-        cls.build(_name, "datamodule", **kwargs)
+        return cls.build(_name, "datamodule", **kwargs)
 
     @classmethod
     def register_collater(cls, _name):
@@ -87,7 +87,7 @@ class Registry:
 
     @classmethod
     def build_collater(cls, _name, **kwargs):
-        cls.build(_name, "collater", **kwargs)
+        return cls.build(_name, "collater", **kwargs)
 
     @classmethod
     def register_processor(cls, _name):
@@ -95,7 +95,7 @@ class Registry:
 
     @classmethod
     def build_processor(cls, _name, **kwargs):
-        cls.build(_name, "processor", **kwargs)
+        return cls.build(_name, "processor", **kwargs)
 
     @classmethod
     def register_task(cls, _name):
@@ -103,7 +103,7 @@ class Registry:
 
     @classmethod
     def build_task(cls, _name, **kwargs):
-        cls.build(_name, "task", **kwargs)
+        return cls.build(_name, "task", **kwargs)
     
     @classmethod
     def register_metric(cls, _name):
@@ -111,7 +111,7 @@ class Registry:
 
     @classmethod
     def build_metric(cls, _name, **kwargs):
-        cls.build(_name, "metric", **kwargs)
+        return cls.build(_name, "metric", **kwargs)
     """
     @classmethod
     def register_(cls, _name):
@@ -119,16 +119,16 @@ class Registry:
 
     @classmethod
     def build_(cls, _name, **kwargs):
-        cls.build(_name, "", **kwargs)
+        return cls.build(_name, "", **kwargs)
     """
 
     @classmethod
     def register_object(cls, name, obj):
-        if "obj" not in cls.mapping["object"]:
+        if "object" not in cls.mapping:
             cls.mapping["object"] = dict()
         if name in cls.mapping["object"]:
             if id(obj) != id(cls.mapping["object"][name]):
-                raise Exception(f"conflict at [{"object"}]{name}")
+                raise Exception(f"conflict at [object]{name}")
         else:
             """only log at first import"""
             log.info(f"[object] {id(obj)} registered as {name}")
