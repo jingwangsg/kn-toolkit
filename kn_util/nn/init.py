@@ -3,6 +3,9 @@ import torch.nn as nn
 import math
 from functools import partial
 
+def freeze_module(module: nn.Module):
+    for param in module.parameters():
+        param.requires_grad = False
 
 def init_weight(m, method="kaiming"):
     _uniform_dict = {

@@ -5,7 +5,6 @@ from termcolor import colored
 import functools
 import sys
 
-
 @functools.lru_cache()
 def get_logger(name="", dist_rank=0, output_dir=None):
     # create logger

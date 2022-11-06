@@ -51,7 +51,7 @@ class Registry:
     def build(cls, _name, _domain, **kwargs):
         assert _name in cls.mapping[_domain], f"no {_name} found in [{_domain}]"
         return cls.mapping[_domain][_name](**kwargs)
-    
+
     @classmethod
     def build_from_cfg(cls, _cfg, domain):
         cfg = copy.deepcopy(_cfg)
@@ -59,7 +59,7 @@ class Registry:
         cfg_dict = OmegaConf.to_container(cfg)
         type = cfg_dict.pop("type")  # type: ignore
         return cls.build(type, domain, **cfg_dict)  # type: ignore
-    
+
     @classmethod
     def register_optimizer(cls, _name):
         return cls.register_cls(_name, "optimizer")
@@ -115,7 +115,7 @@ class Registry:
     @classmethod
     def build_task(cls, _name, **kwargs):
         return cls.build(_name, "task", **kwargs)
-    
+
     @classmethod
     def register_metric(cls, _name):
         return cls.register_cls(_name, "metric")
@@ -123,6 +123,15 @@ class Registry:
     @classmethod
     def build_metric(cls, _name, **kwargs):
         return cls.build(_name, "metric", **kwargs)
+
+    @classmethod
+    def register_loss(cls, _name):
+        return cls.register_cls(_name, "loss")
+
+    @classmethod
+    def build_loss(cls, _name, **kwargs):
+        return cls.build(_name, "loss", **kwargs)
+
     """
     @classmethod
     def register_(cls, _name):
@@ -141,12 +150,21 @@ class Registry:
         else:
             """only log at first import"""
             log.info(f"[object] {id(obj)} registered as {name}")
-        
+
         cls.mapping["object"][name] = obj
-    
+
+    def set_object(cls, name, obj):
+        cls.mapping["object"][name] = obj
+
     @classmethod
     def get_object(cls, name, default_val=None):
         # assert name in cls.mapping["object"], f"no {name} found in [object]"
         return cls.mapping["object"].get(name, default_val)
+
+    @classmethod
+    def delete_object(cls, name):
+        log.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
+        del cls.mapping["object"][name]
+
 
 global_registry = Registry()
