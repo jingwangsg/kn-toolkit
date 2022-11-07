@@ -1,6 +1,7 @@
 from .logger import get_logger
 from omegaconf import OmegaConf
 import copy
+import hydra
 
 # class Registry:
 #     def __init__(self):
@@ -55,10 +56,16 @@ class Registry:
     @classmethod
     def build_from_cfg(cls, _cfg, domain):
         cfg = copy.deepcopy(_cfg)
-        OmegaConf.resolve(cfg)
-        cfg_dict = OmegaConf.to_container(cfg)
-        type = cfg_dict.pop("type")  # type: ignore
-        return cls.build(type, domain, **cfg_dict)  # type: ignore
+        if hasattr(cfg, "_target_"):
+            return hydra.utils.instantiate(cfg)
+        elif hasattr(cfg, "type"):
+            OmegaConf.resolve(cfg)
+            cfg_dict = OmegaConf.to_container(cfg)
+            type = cfg_dict.pop("type")  # type: ignore
+            return cls.build(type, domain, **cfg_dict)  # type: ignore
+        else:
+            raise Exception(f"instantiation for config below is unimplemented\n{cfg}")
+            
 
     @classmethod
     def register_optimizer(cls, _name):
