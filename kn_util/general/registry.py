@@ -150,12 +150,11 @@ class Registry:
     """
 
     @classmethod
-    def register_object(cls, name, obj):
+    def register_object(cls, name, obj, verbose=False):
         if name in cls.mapping["object"]:
             if id(obj) != id(cls.mapping["object"][name]):
                 raise Exception(f"conflict at [object]{name}")
-        else:
-            """only log at first import"""
+        if verbose:
             log.info(f"[object] {id(obj)} registered as {name}")
 
         cls.mapping["object"][name] = obj
@@ -169,8 +168,9 @@ class Registry:
         return cls.mapping["object"].get(name, default_val)
 
     @classmethod
-    def delete_object(cls, name):
-        log.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
+    def destry_object(cls, name, verbose=False):
+        if verbose:
+            log.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
         del cls.mapping["object"][name]
 
 

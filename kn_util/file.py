@@ -1,11 +1,13 @@
 import json
 
 # import joblib
+import numpy as np
 import dill
 import pickle
 import csv
 import os
 import h5py
+from typing import Sequence, Mapping
 
 
 def get_filename_from_absolute_path(url):
@@ -66,3 +68,14 @@ def load_csv(fn, delimiter=",", has_header=True):
             ret_list += [x]
 
     return ret_list
+
+def save_hdf5(kv, cur_handler):
+    """convenient saving hierarchical data recursively to hdf5"""
+    if isinstance(kv, Sequence):
+        kv = {str(idx): v for idx, v in enumerate(kv)}
+    for k, v in kv.items():
+        if isinstance(v, np.ndarray):
+            cur_handler.create_dataset(k, data=v)
+        elif  isinstance(v, Mapping):
+            next_handler = cur_handler.create_group(k)
+            save_hdf5(v, next_handler)
