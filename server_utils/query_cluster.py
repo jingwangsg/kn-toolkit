@@ -163,7 +163,7 @@ def read_args():
     args.add_argument("-n", "--n_gpu", default=20, type=int)
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
-    args.add_argument("--timeout", default=100, type=int)
+    args.add_argument("--timeout", default=15, type=int)
     args.add_argument("--update", action="store_true")
     return args.parse_args()
 
