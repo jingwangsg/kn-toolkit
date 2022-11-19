@@ -1,41 +1,117 @@
 import numpy as np
 import torch
+import os.path as osp
+import subprocess
+import os
+import glob
+from ..general import map_async
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from kn_util.data.collate import collect_features_from_sample_list, merge_list_to_tensor
+from PIL import Image
+from functools import partial
+from einops import rearrange
+import numpy as np
 
 
-# def visual_feature_sampling(visual_feature, max_num_clips, padding=True):
-#     """
-#     visual_feature: [num_frame, dim]
-#     """
-#     num_clips, dim = visual_feature.shape
-#     if num_clips <= max_num_clips:
-#         if padding and max_num_clips > num_clips:
-#             pad_zeros = np.zeros((max_num_clips - num_clips, dim))
-#             visual_feature = np.concatenate([visual_feature, pad_zeros], axis=0)
-#         return visual_feature
-#     idxs = np.arange(0, max_num_clips + 1, 1.0) / max_num_clips * num_clips
-#     idxs = np.round(idxs).astype(np.int32)
-#     idxs[idxs > num_clips - 1] = num_clips - 1
-#     new_visual_feature = []
-#     for i in range(max_num_clips):
-#         s_idx, e_idx = idxs[i], idxs[i + 1]
-#         if s_idx < e_idx:
-#             new_visual_feature.append(np.mean(visual_feature[s_idx:e_idx], axis=0))
-#         else:
-#             new_visual_feature.append(visual_feature[s_idx])
-#     new_visual_feature = np.asarray(new_visual_feature)
-#     return new_visual_feature
+class HFImageModelWrapper(nn.Module):
+    """enable huggingface image transformer to be used for video inference"""
+
+    def __init__(self, model, extractor, batch_size=16) -> None:
+        super().__init__()
+        self.model = model
+        self.extractor = extractor
+        self.batch_size = batch_size
+
+    def forward(self, raw_data):
+
+        images = [Image.open(path).convert("RGB") for path in raw_data]
+        dataloader = DataLoader(images,
+                                batch_size=self.batch_size,
+                                collate_fn=partial(self.extractor, return_tensors="pt"),
+                                num_workers=8,
+                                prefetch_factor=6,
+                                pin_memory=True)
+        outputs_list = []
+        for inputs in dataloader:
+            inputs = {k: v.cuda(non_blocking=True) for k, v in inputs.items()}
+            outputs = self.model(**inputs)
+            outputs = self.post_forward(outputs)
+            outputs = {k: v.cpu().detach().numpy() for k, v in outputs.items()}
+            outputs_list += [outputs]
+
+        outputs = merge_list_to_tensor(collect_features_from_sample_list(outputs_list), mode="concat")
+        return outputs
+
+    def post_forward(self, outputs):
+        return outputs
 
 
-# def average_to_fixed_length(visual_input, num_sample_clips):
-#     num_clips = visual_input.shape[0]
-#     idxs = torch.arange(0, num_sample_clips + 1, 1.0) / num_sample_clips * num_clips
-#     idxs = torch.min(torch.round(idxs).long(), torch.tensor(num_clips - 1))
-#     new_visual_input = []
-#     for i in range(num_sample_clips):
-#         s_idx, e_idx = idxs[i].item(), idxs[i + 1].item()
-#         if s_idx < e_idx:
-#             new_visual_input.append(torch.mean(visual_input[s_idx:e_idx], dim=0))
-#         else:
-#             new_visual_input.append(visual_input[s_idx])
-#     new_visual_input = torch.stack(new_visual_input, dim=0)
-#     return new_visual_input
+class VisionCLIPWrapper(HFImageModelWrapper):
+
+    def __init__(self, model, extractor, batch_size=16, spatial_reduce=4, temporal_reduce=2, pooling="avg") -> None:
+        super().__init__(model, extractor, batch_size)
+        self.spatial_reduce = spatial_reduce
+        self.temporal_reduce = temporal_reduce
+        self.pooling = pooling
+
+    def post_forward(self, outputs):
+        last_hidden_state = outputs["last_hidden_state"]
+        patch_size = int(np.sqrt(last_hidden_state.shape[1]))
+        last_hidden_state = rearrange(last_hidden_state[:, 1:, :], "t (h w) d -> d t h w", h=patch_size,
+                                      w=patch_size)[None, :]
+        pooling = F.avg_pool3d if self.pooling == "avg" else F.max_pool3d
+        spatial_reduce = self.spatial_reduce
+        temporal_reduce = np.minimum(last_hidden_state.shape[2], self.temporal_reduce)
+        last_hidden_state = pooling(last_hidden_state,
+                                    kernel_size=(temporal_reduce, spatial_reduce, spatial_reduce),
+                                    stride=(temporal_reduce, spatial_reduce, spatial_reduce))
+        last_hidden_state = rearrange(last_hidden_state[0], "d t h w -> t h w d")
+
+        outputs["last_hidden_state"] = last_hidden_state
+        return outputs
+
+
+class FFMPEG:
+
+    @classmethod
+    def single_video_to_image(cls,
+                              video_path,
+                              cur_image_dir,
+                              max_frame=None,
+                              frame_scale=None,
+                              quiet=True,
+                              overwrite=False):
+        if not overwrite and osp.exists(osp.join(cur_image_dir, ".finish")):
+            return
+        os.makedirs(cur_image_dir, exist_ok=True)
+        subprocess.run(f"rm -rf {cur_image_dir}/*", shell=True)
+        flag = ""
+        if quiet:
+            flag += "-hide_banner -loglevel error "
+        if frame_scale:
+            flag += f"-filter:v scale={frame_scale} "
+        if max_frame:
+            flag += f"-frames:v {max_frame} "
+
+        subprocess.run(
+            f"ffmpeg -i {video_path} {flag} {osp.join(cur_image_dir, '%04d.png')}",
+            shell=True,
+        )
+        subprocess.run(f"cd {cur_image_dir} && touch .finish", shell=True)
+
+    @classmethod
+    def multiple_video_to_image_async(cls, video_dir, image_root, **kwargs):
+        video_paths = glob.glob(video_dir + "*")
+
+        def func_single(inputs):
+            return cls.single_video_to_image(**inputs)
+
+        args = []
+        for video_path in video_paths:
+            video_id = osp.basename(video_path)[:-4]
+            cur_image_dir = osp.join(image_root, video_id)
+            args += [dict(video_path=video_path, cur_image_dir=cur_image_dir, **kwargs)]
+
+        map_async(args, func_single, num_process=64)

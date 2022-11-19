@@ -6,7 +6,12 @@ import numpy as np
 
 
 def general_pad(
-    arr_list: List[np.ndarray], fill_value=None, axis=None, to_length=None, return_mask=True
+    arr_list: List[np.ndarray],
+    fill_value=None,
+    axis=None,
+    to_length=None,
+    to_multiple=None,
+    return_mask=True,
 ):
     assert axis is not None
     assert fill_value is not None
@@ -17,6 +22,9 @@ def general_pad(
         to_length = 0
         for arr in arr_list:
             to_length = np.maximum(to_length, arr.shape[axis])
+
+    if to_multiple:
+        to_length = int(np.ceil(to_length / to_multiple)) * to_multiple
 
     to_shape = list(arr_list[0].shape)
     to_shape[axis] = to_length
@@ -34,9 +42,10 @@ def general_pad(
         if return_mask:
             full_arr = np.zeros(to_shape, dtype=bool)
             full_arr[sub_slices] = True
-            flatten_slices = tuple(
-                [slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)]
-            )
+            flatten_slices = tuple([
+                slice(0, to_length) if _ == axis else 0
+                for _ in range(shape_dim)
+            ])
             ret_mask += [full_arr[flatten_slices]]
 
     if return_mask:
@@ -52,7 +61,10 @@ def fix_tensor_to_float32(feature_dict):
     return feature_dict
 
 
-def stack_list_to_tensor(feature_dict, include_keys=None, exclude_keys=None):
+def merge_list_to_tensor(feature_dict,
+                         include_keys=None,
+                         exclude_keys=None,
+                         mode="stack"):
     if include_keys is None:
         include_keys = list(feature_dict.keys())
     if exclude_keys is None:
@@ -61,13 +73,18 @@ def stack_list_to_tensor(feature_dict, include_keys=None, exclude_keys=None):
     for k in include_keys:
         if k in exclude_keys:
             continue
-        feature_dict[k] = torch.from_numpy(np.stack(feature_dict[k]))
+        if mode == "stack":
+            feature_dict[k] = torch.from_numpy(np.stack(feature_dict[k]))
+        else:
+            feature_dict[k] = torch.from_numpy(
+                np.concatenate(feature_dict[k], axis=0))
 
     return feature_dict
 
 
 def collect_features_from_sample_list(sample_list, keys=None):
-    assert keys is not None
+    if keys is None:
+        keys = list(sample_list[0].keys())
     has_single_key = isinstance(keys, str)
     if has_single_key:
         keys = [keys]
@@ -77,6 +94,6 @@ def collect_features_from_sample_list(sample_list, keys=None):
         ret_list += [[s[k] for s in sample_list]]
 
     if has_single_key:
-        return ret_list[0]
+        return {keys: ret_list[0]}
     else:
-        return ret_list
+        return dict(zip(keys, ret_list))

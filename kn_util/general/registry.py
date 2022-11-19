@@ -174,4 +174,5 @@ class Registry:
         del cls.mapping["object"][name]
 
 
-global_registry = Registry()
+registry = Registry()
+global_upload = registry.register_object

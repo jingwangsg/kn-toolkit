@@ -1,5 +1,5 @@
 import numpy as np
-from ..general import global_registry
+from ..general import registry
 
 class Statistics:
     vals = dict()

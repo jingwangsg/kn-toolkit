@@ -1,5 +1,5 @@
 from .import_tool import import_modules
-from .registry import global_registry
+from .registry import registry, global_upload
 from .multiproc import *
 from .logger import *
 # from .lazy import *
