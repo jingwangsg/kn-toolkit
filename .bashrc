@@ -5,7 +5,7 @@
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;
-      *) return;;
+    *) return;;
 esac
 
 
@@ -48,12 +48,12 @@ esac
 
 if [ -n "$force_color_prompt" ]; then
     if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
-	# We have color support; assume it's compliant with Ecma-48
-	# (ISO/IEC-6429). (Lack of such support is extremely rare, and such
-	# a case would tend to support setf rather than setaf.)
-	color_prompt=yes
+        # We have color support; assume it's compliant with Ecma-48
+        # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
+        # a case would tend to support setf rather than setaf.)
+        color_prompt=yes
     else
-	color_prompt=
+        color_prompt=
     fi
 fi
 
@@ -66,10 +66,10 @@ unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
-xterm*|rxvt*)
-    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+    xterm*|rxvt*)
+        PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
     ;;
-*)
+    *)
     ;;
 esac
 
@@ -79,7 +79,7 @@ if [ -x /usr/bin/dircolors ]; then
     alias ls='ls --color=auto'
     #alias dir='dir --color=auto'
     #alias vdir='vdir --color=auto'
-
+    
     alias grep='grep --color=auto'
     alias fgrep='fgrep --color=auto'
     alias egrep='egrep --color=auto'
@@ -110,13 +110,13 @@ fi
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
 if ! shopt -oq posix; then
-  if [ -f /usr/share/bash-completion/bash_completion ]; then
-    . /usr/share/bash-completion/bash_completion
-  elif [ -f /etc/bash_completion ]; then
-    . /etc/bash_completion
-  fi
+    if [ -f /usr/share/bash-completion/bash_completion ]; then
+        . /usr/share/bash-completion/bash_completion
+        elif [ -f /etc/bash_completion ]; then
+        . /etc/bash_completion
+    fi
 fi
-module load slurm 
+module load slurm
 
 alias sv="~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
@@ -134,6 +134,9 @@ knkill() {
     conda activate torch
     python $HOME/server_utils/kill.py $1
 }
+rl() {
+    readlink -f $1
+}
 
 # export PS1="[\u@\h \W]\n\$"
 export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\$"
@@ -141,9 +144,31 @@ export WANDB_DIR="$HOME/.wandb"
 export SLURM_TMPDIR="$HOME/.tmp"
 export TMUX_TMPDIR="$HOME/.tmp"
 
-# https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
 gpu() {
-  export CUDA_VISIBLE_DEVICES="$1"
+    export CUDA_VISIBLE_DEVICES="$1"
+}
+# https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
+cuda () {
+    local devs=$1
+    shift
+    CUDA_VISIBLE_DEVICES="$devs" "$@"
+}
+knrun() {
+    local devices=$1
+    shift
+    local nproc_per_node=$(($(echo $devices | grep -o "," | wc -l) + 1))
+    CUDA_VISIBLE_DEVICES=$devices torchrun --rdzv_backend=c10d --rdzv_endpoint=localhost:0 --nnodes=1 --nproc_per_node=$nproc_per_node $@
+}
+knrun_mn() {
+    local nnodes=$1
+    shift
+    local node_rank=$1
+    shift
+    local ngpu=$1
+    shift
+    local port=$1
+    shift
+    torchrun --rdzv_backend=c10d --rdzv_endpoint=155.69.144.22:$port --nnodes=$nnodes --node_rank=$node_rank $node--nproc_per_node=$ngpu $@
 }
 ca() {
     conda activate "$1"
@@ -153,12 +178,17 @@ am() {
     git push
 }
 
-ROOTDIR=${ZZROOT:-$HOME/app}
-export PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$ROOTDIR/lib/share/pkgconfig:$PATH"
-export LD_LIBRARY_PATH="$ROOTDIR/lib"
-export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
-export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
-# export LIBRARY_PATH="$CUDA_HOME/lib64:$LIBRARY_PATH"
+ROOTDIR=$HOME/app
+export LD_LIBRARY_PATH="$ROOTDIR/lib:$ROOTDIR/lib64"
+export CUDA_TOOLKIT_ROOT="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
+export CUDA_HOME="/cm/local/apps/cuda/libs/current/"
+PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$ROOTDIR/lib/share/pkgconfig:$ROOTDIR/lib64/:$PATH"
+PATH="$CUDA_TOOLKIT_ROOT/:$CUDA_HOME:$PATH"
+export PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
+LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+LD_LIBRARY_PATH="$CUDA_HOME/lib:$LD_LIBRARY_PATH"
+# LIBRARY_PATH="$CUDA_HOME/lib:$LIBRARY_PATH"
+export LD_LIBRARY_PATH="$CUDA_TOOLKIT_ROOT/lib64:$LD_LIBRARY_PATH"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
