@@ -18,12 +18,14 @@ import numpy as np
 class HFImageModelWrapper(nn.Module):
     """enable huggingface image transformer to be used for video inference"""
 
-    def __init__(self, model, extractor, batch_size=16) -> None:
+    def __init__(self, model, extractor, batch_size=16, use_cuda=True) -> None:
         super().__init__()
         self.model = model
         self.extractor = extractor
         self.batch_size = batch_size
+        self.use_cuda = use_cuda
 
+    @torch.no_grad()
     def forward(self, raw_data):
 
         images = [Image.open(path).convert("RGB") for path in raw_data]
@@ -35,7 +37,8 @@ class HFImageModelWrapper(nn.Module):
                                 pin_memory=True)
         outputs_list = []
         for inputs in dataloader:
-            inputs = {k: v.cuda(non_blocking=True) for k, v in inputs.items()}
+            if self.use_cuda:
+                inputs = {k: v.cuda(non_blocking=True) for k, v in inputs.items()}
             outputs = self.model(**inputs)
             outputs = self.post_forward(outputs)
             outputs = {k: v.cpu().detach().numpy() for k, v in outputs.items()}
@@ -50,8 +53,15 @@ class HFImageModelWrapper(nn.Module):
 
 class VisionCLIPWrapper(HFImageModelWrapper):
 
-    def __init__(self, model, extractor, batch_size=16, spatial_reduce=4, temporal_reduce=2, pooling="avg") -> None:
-        super().__init__(model, extractor, batch_size)
+    def __init__(self,
+                 model,
+                 extractor,
+                 batch_size=16,
+                 spatial_reduce=4,
+                 temporal_reduce=2,
+                 pooling="avg",
+                 use_cuda=True) -> None:
+        super().__init__(model, extractor, batch_size, use_cuda)
         self.spatial_reduce = spatial_reduce
         self.temporal_reduce = temporal_reduce
         self.pooling = pooling

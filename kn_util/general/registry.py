@@ -65,7 +65,6 @@ class Registry:
             return cls.build(type, domain, **cfg_dict)  # type: ignore
         else:
             raise Exception(f"instantiation for config below is unimplemented\n{cfg}")
-            
 
     @classmethod
     def register_optimizer(cls, _name):
@@ -138,6 +137,14 @@ class Registry:
     @classmethod
     def build_loss(cls, _name, **kwargs):
         return cls.build(_name, "loss", **kwargs)
+
+    @classmethod
+    def register_pipeline(cls, _name):
+        return cls.register_cls(_name, "pipeline")
+
+    @classmethod
+    def build_pipeline(cls, _name, **kwargs):
+        return cls.build(_name, "pipeline", **kwargs)
 
     """
     @classmethod

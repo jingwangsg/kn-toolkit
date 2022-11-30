@@ -11,10 +11,8 @@ import subprocess
 from typing import Sequence, Mapping
 import os.path as osp
 import glob
-
-
-def get_filename_from_absolute_path(url):
-    return url.split("/")[-1]
+from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 
 def load_json(fn):
@@ -147,8 +145,12 @@ class LargeHDF5Cache:
     def final_save(self):
         tmp_files = glob.glob(osp.join(self.tmp_dir, "*.hdf5"))
         result_handle = h5py.File(self.hdf5_path, "a")
-        for tmp_file in tmp_files:
-            ret_dict = load_hdf5(tmp_file)
+        loader = DataLoader(tmp_files,
+                            batch_size=1,
+                            collate_fn=lambda x: load_hdf5(x[0]),
+                            num_workers=8,
+                            prefetch_factor=6)
+        for ret_dict in tqdm(loader, desc=f"merging to {self.hdf5_path}"):
             save_hdf5(ret_dict, result_handle)
         result_handle.close()
         subprocess.run(f"rm -rf {self.tmp_dir}", shell=True)
