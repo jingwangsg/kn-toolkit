@@ -13,6 +13,7 @@ import os.path as osp
 import glob
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+import warnings
 
 
 def load_json(fn):
@@ -86,11 +87,14 @@ def save_hdf5_recursive(kv, cur_handler, **kwargs):
     if isinstance(kv, Sequence):
         kv = {str(idx): v for idx, v in enumerate(kv)}
     for k, v in kv.items():
-        if isinstance(v, np.ndarray):
-            cur_handler.create_dataset(k, data=v, **kwargs)
-        elif isinstance(v, Mapping):
-            next_handler = cur_handler.create_group(k)
-            save_hdf5_recursive(v, next_handler)
+        if k in cur_handler:
+            warnings.warn(f"{k} already exists in {cur_handler}")
+        else:
+            if isinstance(v, np.ndarray):
+                cur_handler.create_dataset(k, data=v, **kwargs)
+            elif isinstance(v, Mapping):
+                next_handler = cur_handler.create_group(k)
+                save_hdf5_recursive(v, next_handler)
 
 
 def load_hdf5(fn):

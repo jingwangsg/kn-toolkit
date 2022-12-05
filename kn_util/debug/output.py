@@ -3,7 +3,29 @@ import torch
 import copy
 import numpy as np
 from .misc import minitensor
+import json
 
+def recursive_lambda(x, _lambda):
+    if isinstance(x, Sequence):
+        ret_list = []
+        for v in x:
+            ret_list += [recursive_lambda(v, _lambda)]
+        return ret_list
+    elif isinstance(x, Mapping):
+        ret_dict = dict()
+        for k, v in x.items():
+            ret_dict[k] = recursive_lambda(v, _lambda)
+        return ret_dict
+    else:
+        return _lambda(x)
+
+def list_gradient_norm(mod):
+    param_dict = dict(mod.named_parameters())
+    def get_gradient_norm(param):
+        return param.grad.norm()
+    grad_norm_dict = recursive_lambda(param_dict, _lambda=get_gradient_norm)
+    print(json.dumps(grad_norm_dict, indent=4, sort_keys=True))
+    
 
 def explore_content(x,
                     name="default",
@@ -21,7 +43,7 @@ def explore_content(x,
                     v, name=str(idx), depth=depth + 1,
                     max_depth=max_depth)  # type: ignore
                 if idx > 10:
-                    ret_str += "\t" * (depth + 1) + "..."
+                    ret_str += "\t" * (depth + 1) + "...\n"
                     break
 
     elif isinstance(x, Mapping):
