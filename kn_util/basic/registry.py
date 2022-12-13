@@ -91,12 +91,12 @@ class Registry:
         return cls.build(_name, "model", **kwargs)
 
     @classmethod
-    def register_datamodule(cls, _name):
-        return cls.register_cls(_name, "datamodule")
+    def register_datapipe(cls, _name):
+        return cls.register_cls(_name, "datapipe")
 
     @classmethod
-    def build_datamodule(cls, _name, **kwargs):
-        return cls.build(_name, "datamodule", **kwargs)
+    def build_datapipe(cls, _name, **kwargs):
+        return cls.build(_name, "datapipe", **kwargs)
 
     @classmethod
     def register_collater(cls, _name):
@@ -180,6 +180,7 @@ class Registry:
             log.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
         del cls.mapping["object"][name]
 
-
 registry = Registry()
 global_upload = registry.register_object
+global_get = registry.get_object
+global_set = registry.set_object

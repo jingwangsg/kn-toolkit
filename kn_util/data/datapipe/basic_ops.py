@@ -36,6 +36,8 @@ class Rename(IterDataPipe):
         """
         for x in self.src_pipeline:
             ret_dict = copy.copy(x)
+            for k in self.from_keys:
+                ret_dict.pop(k)
             for k, to_k in zip(self.from_keys, self.to_keys):
                 ret_dict[to_k] = x[k]
             yield ret_dict

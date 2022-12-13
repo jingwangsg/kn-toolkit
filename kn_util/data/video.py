@@ -4,7 +4,7 @@ import os.path as osp
 import subprocess
 import os
 import glob
-from ..general import map_async
+from ..basic import map_async
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -86,30 +86,65 @@ class VisionCLIPWrapper(HFImageModelWrapper):
 class FFMPEG:
 
     @classmethod
+    def single_video_process(cls, video_path, output_video_path, frame_scale=None, fps=None, quiet=True):
+        flags = ""
+        if quiet:
+            flags += " -hide_banner -loglevel error"
+
+        vf_flags = []
+        if frame_scale:
+            vf_flags += [f"scale={frame_scale}"]
+        if fps:
+            vf_flags += [f"fps=fps={fps}"]
+
+        if len(vf_flags) > 0:
+            flags += " -vf " + ",".join(vf_flags)
+
+        cmd = f"ffmpeg -i {video_path} {flags} {output_video_path}"
+        if not quiet:
+            print(cmd)
+
+        subprocess.run(cmd, shell=True)
+
+    @classmethod
     def single_video_to_image(cls,
                               video_path,
                               cur_image_dir,
                               max_frame=None,
                               frame_scale=None,
+                              fps=None,
                               quiet=True,
                               overwrite=False):
-        if not overwrite and osp.exists(osp.join(cur_image_dir, ".finish")):
-            return
+        # if not overwrite and osp.exists(osp.join(cur_image_dir, ".finish")):
+        #     return
         os.makedirs(cur_image_dir, exist_ok=True)
         subprocess.run(f"rm -rf {cur_image_dir}/*", shell=True)
         flag = ""
         if quiet:
             flag += "-hide_banner -loglevel error "
+        # filter:v
+        filter_v = []
         if frame_scale:
-            flag += f"-filter:v scale={frame_scale} "
+            if isinstance(frame_scale, int):
+                frame_scale = f"{frame_scale}:{frame_scale}"
+            assert isinstance(frame_scale, str)
+            filter_v += [f"scale={frame_scale}"]
+        if fps:
+            filter_v += [f"fps=fps={fps}"]
+        if len(filter_v) > 0:
+            flag += f" -filter:v {','.join(filter_v)}"
         if max_frame:
             flag += f"-frames:v {max_frame} "
 
+        cmd = f"ffmpeg -i {video_path} {flag} {osp.join(cur_image_dir, '%04d.png')}"
+        if not quiet:
+            print(cmd)
+
         subprocess.run(
-            f"ffmpeg -i {video_path} {flag} {osp.join(cur_image_dir, '%04d.png')}",
+            cmd,
             shell=True,
         )
-        subprocess.run(f"cd {cur_image_dir} && touch .finish", shell=True)
+        # subprocess.run(f"cd {cur_image_dir} && touch .finish", shell=True)
 
     @classmethod
     def multiple_video_to_image_async(cls, video_dir, image_root, **kwargs):
@@ -125,3 +160,20 @@ class FFMPEG:
             args += [dict(video_path=video_path, cur_image_dir=cur_image_dir, **kwargs)]
 
         map_async(args, func_single, num_process=64)
+
+
+class YTDLP:
+
+    @classmethod
+    def download(cls, youtube_id, video_path, video_format="mp4", quality="worst", scale=None, quiet=True):
+        # scale should be conditon like "<=224" or ">=224"
+        filter = ""
+        flags = []
+        if scale:
+            filter += f"[height{scale}]"
+        if quiet:
+            flags.append("-q")
+        cmd = f"yt-dlp {youtube_id} -f '{quality}[ext={video_format}]{filter}' {' '.join(flags)} -o {video_path}"
+        if not quiet:
+            print(cmd)
+        subprocess.run(cmd, shell=True)

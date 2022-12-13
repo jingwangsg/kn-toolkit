@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Dict
 import numpy as np
+from .seq import slice_by_axis
+import copy
 
 
 def general_pad(
@@ -15,10 +17,7 @@ def general_pad(
 ):
     assert axis is not None
     assert fill_value is not None
-    to_length = None
-    if to_length is not None:
-        to_length = to_length
-    else:
+    if to_length is None:
         to_length = 0
         for arr in arr_list:
             to_length = np.maximum(to_length, arr.shape[axis])
@@ -33,19 +32,20 @@ def general_pad(
     ret_mask = []
 
     shape_dim = len(arr_list[0].shape)
-
     for arr in arr_list:
-        full_arr = np.full(to_shape, fill_value=fill_value, dtype=arr[0].dtype)
+        if fill_value == "last":
+            cur_fill_value = slice_by_axis(arr, _slice=slice(-1, None), axis=axis)
+            tile_args = tuple([1 if _ != axis else to_length for _ in range(shape_dim)])
+            full_arr = np.tile(cur_fill_value, tile_args)
+        else:
+            full_arr = np.full(to_shape, fill_value=fill_value, dtype=arr[0].dtype)
         sub_slices = tuple([slice(0, arr.shape[_]) for _ in range(shape_dim)])
         full_arr[sub_slices] = arr
         ret_arr += [full_arr]
         if return_mask:
             full_arr = np.zeros(to_shape, dtype=bool)
             full_arr[sub_slices] = True
-            flatten_slices = tuple([
-                slice(0, to_length) if _ == axis else 0
-                for _ in range(shape_dim)
-            ])
+            flatten_slices = tuple([slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)])
             ret_mask += [full_arr[flatten_slices]]
 
     if return_mask:
@@ -61,10 +61,7 @@ def fix_tensor_to_float32(feature_dict):
     return feature_dict
 
 
-def merge_list_to_tensor(feature_dict,
-                         include_keys=None,
-                         exclude_keys=None,
-                         mode="stack"):
+def merge_list_to_tensor(feature_dict, include_keys=None, exclude_keys=None, mode="stack"):
     if include_keys is None:
         include_keys = list(feature_dict.keys())
     if exclude_keys is None:
@@ -76,8 +73,7 @@ def merge_list_to_tensor(feature_dict,
         if mode == "stack":
             feature_dict[k] = torch.from_numpy(np.stack(feature_dict[k]))
         else:
-            feature_dict[k] = torch.from_numpy(
-                np.concatenate(feature_dict[k], axis=0))
+            feature_dict[k] = torch.from_numpy(np.concatenate(feature_dict[k], axis=0))
 
     return feature_dict
 

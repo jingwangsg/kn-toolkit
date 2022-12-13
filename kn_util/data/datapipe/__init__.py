@@ -6,3 +6,4 @@ from .parse import *
 from .filter import *
 from .seq import *
 from .utils import *
+from .video import *

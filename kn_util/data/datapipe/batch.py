@@ -2,7 +2,6 @@ from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 from kn_util.data import general_pad
 
-
 @functional_datapipe("pad_sequence")
 class SequencePadder(IterDataPipe):
 

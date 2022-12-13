@@ -5,7 +5,7 @@ import json
 import yaml
 
 
-def yapf_pprint(obj):
+def yapf_pformat(obj):
     """pretty print object using yapf
     https://stackoverflow.com/questions/3229419/how-to-pretty-print-nested-dictionaries
 
@@ -16,14 +16,13 @@ def yapf_pprint(obj):
     string = pformat(obj)
     format_code, _ = FormatCode(string)
 
-    print(format_code)
+    return format_code
 
-
-def black_pprint(obj):
+def black_pformat(obj):
     string = pformat(obj)
     format_code = black.format_str(string, mode=black.FileMode(line_length=119))
 
-    print(format_code)
+    return format_code
 
 
 def json2yaml(json_str, is_file=False):

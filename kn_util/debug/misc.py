@@ -1,4 +1,4 @@
-from ..general import registry
+from ..basic import registry
 
 class SignalContext:
     # https://book.pythontips.com/en/latest/context_managers.html

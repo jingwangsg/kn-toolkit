@@ -1,4 +1,4 @@
-from kn_util.general import registry
+from kn_util.basic import global_set
 from kn_util.data import delete_noisy_char
 from torchtext.data.utils import get_tokenizer
 import torchtext
@@ -74,7 +74,7 @@ class GloveTokenizer(IterDataPipe):
         print(f"glove vocab built with {len(itos)} words")
 
         if self.upload_vocab_key:
-            registry.register_object(self.upload_vocab_key, (itos, vectors))
+            global_set(self.upload_vocab_key, (itos, vectors))
 
         del pretrained_vocab
     

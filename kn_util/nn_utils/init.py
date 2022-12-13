@@ -3,9 +3,11 @@ import torch.nn as nn
 import math
 from functools import partial
 
+
 def freeze_module(module: nn.Module):
     for param in module.parameters():
         param.requires_grad = False
+
 
 def init_weight(m, method="kaiming"):
     _uniform_dict = {
@@ -27,3 +29,17 @@ def init_weight(m, method="kaiming"):
     elif isinstance(m, nn.BatchNorm2d):
         nn.init.constant_(m.weight, 1)
         nn.init.constant_(m.bias, 0)
+
+
+def init_module(module, init_cfg=None):
+    cfg = dict(initializer_range=0.02)
+    if init_cfg:
+        cfg.update(init_cfg)
+
+    if isinstance(module, (nn.Linear, nn.Embedding)):
+        module.weight.data.normal_(mean=0.0, std=cfg["initializer_range"])
+    elif isinstance(module, nn.LayerNorm):
+        module.bias.data.zero_()
+        module.weight.data.fill_(1.0)
+    if isinstance(module, nn.Linear) and module.bias is not None:
+        module.bias.data.zero_()
