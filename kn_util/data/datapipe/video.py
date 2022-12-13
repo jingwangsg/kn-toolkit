@@ -1,5 +1,4 @@
-from ..video import YTDLP
-from ..video import FFMPEG
+from ..video import FFMPEG, YTDLP
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 import os
@@ -28,7 +27,7 @@ class YoutubeDownloader(IterDataPipe):
             youtube_id = x if not self.from_key else x[self.from_key]
             video_path_raw = osp.join(self.cache_dir, f"{youtube_id}.raw.mp4")
 
-            success = YTDLP.download(youtube_id, video_path_raw, "mp4", **self.download_args)
+            success = YTDLP.download(youtube_id, video_path_raw, **self.download_args)
             if success:
                 x[self.from_key + ".vid_path"] = video_path_raw
                 yield x

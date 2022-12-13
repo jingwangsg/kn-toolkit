@@ -28,7 +28,7 @@ def pad_to_multiple_of(datapipe, divisor):
     return datapipe
 
 
-def prepare_for_dataloader(datapipe, shuffle=True):
+def prepare_for_dataloader(datapipe, shuffle=False):
     # if dist.is_initialized() and dist.is_available():
     #     world_size = int(os.environ["WORLD_SIZE"])
     # else:

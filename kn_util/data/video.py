@@ -13,6 +13,7 @@ from PIL import Image
 from functools import partial
 from einops import rearrange
 import numpy as np
+import yt_dlp
 
 
 class HFImageModelWrapper(nn.Module):
@@ -165,20 +166,18 @@ class FFMPEG:
 class YTDLP:
 
     @classmethod
-    def download(cls, youtube_id, video_path, video_format="mp4", quality="worst", scale=None, quiet=True):
+    def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # scale should be conditon like "<=224" or ">=224"
-        filter = ""
-        flags = []
-        if scale:
-            filter += f"[height{scale}]"
-        if quiet:
-            flags.append("-q")
-        cmd = f"yt-dlp {youtube_id} -f '{quality}[ext={video_format}]{filter}' {' '.join(flags)} -o {video_path}"
-        out = subprocess.run(cmd, shell=True, capture_output=True)
-        if not quiet:
-            print(cmd)
-            print(out.stdout)
-            print(out.stderr)
+        ydl_opts = {
+            'ignoreerrors': True,
+            'format': video_format,
+            'outtmpl': video_path,
+            'quiet': quiet,
+            'noprogress': quiet
+        }
 
-        success = not out.stderr
-        return success
+        url = f"https://www.youtube.com/watch?v={youtube_id}"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            error_code = ydl.download(url)
+        
+        return error_code == 0
