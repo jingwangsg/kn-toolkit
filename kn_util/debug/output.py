@@ -32,15 +32,20 @@ def list_gradient_norm(mod):
     print(json.dumps(grad_norm_dict, indent=4, sort_keys=True))
 
 
-def explore_content(x, name="default", depth=0, max_depth=2, output_mini_tensor=False, print_str=True):
+def explore_content(x, name="default", depth=0, max_depth=2, str_len_limit=20, list_limit=10, print_str=True):
     ret_str = ""
+    if isinstance(x, str):
+        if len(x) < str_len_limit:
+            ret_str += "\t" * depth + f"{name}\t({type(x).__name__}\t{x})\n"
+        else:
+            ret_str += "\t" * depth + f"{name}\t({type(x).__name__}\t{len(x)} elements)\n"
 
-    if isinstance(x, Sequence):
+    elif isinstance(x, Sequence):
         ret_str += "\t" * depth + f"{name}\t({type(x).__name__}\t{len(x)} elements)\n"
         if not isinstance(x, str):
             for idx, v in enumerate(x):
                 ret_str += explore_content(v, name=str(idx), depth=depth + 1, max_depth=max_depth)  # type: ignore
-                if idx > 10:
+                if idx > list_limit:
                     ret_str += "\t" * (depth + 1) + "...\n"
                     break
 
@@ -51,8 +56,6 @@ def explore_content(x, name="default", depth=0, max_depth=2, output_mini_tensor=
 
     elif isinstance(x, np.ndarray) or isinstance(x, torch.Tensor):
         ret_str += "\t" * depth + f"{name}\t({type(x).__name__}[{x.dtype}]\t{tuple(x.shape)})" + "\n"
-        if output_mini_tensor:
-            ret_str += "\t" * (depth + 1) + str(minitensor(x)) + "\n"
     else:
         ret_str += "\t" * depth + f"{name}\t({type(x).__name__})\n"
         if hasattr(x, "__dict__") and depth < max_depth:  # in case it's not a class

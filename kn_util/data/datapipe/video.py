@@ -66,7 +66,7 @@ class DecordFrameLoader(IterDataPipe):
 
     def __init__(self,
                  src_pipeline,
-                 stride=3,
+                 stride=1,
                  from_key=None,
                  width=224,
                  height=224,
