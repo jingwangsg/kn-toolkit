@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 import subprocess
 from decord import VideoReader
+import warnings
 
 
 @functional_datapipe("download_youtube")
@@ -26,12 +27,16 @@ class YoutubeDownloader(IterDataPipe):
         for x in self.src_pipeline:
             youtube_id = x if not self.from_key else x[self.from_key]
             video_path_raw = osp.join(self.cache_dir, f"{youtube_id}.raw.mp4")
-            YTDLP.download(youtube_id, video_path_raw, "mp4", **self.download_args)
 
-            x[self.from_key + ".vid_path"] = video_path_raw
-            yield x
+            try:
+                YTDLP.download(youtube_id, video_path_raw, "mp4", **self.download_args)
+                x[self.from_key + ".vid_path"] = video_path_raw
+                yield x
+            except:
+                warnings.warn(f"{youtube_id} CANNOT DOWNLOADED on YouTube")
+
             if self.remove_cache:
-                subprocess.run(f"rm -rf {video_path_raw}", shell=True)
+                subprocess.Popen(f"rm -rf {video_path_raw}", shell=True)
 
 
 @functional_datapipe("ffmpeg_to_video")
@@ -55,7 +60,7 @@ class FFMPEGToVideo(IterDataPipe):
             yield x
 
             if self.remove_cache:
-                subprocess.run(f"rm -rf {video_path}", shell=True)
+                subprocess.Popen(f"rm -rf {video_path}", shell=True)
 
 
 @functional_datapipe("load_frames_decord")
@@ -129,4 +134,4 @@ class FFMPEGFrameLoader(IterDataPipe):
             yield x
 
             if self.remove_cache:
-                subprocess.run(f"rm -rf {image_dir}", shell=True)
+                subprocess.Popen(f"rm -rf {image_dir}", shell=True)
