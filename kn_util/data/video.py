@@ -174,6 +174,11 @@ class YTDLP:
         if quiet:
             flags.append("-q")
         cmd = f"yt-dlp {youtube_id} -f '{quality}[ext={video_format}]{filter}' {' '.join(flags)} -o {video_path}"
+        out = subprocess.run(cmd, shell=True, capture_output=True)
         if not quiet:
             print(cmd)
-        subprocess.run(cmd, shell=True)
+            print(out.stdout)
+            print(out.stderr)
+
+        success = not out.stderr
+        return success

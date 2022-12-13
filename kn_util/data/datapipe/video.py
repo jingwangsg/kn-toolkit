@@ -28,12 +28,10 @@ class YoutubeDownloader(IterDataPipe):
             youtube_id = x if not self.from_key else x[self.from_key]
             video_path_raw = osp.join(self.cache_dir, f"{youtube_id}.raw.mp4")
 
-            try:
-                YTDLP.download(youtube_id, video_path_raw, "mp4", **self.download_args)
+            success = YTDLP.download(youtube_id, video_path_raw, "mp4", **self.download_args)
+            if success:
                 x[self.from_key + ".vid_path"] = video_path_raw
                 yield x
-            except:
-                warnings.warn(f"{youtube_id} CANNOT DOWNLOADED on YouTube")
 
             if self.remove_cache:
                 subprocess.Popen(f"rm -rf {video_path_raw}", shell=True)
