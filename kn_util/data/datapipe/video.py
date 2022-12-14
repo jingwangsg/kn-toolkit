@@ -1,4 +1,4 @@
-from ..video import FFMPEG, YTDLP
+from ..video import FFMPEG, YTDLPDownloader, PyTubeDownloader
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 import os
@@ -14,26 +14,56 @@ import warnings
 @functional_datapipe("download_youtube")
 class YoutubeDownloader(IterDataPipe):
 
-    def __init__(self, src_pipeline, cache_dir, from_key=None, remove_cache=True, **download_args) -> None:
+    def __init__(self,
+                 src_pipeline,
+                 cache_dir=None,
+                 from_key=None,
+                 to_file=False,
+                 to_buffer=False,
+                 quiet=True,
+                 **downloader_args) -> None:
+        # use pytube by default, ytdlp deprecated
+        # load: return byteio
+        # dump: return filepath
+        assert to_file or to_buffer
+        assert not to_file or cache_dir
         self.src_pipeline = src_pipeline
-        self.remove_cache = remove_cache
+        self.to_file = to_file
+        self.to_buffer = to_buffer
         self.cache_dir = cache_dir
         self.from_key = from_key
-        self.download_args = download_args
-        os.makedirs(cache_dir, exist_ok=True)
+        self.downloader_args = downloader_args
+        # self.downloader = downloader
+        if cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
 
     def __iter__(self):
         for x in self.src_pipeline:
             youtube_id = x if not self.from_key else x[self.from_key]
-            video_path_raw = osp.join(self.cache_dir, f"{youtube_id}.raw.mp4")
+            if self.to_buffer and not self.to_file:
+                buffer, success = YTDLPDownloader.load_to_buffer(youtube_id, **self.downloader_args)
+                if not success:
+                    continue
+                x.update({self.from_key + ".buffer": buffer})
+                yield x
+                buffer.close()
+            else:
+                ret_dict = dict()
+                video_fn = osp.join(self.cache_dir, f"{youtube_id}.raw.mp4")
+                # PyTubeDownloader.download(vid=youtube_id, fn=video_fn, **self.downloader_args)
+                success = YTDLPDownloader.download(youtube_id=youtube_id, video_path=video_fn, quiet=True)
+                if not success:
+                    continue
+                if self.to_file:
+                    ret_dict[self.from_key + ".path"] = video_fn
+                if self.to_buffer:
+                    ret_dict[self.from_key + ".buffer"] = open(video_fn, "rb")
 
-            success = YTDLP.download(youtube_id, video_path_raw, **self.download_args)
-            if success:
-                x[self.from_key + ".vid_path"] = video_path_raw
+                x.update(ret_dict)
                 yield x
 
-            if self.remove_cache:
-                subprocess.Popen(f"rm -rf {video_path_raw}", shell=True)
+                if self.to_buffer:
+                    ret_dict[self.from_key + ".buffer"].close()
 
 
 @functional_datapipe("ffmpeg_to_video")
@@ -82,9 +112,10 @@ class DecordFrameLoader(IterDataPipe):
 
     def __iter__(self):
         for x in self.src_pipeline:
-            video_path_raw = x[self.from_key]
-            with open(video_path_raw, "rb") as f:
-                vr = VideoReader(f, width=self.width, height=self.height)
+            # video_path_raw = x[self.from_key]
+            # with open(video_path_raw, "rb") as f:
+            buffer = x[self.from_key]
+            vr = VideoReader(buffer, width=self.width, height=self.height)
 
             indices = list(range(0, len(vr), self.stride))
             arr = vr.get_batch(indices).asnumpy()

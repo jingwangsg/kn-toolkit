@@ -32,7 +32,7 @@ def list_gradient_norm(mod):
     print(json.dumps(grad_norm_dict, indent=4, sort_keys=True))
 
 
-def explore_content(x, name="default", depth=0, max_depth=2, str_len_limit=20, list_limit=10, print_str=True):
+def explore_content(x, name="default", depth=0, max_depth=3, str_len_limit=20, list_limit=10, print_str=True):
     ret_str = ""
     if isinstance(x, str):
         if len(x) < str_len_limit:

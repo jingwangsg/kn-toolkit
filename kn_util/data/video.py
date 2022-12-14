@@ -14,6 +14,13 @@ from functools import partial
 from einops import rearrange
 import numpy as np
 import yt_dlp
+from pytube import YouTube
+import pytube
+from functools import partial
+import io
+import warnings
+from contextlib import redirect_stdout
+from pathlib import Path
 
 
 class HFImageModelWrapper(nn.Module):
@@ -163,7 +170,7 @@ class FFMPEG:
         map_async(args, func_single, num_process=64)
 
 
-class YTDLP:
+class YTDLPDownloader:
 
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
@@ -179,5 +186,106 @@ class YTDLP:
         url = f"https://www.youtube.com/watch?v={youtube_id}"
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download(url)
-        
+
         return error_code == 0
+    
+    @classmethod
+    def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
+        # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+        ydl_opts = {
+            'ignoreerrors': True,
+            'format': video_format,
+            'outtmpl': "-",
+            'logtostderr': True,
+            'quiet': quiet,
+            'noprogress': quiet
+        }
+
+        buffer = io.BytesIO()
+        with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            error_code = ydl.download([youtube_id])
+        
+        buffer.seek(0)
+
+        # write out the buffer for demonstration purposes
+        # Path(f"{youtube_id}.mp4").write_bytes(buffer.getvalue())
+        return buffer, error_code == 0
+
+
+def evaluate_condition(a, con):
+    if con[0] not in (">", "<"):
+        return a == con
+    else:
+        return eval(delete_character(a + con))
+
+
+def delete_character(s):
+    op = lambda c: c in ("<", "=", ">") or str.isdigit(c)
+    s = "".join(filter(op, s))
+    return s
+
+
+def custom_filter(stream, **kwargs):
+    for k, condition in kwargs.items():
+        attr_val = getattr(stream, k, None)
+        if attr_val is None:
+            return False
+        if not evaluate_condition(attr_val, condition):
+            return False
+
+    return True
+
+
+def get_url(vid):
+    if vid.startswith("http"):
+        url = vid
+    else:
+        url = f"https://www.youtube.com/watch?v={vid}"
+
+    return url
+
+
+class PyTubeDownloader:
+    # deprecated because of content-length key error
+    @classmethod
+    def get_stream(cls, url, mode="worst", **kwargs):
+        yt = YouTube(url)
+        import ipdb; ipdb.set_trace() #FIXME
+        custom_filter_partial = partial(custom_filter, **kwargs)
+        streams = yt.streams.filter(custom_filter_functions=[custom_filter_partial])
+        if len(streams) == 0:
+            warnings.warn(f"no {url} found under condition {kwargs}")
+            return None
+
+        streams = streams.order_by("resolution")
+        if mode == "best":
+            stream = streams.last()
+        else:
+            stream = streams.first()
+
+        return stream
+
+    @classmethod
+    def download(cls, vid, fn, mode="worst", **kwargs):
+        assert mode in ("worst", "best")
+        url = get_url(vid)
+        stream = cls.get_stream(url, mode=mode, **kwargs)
+        if stream is None:
+            return
+        stream = stream.download(filename=fn)
+
+    @classmethod
+    def load_to_buffer(cls, vid, mode="worst", **kwargs):
+        assert mode in ("worst", "best")
+        buffer = io.BytesIO()
+        url = get_url(vid)
+        stream = cls.get_stream(url, mode=mode, **kwargs)
+        print(stream)
+        if stream is None:
+            return None
+
+        stream.stream_to_buffer(buffer)
+        # https://stackoverflow.com/questions/71820529/how-do-i-combine-pytube-audio-and-video-streams-in-a-flask-app-and-let-the-user
+        buffer.seek(0)
+
+        return buffer
