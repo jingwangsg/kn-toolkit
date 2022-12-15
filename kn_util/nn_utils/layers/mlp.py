@@ -16,13 +16,11 @@ class MLP(nn.Module):
         super().__init__()
         assert num_layers > 1, "this class is intended for multiple linear layers"
         dims = [input_size] + [hidden_size] * (num_layers - 1) + [output_size]
-        self.layers = nn.ModuleList(
-            [nn.Linear(dims[i], dims[i + 1]) for i in range(num_layers)])
+        self.layers = nn.ModuleList([nn.Linear(dims[i], dims[i + 1]) for i in range(num_layers)])
         self.activation = activation
         self.do = nn.Dropout(dropout)
         if has_ln:
-            self.lns = nn.ModuleList(
-                [nn.LayerNorm(dims[i]) for i in range(num_layers)])
+            self.lns = nn.ModuleList([nn.LayerNorm(dims[i]) for i in range(num_layers)])
 
     def forward(self, x):
         for idx, layer in enumerate(self.layers):

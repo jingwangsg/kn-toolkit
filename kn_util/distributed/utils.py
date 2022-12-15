@@ -25,6 +25,10 @@ def rank_zero_only(fn: Callable) -> Callable:
     return wrapped_fn
 
 
+def get_device(model):
+    return next(model.parameters()).device
+
+
 def get_available_port():
     sock = socket.socket()
     sock.bind(('', 0))

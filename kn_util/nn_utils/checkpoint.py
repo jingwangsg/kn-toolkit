@@ -7,6 +7,7 @@ import subprocess
 import numpy as np
 import glob
 
+
 class CheckPointer:
 
     def __init__(self, monitor, work_dir, mode="min") -> None:
@@ -51,7 +52,7 @@ class CheckPointer:
         if mode == "latest":
             fn = self.ckpt_latest
         elif mode == "best":
-            ckpt_best = glob.glob(self.work_dir, self.ckpt_best)[0]
+            ckpt_best = glob.glob(osp.join(self.work_dir, self.ckpt_best))[0]
             fn = ckpt_best
         else:
             raise NotImplementedError()
