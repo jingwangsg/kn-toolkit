@@ -126,13 +126,28 @@ alias sg="conda activate torch && python ~/server_utils/train_model.py"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 alias nvp="conda activate torch && nvidia-htop.py -c"
 timestamp=$(date)
-alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 alias tc='conda activate torch'
+alias pyipdb="python -m ipdb -c continue "
+alias pypdb="python -m pdb -c continue "
 # alias aner="conda activate decouplener"
 alias tf2="conda activate tf2"
+alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
 knkill() {
     conda activate torch
     python $HOME/server_utils/kill.py $1
+}
+
+alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
+upl() {
+    commit_content=${1:-tmp commit \$timestamp}
+    echo $commit_content
+    git add .
+    git commit -m ${commit_content}
+    git push
+}
+
+gpukill() {
+    nvidia-smi pmon -c 1 -d 1 -i $1 | tail -n +3 | awk '{print $2}' | xargs kill -9
 }
 rl() {
     readlink -f $1
@@ -179,9 +194,10 @@ am() {
 }
 
 ROOTDIR=$HOME/app
-export LD_LIBRARY_PATH="$ROOTDIR/lib:$ROOTDIR/lib64"
+export LD_LIBRARY_PATH="/cm/shared/apps/cudnn8.4.1/usr/lib/x86_64-linux-gnu:$ROOTDIR/lib:$ROOTDIR/lib64"
 export CUDA_TOOLKIT_ROOT="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
-export CUDA_HOME="/cm/local/apps/cuda/libs/current/"
+# export CUDA_HOME="/cm/local/apps/cuda/libs/current/"
+export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
 PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$ROOTDIR/lib/share/pkgconfig:$ROOTDIR/lib64/:$PATH"
 PATH="$CUDA_TOOLKIT_ROOT/:$CUDA_HOME:$PATH"
 export PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"

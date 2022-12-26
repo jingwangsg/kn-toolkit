@@ -4,6 +4,22 @@ import math
 from functools import partial
 
 
+def filter_params(m, name_filter_fn=lambda n: True, param_filter_fn=lambda p: True, requires_grad=True):
+    return [
+        p for n, p in m.named_parameters()
+        if name_filter_fn(n) and param_filter_fn(p) and p.requires_grad == requires_grad
+    ]
+
+
+def match_name_keywords(n, name_keywords):
+    out = False
+    for b in name_keywords:
+        if b in n:
+            out = True
+            break
+    return out
+
+
 def freeze_module(module: nn.Module):
     for param in module.parameters():
         param.requires_grad = False
@@ -31,13 +47,10 @@ def init_weight(m, method="kaiming"):
         nn.init.constant_(m.bias, 0)
 
 
-def init_module(module, init_cfg=None):
-    cfg = dict(initializer_range=0.02)
-    if init_cfg:
-        cfg.update(init_cfg)
-
+def init_module(module):
     if isinstance(module, (nn.Linear, nn.Embedding)):
-        module.weight.data.normal_(mean=0.0, std=cfg["initializer_range"])
+        # module.weight.data.normal_(mean=0.0, std=cfg["initializer_range"])
+        nn.init.xavier_uniform_(module.weight.data)
     elif isinstance(module, nn.LayerNorm):
         module.bias.data.zero_()
         module.weight.data.fill_(1.0)

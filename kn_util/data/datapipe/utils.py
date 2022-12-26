@@ -4,8 +4,8 @@ import torch.distributed as dist
 import torch
 import warnings
 import os
-from kn_util.basic import global_get
-from kn_util.basic import Signal
+from ...basic import global_get
+from ...basic import Signal
 
 
 def default_collate_fn(x):
@@ -33,10 +33,10 @@ def prepare_for_dataloader(datapipe, shuffle=False):
     #     world_size = int(os.environ["WORLD_SIZE"])
     # else:
     #     world_size = 1
-    if shuffle and not global_get(Signal.train_no_shuffle, False):
+    if shuffle:
         datapipe = datapipe.shuffle()
     datapipe = datapipe.sharding_filter()
-    if dist.is_initialized():
-        datapipe = datapipe.fullsync()
+    # if dist.is_initialized():
+    #     datapipe = datapipe.fullsync()
 
     return datapipe

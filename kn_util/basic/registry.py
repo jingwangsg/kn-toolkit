@@ -24,7 +24,6 @@ import hydra
 
 log = get_logger(__name__)
 
-
 class Registry:
     """mini version of https://github.com/facebookresearch/mmf/blob/main/mmf/common/registry.py"""
 

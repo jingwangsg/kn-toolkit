@@ -1,4 +1,4 @@
-from ..video import FFMPEG, YTDLPDownloader, PyTubeDownloader
+from ..video import FFMPEG, YTDLPDownloader
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 import os

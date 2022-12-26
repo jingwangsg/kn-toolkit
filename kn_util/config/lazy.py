@@ -79,7 +79,7 @@ class LazyCall:
 
     Examples:
     ::
-        from detectron2.config import instantiate, LazyCall
+        from kn_util.config import instantiate, LazyCall
 
         layer_cfg = LazyCall(nn.Conv2d)(in_channels=32, out_channels=32)
         layer_cfg.out_channels = 64   # can edit it afterwards

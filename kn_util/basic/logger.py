@@ -1,5 +1,4 @@
 import logging
-from ..distributed import rank_zero_only
 import os
 from termcolor import colored
 import functools
@@ -8,6 +7,7 @@ import torch.distributed as dist
 
 @functools.lru_cache()
 def get_logger(name="", output_dir=None):
+    from ..distributed import rank_zero_only
     # create logger
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)

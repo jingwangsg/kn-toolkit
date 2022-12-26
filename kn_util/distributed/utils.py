@@ -35,7 +35,17 @@ def get_available_port():
     return sock.getsockname()[1]
 
 
+def get_env(name):
+    if name == "local_rank":
+        return int(os.getenv("LOCAL_RANK", 0))
+    if name == "rank":
+        return int(os.getenv("RANK", 0))
+    if name == "world_size":
+        return int(os.getenv("WORLD_SIZE", 1))
+
+
 def initialize_ddp_from_env():
+    from ..basic import global_get as G
     # local_rank = int(os.environ["LOCAL_RANK"])
     world_size = int(os.environ["WORLD_SIZE"])
     rank = int(os.environ["RANK"])
@@ -47,3 +57,11 @@ def initialize_ddp_from_env():
                             timeout=datetime.timedelta(seconds=5400))
 
     torch.cuda.set_device(local_rank)
+    G("cfg").train.batch_size = G("cfg").train.batch_size // world_size
+    print(f"rank#{rank}\t"
+          f"env {local_rank}/{rank}/{world_size}\t"
+          f"mem {torch.cuda.memory_usage()}")
+
+
+def is_ddp_initialized_and_available():
+    return dist.is_initialized() and dist.is_available()
