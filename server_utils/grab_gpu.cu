@@ -157,12 +157,17 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
                 cudaError_t status = cudaMalloc(&array[id], target_size);
                 if (status == cudaSuccess) {
                     allocated[id] += target_size;
+                    cudaMemGetInfo(&avail_size, &total_size);
+                    printf(
+                        "[RUNNING] GPU-%d: Successfully allocate %.2f GB GPU memory (%.2f GB "
+                        "available)\n",
+                        id, target_size / bytes_per_gb, avail_size / bytes_per_gb);
                 }
                 if (allocated[id] == occupy_size) {
                     num_allocated++;
                     cudaMemGetInfo(&avail_size, &total_size);
                     printf(
-                        "GPU-%d: Successfully allocate %.2f GB GPU memory (%.2f GB "
+                        "[DONE] GPU-%d: Successfully allocate %.2f GB GPU memory (%.2f GB "
                         "available)\n",
                         id, occupy_size / bytes_per_gb, avail_size / bytes_per_gb);
                 }
