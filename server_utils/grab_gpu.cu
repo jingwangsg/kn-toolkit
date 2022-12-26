@@ -13,11 +13,11 @@
     if (cnt < argc) arg_str = argv[cnt++]
 
 const float bytes_per_gb = (1 << 30);
-// const float ms_per_hour = 1000 * 3600;
+const float ms_per_hour = 1000 * 3600;
 const int max_grid_dim = (1 << 15);
 const int max_block_dim = 1024;
-// const int max_sleep_time = 1e3;
-// const float sleep_interval = 1e16;
+const int max_sleep_time = 1e3;
+const float sleep_interval = 1e16;
 const int max_gpu_num = 32;
 
 __global__ void default_script_kernel(char* array, size_t occupy_size) {
@@ -55,18 +55,19 @@ void run_default_script(char** array, size_t occupy_size, float total_time,
     std::time_t now = std::time(0);
     tm* localtm = localtime(&now);
     std::cout << "Occupied since local time: " << asctime(localtm) << std::endl;
+    int cnt = 0;
     while (true) {
         launch_default_script(array, occupy_size, grid_dim, gpu_ids);
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&time, start, stop);
-        // if (total_time > 0 && time / ms_per_hour > total_time) break;
-        // if (!((++cnt) % size_t(sleep_interval / occupy_size))) {
-        //     cnt = 0;
-        //     printf("Occupied time: %.2f hours\n", time / ms_per_hour);
-        //     sleep_time = rand() % max_sleep_time + 1;
-        //     sleep(sleep_time);
-        // }
+        if (total_time > 0 && time / ms_per_hour > total_time) break;
+        if (!((++cnt) % size_t(sleep_interval / occupy_size))) {
+            cnt = 0;
+            // printf("Occupied time: %.2f hours\n", time / ms_per_hour);
+            int sleep_time = rand() % max_sleep_time + 1;
+            sleep(sleep_time);
+        }
     }
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
@@ -129,7 +130,7 @@ void inform_email(std::vector<int> ids) {
     std::string subject = ss.str();
     std::string text = "Captured GPU List: ";
 
-    for (int i=0; i < ids.size(); i++) {
+    for (int i = 0; i < ids.size(); i++) {
         text += std::to_string(ids[i]);
         if (i != ids.size() - 1) text += ",";
     }
@@ -138,7 +139,7 @@ void inform_email(std::vector<int> ids) {
         "python -c \"from kn_util.tools import send_email; send_email"
         "('" +
         to_addr + "','" + subject + "','" + text + "')\"";
-    std::cout << cmd << std::endl;
+    // std::cout << cmd << std::endl;
     system(cmd.c_str());
 }
 
