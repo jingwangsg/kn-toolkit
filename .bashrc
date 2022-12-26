@@ -137,9 +137,8 @@ knkill() {
 }
 upl() {
     commit_content=${1:-tmp commit $(date)}
-    echo $commit_content
     git add .
-    echo "git commit -m \"$commit_content\""
+    git commit -m "$commit_content"
     git push
 }
 
