@@ -119,6 +119,29 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
     }
 }
 
+void inform_email(std::vector<int> ids) {
+    std::string to_addr = "knjingwang@gmail.com";
+
+    cudaDeviceProp props;
+    cudaGetDeviceProperties(&props, 0);
+    std::stringstream ss;
+    ss << "[SG] $SLURM_JOB_NODELIST GPU:" << props.name;
+    std::string subject = ss.str();
+    std::string text = "Captured GPU List: ";
+
+    for (int i=0; i < ids.size(); i++) {
+        text += std::to_string(ids[i]);
+        if (i != ids.size() - 1) text += ",";
+    }
+
+    std::string cmd =
+        "python -c \"from kn_util.tools import send_email; send_email"
+        "('" +
+        to_addr + "','" + subject + "','" + text + "')\"";
+    std::cout << cmd << std::endl;
+    system(cmd.c_str());
+}
+
 void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
     std::vector<size_t> allocated(max_gpu_num, 0);
     while (true) {
@@ -146,6 +169,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
         }
         if (num_allocated == gpu_ids.size()) break;
     }
+    inform_email(gpu_ids);
     printf("Successfully allocate memory on all GPUs!\n");
 }
 
