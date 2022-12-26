@@ -125,7 +125,6 @@ alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task 
 alias sg="conda activate torch && python ~/server_utils/train_model.py"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 alias nvp="conda activate torch && nvidia-htop.py -c"
-timestamp=$(date)
 alias tc='conda activate torch'
 alias pyipdb="python -m ipdb -c continue "
 alias pypdb="python -m pdb -c continue "
@@ -136,13 +135,12 @@ knkill() {
     conda activate torch
     python $HOME/server_utils/kill.py $1
 }
-
-alias upl='git add . && git commit -m "tmp commit $timestamp" && git push'
 upl() {
-    commit_content=${1:-tmp commit \$timestamp}
+    commit_content=${1:-tmp commit $(date)}
     echo $commit_content
     git add .
-    git commit -m ${commit_content}
+    cmd=git commit -m \"$commit_content\"
+    echo $cmd
     git push
 }
 
