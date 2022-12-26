@@ -139,8 +139,7 @@ upl() {
     commit_content=${1:-tmp commit $(date)}
     echo $commit_content
     git add .
-    cmd=git commit -m \"$commit_content\"
-    echo $cmd
+    echo "git commit -m \"$commit_content\""
     git push
 }
 
