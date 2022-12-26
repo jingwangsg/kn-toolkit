@@ -122,7 +122,6 @@ alias sv="~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
 alias fg="conda activate torch && python ~/server_utils/query_cluster.py --task available"
 alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task usage"
-alias sg="conda activate torch && python ~/server_utils/train_model.py"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 alias nvp="conda activate torch && nvidia-htop.py -c"
 alias tc='conda activate torch'
@@ -131,6 +130,7 @@ alias pypdb="python -m pdb -c continue "
 # alias aner="conda activate decouplener"
 alias tf2="conda activate tf2"
 alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
+alias sg="$HOME/server_utils/dist_train"
 knkill() {
     conda activate torch
     python $HOME/server_utils/kill.py ${1:-python}
@@ -143,7 +143,11 @@ upl() {
 }
 
 gpukill() {
-    nvidia-smi pmon -c 1 -d 1 -i $1 | tail -n +3 | awk '{print $2}' | xargs kill -9
+    variable=$1
+    for i in ${variable//,/ }
+    do
+        nvidia-smi pmon -c 1 -d 1 -i $i | tail -n +3 | awk '{print $2}' | xargs kill -9
+    done
 }
 rl() {
     readlink -f $1
@@ -184,10 +188,6 @@ knrun_mn() {
 ca() {
     conda activate "$1"
 }
-am() {
-    git commit -am "$@"
-    git push
-}
 
 ROOTDIR=$HOME/app
 export LD_LIBRARY_PATH="/cm/shared/apps/cudnn8.4.1/usr/lib/x86_64-linux-gnu:$ROOTDIR/lib:$ROOTDIR/lib64"
@@ -216,4 +216,3 @@ else
 fi
 unset __conda_setup
 # <<< conda initialize <<<
-
