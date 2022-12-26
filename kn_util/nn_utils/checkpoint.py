@@ -47,6 +47,8 @@ class CheckPointer:
                 self.best_metric = metric_vals[self.monitor]
                 subprocess.run(f"rm -rf {self.ckpt_best}".format('*', '*'), shell=True)
                 torch.save(save_dict, self.ckpt_best.format(num_epochs, np.round(self.best_metric, decimals=6)))
+                return True
+        return False
 
     def load_checkpoint(self, model, optimizer, lr_scheduler=None, loss_scaler=None, mode="latest"):
         if mode == "latest":

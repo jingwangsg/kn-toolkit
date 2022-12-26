@@ -133,7 +133,7 @@ alias tf2="conda activate tf2"
 alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
 knkill() {
     conda activate torch
-    python $HOME/server_utils/kill.py $1
+    python $HOME/server_utils/kill.py ${1:-python}
 }
 upl() {
     commit_content=${1:-tmp commit $(date)}
