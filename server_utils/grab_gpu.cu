@@ -101,11 +101,11 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
     float occupy_mem;
     if (cnt < argc) {
         sscanf(argv[cnt++], "%f", &occupy_mem);
-        occupy_size = occupy_mem * bytes_per_gb;
+        occupy_size = size_t(occupy_mem * bytes_per_gb);
     } else {
         size_t total_size, avail_size;
         cudaMemGetInfo(&avail_size, &total_size);
-        occupy_size = total_size - bytes_per_gb;
+        occupy_size = total_size - size_t(bytes_per_gb);
     }
 
     script_path = "";
@@ -129,7 +129,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
                 cudaSetDevice(id);
                 size_t total_size, avail_size;
                 cudaMemGetInfo(&avail_size, &total_size);
-                size_t target_size = min(avail_size, occupy_size - allocated[id]);
+                size_t target_size = min(avail_size - size_t(bytes_per_gb * 0.5), occupy_size - allocated[id]);
                 cudaError_t status = cudaMalloc(&array[id], target_size);
                 if (status == cudaSuccess) {
                     allocated[id] += target_size;
