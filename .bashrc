@@ -130,7 +130,7 @@ alias pypdb="python -m pdb -c continue "
 # alias aner="conda activate decouplener"
 alias tf2="conda activate tf2"
 alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
-alias sg="$HOME/server_utils/dist_train"
+alias sg="python $HOME/server_utils/dist_train.py --gpus"
 knkill() {
     conda activate torch
     python $HOME/server_utils/kill.py ${1:-python}
@@ -158,6 +158,10 @@ export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\
 export WANDB_DIR="$HOME/.wandb"
 export SLURM_TMPDIR="$HOME/.tmp"
 export TMUX_TMPDIR="$HOME/.tmp"
+
+show_gpu() {
+    echo $CUDA_VISIBLE_DEVICES
+}
 
 gpu() {
     export CUDA_VISIBLE_DEVICES="$1"

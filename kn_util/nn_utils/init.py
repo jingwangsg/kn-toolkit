@@ -48,6 +48,8 @@ def init_weight(m, method="kaiming"):
 
 
 def init_module(module):
+    if hasattr(module, "init_weight"):
+        return
     if isinstance(module, (nn.Linear, nn.Embedding)):
         # module.weight.data.normal_(mean=0.0, std=cfg["initializer_range"])
         nn.init.xavier_uniform_(module.weight.data)

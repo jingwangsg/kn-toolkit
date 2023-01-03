@@ -3,3 +3,5 @@ rm -rf ~/.bashrc
 ln -s $(pwd)/.bashrc ~/.bashrc
 rm -rf ~/server_utils
 ln -s $(pwd)/server_utils ~/server_utils
+rm -rf ~/.tmux.conf
+ln -s $(pwd)/.tmux.conf ~/.tmux.conf

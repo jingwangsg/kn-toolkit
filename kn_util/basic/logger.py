@@ -6,7 +6,7 @@ import sys
 import torch.distributed as dist
 
 @functools.lru_cache()
-def get_logger(name="", output_dir=None):
+def get_logger(name="", output_dir=None, to_console=True):
     from ..distributed import rank_zero_only
     # create logger
     logger = logging.getLogger(name)

@@ -144,6 +144,14 @@ class Registry:
     @classmethod
     def build_pipeline(cls, _name, **kwargs):
         return cls.build(_name, "pipeline", **kwargs)
+    
+    @classmethod
+    def register_function(cls, _name):
+        return cls.register_cls(_name, "function")
+
+    @classmethod
+    def call_function(cls, _name, **kwargs):
+        return cls.build(_name, "function", **kwargs)
 
     """
     @classmethod

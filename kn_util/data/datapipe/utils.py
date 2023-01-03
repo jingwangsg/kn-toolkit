@@ -28,15 +28,8 @@ def pad_to_multiple_of(datapipe, divisor):
     return datapipe
 
 
-def prepare_for_dataloader(datapipe, shuffle=False):
-    # if dist.is_initialized() and dist.is_available():
-    #     world_size = int(os.environ["WORLD_SIZE"])
-    # else:
-    #     world_size = 1
-    if shuffle:
-        datapipe = datapipe.shuffle()
+def prepare_for_dataloader(datapipe, num_batches):
+    datapipe = datapipe.set_length(num_batches)
     datapipe = datapipe.sharding_filter()
-    # if dist.is_initialized():
-    #     datapipe = datapipe.fullsync()
 
     return datapipe

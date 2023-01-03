@@ -54,7 +54,7 @@ class CheckPointer:
         if mode == "latest":
             fn = self.ckpt_latest
         elif mode == "best":
-            ckpt_best = glob.glob(osp.join(self.work_dir, self.ckpt_best))[0]
+            ckpt_best = glob.glob(osp.join(self.work_dir, self.ckpt_best.format("*", "*")))[0]
             fn = ckpt_best
         else:
             raise NotImplementedError()

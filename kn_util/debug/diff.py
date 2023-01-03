@@ -10,6 +10,7 @@ import os
 import os.path as osp
 from ..basic import load_pickle, save_pickle
 
+
 def diff(a, b, index=""):
     if type(a) != type(b):
         print(colored(index, "blue") + colored(":type_diff:", "red") + f"a({type(a)} b({type(b)}))")
@@ -49,14 +50,19 @@ def diff(a, b, index=""):
         except:
             pass
 
-def sync_diff(obj, name, debug_dir="./_DEBUG"):
+def get_variable(name, debug_dir=osp.expanduser("~/_DEBUG")):
+    fn = osp.join(debug_dir, name + ".pkl")
+    loaded = load_pickle(fn)
+    return loaded
+
+def sync_diff(obj, name, debug_dir=osp.expanduser("~/_DEBUG")):
     # for debugging randomness
     # sync and compare between two processes
     os.makedirs(debug_dir, exist_ok=True)
     fn = osp.join(debug_dir, name + ".pkl")
-    if os.environ.get("KN_DEBUG_SEND", False):
+    if os.getenv("KN_DEBUG_SEND", False):
         save_pickle(obj, fn)
         print(f"{fn} saved")
-    if os.environ.get("KN_DEBUG_RECV", False):
+    if os.getenv("KN_DEBUG_RECV", False):
         loaded = load_pickle(fn)
-        diff(obj, loaded)
+        diff(obj, loaded, index=name)
