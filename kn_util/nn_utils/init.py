@@ -58,3 +58,8 @@ def init_module(module):
         module.weight.data.fill_(1.0)
     if isinstance(module, nn.Linear) and module.bias is not None:
         module.bias.data.zero_()
+
+
+def init_children(m):
+    for children in m.children():
+        init_module(children)

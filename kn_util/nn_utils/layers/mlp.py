@@ -5,26 +5,14 @@ import torch.nn.functional as F
 
 class MLP(nn.Module):
 
-    def __init__(self, input_size, hidden_size, output_size, num_layers=2, activation="relu", dropout=0.1) -> None:
+    def __init__(self, dims, activation="relu", dropout=0.1) -> None:
         super().__init__()
-        assert num_layers > 1, "this class is intended for multiple linear layers"
-        dims = [input_size] + [hidden_size] * (num_layers - 1) + [output_size]
+        # assert num_layers > 1, "this class is intended for multiple linear layers"
+        # dims = dims
+        num_layers = len(dims) - 1
         self.layers = nn.ModuleList([nn.Linear(dims[i], dims[i + 1]) for i in range(num_layers)])
-        self.activation = self.build_activation(activation)
+        self.activation = get_activation_fn(activation)
         self.do = nn.Dropout(dropout)
-    
-    def build_activation(self, name):
-        if name == "prelu":
-            activation = nn.PReLU(device=next(self.parameters()).device)
-        elif name == "relu":
-            activation = F.relu
-        elif name == "gelu":
-            activation = nn.GELU()
-        else:
-            activation = None
-            raise Exception(f"no such activation as {name}")
-        
-        return activation
 
     def forward(self, x):
         for idx, layer in enumerate(self.layers):
@@ -33,3 +21,18 @@ class MLP(nn.Module):
                 x = self.activation(x)
                 x = self.do(x)
         return x
+
+
+def get_activation_fn(activation):
+    """Return an activation function given a string"""
+    if activation == "relu":
+        return F.relu
+    if activation == "gelu":
+        return F.gelu
+    if activation == "glu":
+        return F.glu
+    if activation == "prelu":
+        return nn.PReLU()
+    if activation == "selu":
+        return F.selu
+    raise RuntimeError(F"activation should be relu/gelu, not {activation}.")

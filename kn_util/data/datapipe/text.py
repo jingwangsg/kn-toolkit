@@ -50,7 +50,6 @@ class GloveTokenizer(IterDataPipe):
         if global_vocab:
             itos, vectors = global_vocab
         else:
-
             pretrained_vocab = torchtext.vocab.pretrained_aliases[self.glove](cache=self.cache_dir)
             if self.vocab_file:
                 with open(self.vocab_file, "r") as f:

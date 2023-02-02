@@ -5,8 +5,12 @@ import functools
 import sys
 import torch.distributed as dist
 
+logger_initialized = dict()
+
 @functools.lru_cache()
 def get_logger(name="", output_dir=None, to_console=True):
+    if name in logger_initialized:
+        return logger_initialized[name]
     from ..distributed import rank_zero_only
     # create logger
     logger = logging.getLogger(name)
@@ -45,5 +49,7 @@ def get_logger(name="", output_dir=None, to_console=True):
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S"))
         logger.addHandler(file_handler)
+    
+    logger_initialized[name] = logger
 
     return logger

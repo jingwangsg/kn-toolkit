@@ -118,7 +118,7 @@ if ! shopt -oq posix; then
 fi
 module load slurm
 
-alias sv="~/server_utils/server.sh"
+alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
 alias fg="conda activate torch && python ~/server_utils/query_cluster.py --task available"
 alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task usage"
@@ -131,9 +131,12 @@ alias pypdb="python -m pdb -c continue "
 alias tf2="conda activate tf2"
 alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
 alias sg="python $HOME/server_utils/dist_train.py --gpus"
+alias gk="gpukill"
+alias g="gpu"
 knkill() {
-    conda activate torch
-    python $HOME/server_utils/kill.py ${1:-python}
+    # conda activate torch
+    # python $HOME/server_utils/kill.py ${1:-python}
+    ps -u kningtg -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
 }
 upl() {
     commit_content=${1:-tmp commit $(date)}

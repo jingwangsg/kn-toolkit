@@ -61,7 +61,7 @@ void run_default_script(char** array, size_t occupy_size, float total_time,
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&time, start, stop);
-        if (total_time > 0 && time / ms_per_hour > total_time) break;
+        if (total_time >= 0 && time / ms_per_hour > total_time) break;
         if (!((++cnt) % size_t(sleep_interval / occupy_size))) {
             cnt = 0;
             // printf("Occupied time: %.2f hours\n", time / ms_per_hour);
@@ -76,7 +76,7 @@ void run_default_script(char** array, size_t occupy_size, float total_time,
     }
 }
 
-void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occupy_size, float& total_time, std::string& script_path) {
+void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occupy_size, float& total_time, std::string& script_path, int& mode) {
     int cnt = 13;
 
     int gpu_num;
@@ -100,11 +100,22 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
         }
     }
 
-    float occupy_mem;
+    mode = 0;
+    if (cnt < argc) {
+        sscanf(argv[cnt++], "%d", &mode);
+    }
+
+    total_time = -1;
+    if (cnt < argc) {
+        sscanf(argv[cnt++], "%f", &total_time);
+    }
+
+    float occupy_mem = -1;
     if (cnt < argc) {
         sscanf(argv[cnt++], "%f", &occupy_mem);
         occupy_size = size_t(occupy_mem * bytes_per_gb);
-    } else {
+    }
+    if (occupy_mem == -1) {
         cudaSetDevice(gpu_ids[0]);
         size_t total_size, avail_size;
         cudaMemGetInfo(&avail_size, &total_size);
@@ -114,11 +125,6 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
     script_path = "";
     if (cnt < argc) {
         script_path = argv[cnt++];
-    }
-
-    total_time = -1;
-    if (cnt < argc) {
-        sscanf(argv[cnt++], "%f", &total_time);
     }
 }
 
@@ -145,7 +151,7 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
 //     system(cmd.c_str());
 // }
 
-void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
+void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, int mode) {
     std::vector<size_t> allocated(max_gpu_num, 0);
     while (true) {
         // printf("Try allocate GPU memory %d times >>>>>>>>>>>>>>>>>>>>\n", ++cnt);
@@ -155,7 +161,12 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
                 cudaSetDevice(id);
                 size_t total_size, avail_size;
                 cudaMemGetInfo(&avail_size, &total_size);
-                size_t target_size = min(avail_size - size_t(bytes_per_gb * 0.5), occupy_size - allocated[id]);
+                size_t target_size = 0;
+                if (mode != 2 or allocated[id] == 0) {
+                    target_size = min(avail_size - size_t(bytes_per_gb * 0.5), occupy_size - allocated[id]);
+                } else {
+                    target_size = occupy_size - allocated[id];
+                }
                 cudaError_t status = cudaMalloc(&array[id], target_size);
                 if (status == cudaSuccess) {
                     allocated[id] += target_size;
@@ -179,6 +190,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids) {
         }
         if (num_allocated == gpu_ids.size()) break;
     }
+    sleep(500);
     // inform_email(gpu_ids);
     // printf("Successfully allocate memory on all GPUs!\n");
 }
@@ -199,9 +211,16 @@ int main(int argc, char** argv) {
     std::vector<int> gpu_ids;
     std::string script_path;
     char* array[max_gpu_num];
+    int mode;
 
-    process_args(argc, argv, gpu_ids, occupy_size, total_time, script_path);
-    allocate_mem(array, occupy_size, gpu_ids);
+    process_args(argc, argv, gpu_ids, occupy_size, total_time, script_path, mode);
+    // mode = 0: fight and occupy
+    // mode = 1: fight and exit
+    // mode = 2: peace
+
+    if (mode == 1) total_time = 0.0;
+
+    allocate_mem(array, occupy_size, gpu_ids, mode);
 
     if (script_path == "") {
         run_default_script(array, occupy_size, total_time, gpu_ids);
