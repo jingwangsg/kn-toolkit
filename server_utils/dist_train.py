@@ -4,6 +4,7 @@ import subprocess
 import torch
 import numpy as np
 import time
+import random
 
 
 def parse_args():
@@ -33,16 +34,19 @@ def main():
     fake_datasets = ["coco2017", "coco_seg2017", "Charades-STA", "ActivityNetCaption"]
     fake_models = ["GroundingFormer", "PSGFormer", "GDBFormer", "QueryMoment", "GTR"]
 
-    mode_dict = dict(occupy=0,
-                     attack=1,
-                     peace=2)
+    mode_dict = dict(occupy=0, attack=1, peace=2)
 
     for id in gpus:
+        if args.mode != "attack":
+            rand_left = random.uniform(2.5, 3.5)
+        else:
+            rand_left = 1.0
         dataset = np.random.choice(fake_datasets, size=1)
         model = np.random.choice(fake_models, size=1)
         cmd = f"$HOME/miniconda3/envs/cuda11/bin/python main.py --model {model[0]} --dataset {dataset[0]} --use_bbox_refine --num_epoch 100 --host 127.0.0.1 --ddp --local-rank {id}"
-        cmd  = cmd + f" {mode_dict[args.mode]} {args.time} {args.mem}"
+        cmd = cmd + f" {mode_dict[args.mode]} {args.time} {args.mem} {rand_left}"
         subprocess.Popen(cmd, shell=True)
+
 
 if __name__ == "__main__":
     main()

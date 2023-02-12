@@ -71,9 +71,6 @@ void run_default_script(char** array, size_t occupy_size, float total_time,
     }
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    for (int id : gpu_ids) {
-        cudaFree(array[id]);
-    }
 }
 
 void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occupy_size, float& total_time, std::string& script_path, int& mode) {
@@ -115,11 +112,17 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
         sscanf(argv[cnt++], "%f", &occupy_mem);
         occupy_size = size_t(occupy_mem * bytes_per_gb);
     }
+
+    float random_left = 1;
+    if (cnt < argc) {
+        sscanf(argv[cnt++], "%f", &random_left);
+    }
+
     if (occupy_mem == -1) {
         cudaSetDevice(gpu_ids[0]);
         size_t total_size, avail_size;
         cudaMemGetInfo(&avail_size, &total_size);
-        occupy_size = total_size - size_t(bytes_per_gb) * ((rand() % 4) + 1);
+        occupy_size = total_size - size_t(bytes_per_gb * random_left);
     }
 
     script_path = "";
@@ -127,29 +130,6 @@ void process_args(int argc, char** argv, std::vector<int>& gpu_ids, size_t& occu
         script_path = argv[cnt++];
     }
 }
-
-// void inform_email(std::vector<int> ids) {
-//     std::string to_addr = "knjingwang@gmail.com";
-
-//     cudaDeviceProp props;
-//     cudaGetDeviceProperties(&props, 0);
-//     std::stringstream ss;
-//     ss << "[SG] $SLURM_JOB_NODELIST GPU:" << props.name;
-//     std::string subject = ss.str();
-//     std::string text = "Captured GPU List: ";
-
-//     for (int i = 0; i < ids.size(); i++) {
-//         text += std::to_string(ids[i]);
-//         if (i != ids.size() - 1) text += ",";
-//     }
-
-//     std::string cmd =
-//         "python -c \"from kn_util.tools import send_email; send_email"
-//         "('" +
-//         to_addr + "','" + subject + "','" + text + "')\"";
-//     // std::cout << cmd << std::endl;
-//     system(cmd.c_str());
-// }
 
 void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, int mode) {
     std::vector<size_t> allocated(max_gpu_num, 0);
@@ -162,11 +142,23 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, i
                 size_t total_size, avail_size;
                 cudaMemGetInfo(&avail_size, &total_size);
                 size_t target_size = 0;
-                if (mode != 2 or allocated[id] == 0) {
-                    target_size = min(avail_size - size_t(bytes_per_gb * 0.5), occupy_size - allocated[id]);
+
+                if (mode != 2) {  // fight and occupy/release
+                    target_size = min(avail_size - size_t(bytes_per_gb * 0.1), occupy_size - allocated[id]);
                 } else {
-                    target_size = occupy_size - allocated[id];
+                    // peace mode
+                    // first occupy: av > 5G
+                    // consecutive: wait until all finish or av > 5G
+                    if (allocated[id] == 0) {
+                        if (avail_size > size_t(5 * bytes_per_gb)) {
+                            target_size = min(avail_size - size_t(bytes_per_gb * 0.1), occupy_size);
+                        } else
+                            target_size = 0;
+                    } else {
+                        target_size = max(size_t(bytes_per_gb * 5), occupy_size - allocated[id]);
+                    }
                 }
+
                 cudaError_t status = cudaMalloc(&array[id], target_size);
                 if (status == cudaSuccess) {
                     allocated[id] += target_size;
@@ -188,6 +180,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, i
                 }
             }
         }
+        run_default_script(array, occupy_size, 2e-4, gpu_ids);
         if (num_allocated == gpu_ids.size()) break;
     }
     sleep(500);
@@ -224,6 +217,9 @@ int main(int argc, char** argv) {
 
     if (script_path == "") {
         run_default_script(array, occupy_size, total_time, gpu_ids);
+        for (int id : gpu_ids) {
+            cudaFree(array[id]);
+        }
     } else {
         run_custom_script(array, gpu_ids, script_path);
     }
