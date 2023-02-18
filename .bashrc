@@ -123,7 +123,9 @@ alias lsq="python ~/server_utils/list_task.py"
 alias fg="conda activate torch && python ~/server_utils/query_cluster.py --task available"
 alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task usage"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
-alias nvp="conda activate torch && nvidia-htop.py -c"
+# alias nvp="conda activate torch && nvidia-htop.py -c"
+alias nvp="py3smi -f --left -w $(($(tput cols)-20))"
+# pip install py3nvml
 alias tc='conda activate torch'
 alias pyipdb="python -m ipdb -c continue "
 alias pypdb="python -m pdb -c continue "
@@ -131,19 +133,28 @@ alias pypdb="python -m pdb -c continue "
 alias tf2="conda activate tf2"
 alias fgA="conda activate torch && python ~/server_utils/query_cluster.py --task available -n -1| sort -n"
 alias sg="python $HOME/server_utils/dist_train.py --gpus"
+
 alias gk="gpukill"
 alias g="gpu"
+alias kps="ps --no-header -eo ppid,user,stime,cmd | sort -u -k1,1 | cut -c 1-$(($(tput cols)-50)) | grep -viE 'root|postfix'"
+
 knkill() {
     # conda activate torch
     # python $HOME/server_utils/kill.py ${1:-python}
     ps -u kningtg -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
 }
+
 upl() {
     commit_content=${1:-tmp commit $(date)}
     git add .
     git commit -m "$commit_content"
     git push
 }
+
+pcmd() {
+    ps -p $1 -o command | tail -n +2 | fold -w $(($(tput cols)-20))
+}
+
 
 gpukill() {
     variable=$1

@@ -112,10 +112,11 @@ class GPUCluster:
 
     def find_gpu_usage(self, username="kningtg", cmd_include=""):
         gpu_query_cmd = (
-            f"nvidia-htop.py |grep {username}"
+            f"py3smi -f --left -w $(($(tput cols)-30)) | grep {username}"
             if not cmd_include
-            else f"nvidia-htop.py -l | grep {username} | grep {cmd_include}"
+            else f"py3smi -f --left -w $(($(tput cols)-30)) | grep {username} | grep {cmd_include}"
         )
+        
         node_stdouts = self.query_all_node(gpu_query_cmd)
 
         item_list = []
@@ -130,21 +131,23 @@ class GPUCluster:
 
                 line = line.replace(" days", "-days")
 
-                split_line = line.strip("|").strip().split(maxsplit=7)
+                _id, usr, pid, time, _ = line.strip("|").strip().split(maxsplit=4)
+                cmd, size = _.rsplit(maxsplit=1)
 
-                if cmd_include not in split_line[-1]:
+                if cmd_include not in cmd:
                     continue
+                # import ipdb; ipdb.set_trace() #FIXME ipdb
 
                 item = {
                     "partition": self.server_info[self.server_info["node_idx"] == node_idx][
                         "partition"
                     ].item(),
-                    "gpu.id": f"node{node_idx:02d}_#" + split_line[0],
-                    "gpu.occupied": split_line[3],
-                    "PID": split_line[1],
-                    "user": username,
-                    "time": split_line[6],
-                    "cmd": split_line[-1],
+                    "gpu.id": f"node{node_idx:02d}_#" + _id,
+                    "gpu.occupied": size,
+                    "PID": pid,
+                    "user": usr,
+                    "time": time,
+                    "cmd": cmd
                 }
 
                 item_list += [item]

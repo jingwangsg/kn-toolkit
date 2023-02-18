@@ -14,6 +14,8 @@ def parse_args():
     parser.add_argument("-m", "--mode", choices=["occupy", "attack", "peace"], default="peace")
     parser.add_argument("-t", "--time", type=int, default=-1)
     parser.add_argument("--mem", type=int, default=-1)
+    parser.add_argument("--delay", type=float, default=0.0)
+    parser.add_argument("-s", "--sleep", action="store_true", default=False)
     #  mode = 0: fight and occupy
     #  mode = 1: fight and exit
     #  mode = 2: peace
@@ -23,7 +25,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    print(f"Running in mode[{args.mode}]")
+    print(f"Running in mode[{args.mode}] | delay = {args.delay:.1f} (h)")
+    time.sleep((args.delay * 3600))
     gpus = []
     if args.gpus == "-1":
         num_devices = torch.cuda.device_count()
@@ -46,6 +49,10 @@ def main():
         cmd = f"$HOME/miniconda3/envs/cuda11/bin/python main.py --model {model[0]} --dataset {dataset[0]} --use_bbox_refine --num_epoch 100 --host 127.0.0.1 --ddp --local-rank {id}"
         cmd = cmd + f" {mode_dict[args.mode]} {args.time} {args.mem} {rand_left}"
         subprocess.Popen(cmd, shell=True)
+
+    if args.sleep:
+        while True:
+            pass
 
 
 if __name__ == "__main__":

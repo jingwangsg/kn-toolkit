@@ -11,9 +11,7 @@ def read_args():
 
 if __name__ == "__main__":
     args = read_args()
-    server_list = pd.read_csv(
-        "~/server_utils/server_list.csv", header=None
-    )
+    server_list = pd.read_csv("~/server_utils/server_list.csv", header=None)
     server_list = server_list.set_axis(["no", "partition"], axis=1, copy=False)
 
     server_nos = [int(no) for no in args.server_nos.split(",")]
@@ -25,10 +23,6 @@ if __name__ == "__main__":
 
     # print(server_list)
     node_args = ",".join([f"node{idx:02d}" for idx in server_nos])
-    # subprocess.run(
-    #     f"srun -p {partition} -w {node_args} --export ALL --mem=0 nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv",
-    #     shell=True,
-    # )
-    print(
-        f"srun -p {partition} -w {node_args} --export ALL --mem=0 --pty bash"
-    )
+
+    prefix = f"srun -p {partition} -w {node_args} --export ALL --mem=0"
+    print(prefix)

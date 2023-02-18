@@ -148,14 +148,14 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, i
                 } else {
                     // peace mode
                     // first occupy: av > 5G
-                    // consecutive: wait until all finish or av > 5G
+                    // consecutive: wait until all finish
                     if (allocated[id] == 0) {
                         if (avail_size > size_t(5 * bytes_per_gb)) {
-                            target_size = min(avail_size - size_t(bytes_per_gb * 0.1), occupy_size);
+                            target_size = min(avail_size - size_t(bytes_per_gb * 2), occupy_size);
                         } else
                             target_size = 0;
                     } else {
-                        target_size = max(size_t(bytes_per_gb * 5), occupy_size - allocated[id]);
+                        target_size = occupy_size - allocated[id];
                     }
                 }
 
@@ -180,7 +180,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, i
                 }
             }
         }
-        run_default_script(array, occupy_size, 2e-4, gpu_ids);
+        // run_default_script(array, occupy_size, 2e-4, gpu_ids);
         if (num_allocated == gpu_ids.size()) break;
     }
     sleep(500);
