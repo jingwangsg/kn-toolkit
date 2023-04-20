@@ -1,14 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import List, Dict
+from typing import List, Dict, Union
 import numpy as np
-from .seq import slice_by_axis
-import copy
-
+from .tensor_ops import general_pad_arr
 
 def general_pad(
-    arr_list: List[np.ndarray],
+    arr_list: List[Union[np.ndarray, torch.Tensor]],
     fill_value=None,
     axis=None,
     to_length=None,
@@ -17,6 +15,20 @@ def general_pad(
 ):
     assert axis is not None
     assert fill_value is not None
+
+    backend = None
+
+    if isinstance(arr_list[0], torch.Tensor):
+        backend = "pt"
+    elif isinstance(arr_list[0], np.ndarray):
+        backend = "np"
+    else:
+        raise ValueError("arr_list must be a list of torch.Tensor or np.ndarray")
+
+
+    if not isinstance(arr_list, list):
+        arr_list = [arr_list]
+    
     if to_length is None:
         to_length = 0
         for arr in arr_list:
@@ -25,33 +37,24 @@ def general_pad(
     if to_multiple:
         to_length = int(np.ceil(to_length / to_multiple)) * to_multiple
 
-    to_shape = list(arr_list[0].shape)
-    to_shape[axis] = to_length
 
     ret_arr = []
     ret_mask = []
 
     shape_dim = len(arr_list[0].shape)
     for arr in arr_list:
-        if fill_value == "last":
-            cur_fill_value = slice_by_axis(arr, _slice=slice(-1, None), axis=axis)
-            tile_args = tuple([1 if _ != axis else to_length for _ in range(shape_dim)])
-            full_arr = np.tile(cur_fill_value, tile_args)
-        else:
-            full_arr = np.full(to_shape, fill_value=fill_value, dtype=arr[0].dtype)
-        sub_slices = tuple([slice(0, arr.shape[_]) for _ in range(shape_dim)])
-        full_arr[sub_slices] = arr
-        ret_arr += [full_arr]
+        cur_arr, cur_mask = general_pad_arr(arr, axis, to_length, fill_value, return_mask=True)
+        ret_arr.append(cur_arr)
         if return_mask:
-            full_arr = np.zeros(to_shape, dtype=bool)
-            full_arr[sub_slices] = True
-            flatten_slices = tuple([slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)])
-            ret_mask += [full_arr[flatten_slices]]
-
-    if return_mask:
-        return ret_arr, ret_mask
-    else:
-        return ret_arr
+            ret_mask.append(cur_mask)
+    
+    if backend == "np":
+        ret_arr = np.stack(ret_arr, axis=0)
+    elif backend == "pt":
+        ret_arr = torch.stack(ret_arr, dim=0)
+    
+    return ret_arr, ret_mask if return_mask else ret_arr
+    
 
 
 def fix_tensor_to_float32(feature_dict):
