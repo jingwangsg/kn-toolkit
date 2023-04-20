@@ -16,7 +16,7 @@ conda init bash
 source $HOME/.bashrc
 conda create -n torch python=3.10 -y
 conda activate torch
-echo_and_eval("conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia")
+echo_and_eval "conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y"
 
 echo "==================install berw=================="
 cd $HOME
