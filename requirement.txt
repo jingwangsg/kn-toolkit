@@ -1,0 +1,6 @@
+pathos
+tabulate
+py3nvml
+ipdb
+ipython
+yapf
