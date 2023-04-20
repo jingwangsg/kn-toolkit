@@ -204,8 +204,9 @@ LD_LIBRARY_PATH="$HOMEBREW/lib:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH
 export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
 PATH="$HOMEBREW/bin:$PATH"
-PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
-PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
+PATH="$HOME/miniconda3/bin:$PATH"
+# PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
+# PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
 if [ -z $NO_FISH ] ; then
     exec fish

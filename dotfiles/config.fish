@@ -5,7 +5,7 @@ end
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
 if test -f "$HOME/miniconda3/bin/conda"
-    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
+    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source && echo "conda init"
 end
 # <<< conda initialize <<<
 
