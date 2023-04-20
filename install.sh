@@ -22,3 +22,9 @@ echo "==================install berw=================="
 cd $HOME
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install fish -vd
+
+echo "==================install vscode cli=================="
+cd $HOME/Downloads
+curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output vscode_cli.tar.gz
+tar -xvf vscode_cli.tar.gz
+mv code $HOME/
