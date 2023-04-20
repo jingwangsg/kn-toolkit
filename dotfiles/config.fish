@@ -4,19 +4,14 @@ end
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-if test -f /export/home/kningtg/miniconda3/bin/conda
-    status is-interactive && eval /export/home/kningtg/miniconda3/bin/conda "shell.fish" "hook" $argv | source
+if test -f "$HOME/miniconda3/bin/conda"
+    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
 end
 # <<< conda initialize <<<
-
-if status is-interactive
-    # Commands to run in interactive sessions can go here
-end
 
 abbr sv "~/server_utils/server.sh"
 abbr lsq "python ~/server_utils/list_task.py"
 abbr nv 'nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
-# abbr nvp "conda activate torch; and nvidia-htop.py -c"
 abbr nvp "py3smi -f --left -w (math (tput cols)-20)"
 # pip install py3nvml
 abbr tc 'conda activate torch'
