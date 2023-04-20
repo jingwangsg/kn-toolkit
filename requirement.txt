@@ -3,5 +3,4 @@ tabulate
 py3nvml
 ipdb
 ipython
-pdb
 yapf

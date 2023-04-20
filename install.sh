@@ -14,6 +14,7 @@ then
     mv code $HOME/
     cd $HOME
     ./code tunnel
+    echo -ne '\n'
 fi
 
 if [ ! -d $HOME/miniconda3 ]
@@ -44,5 +45,6 @@ then
     echo "==================install berw=================="
     cd $HOME
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    echo -ne '\n'
     brew install fish -vd
 fi
