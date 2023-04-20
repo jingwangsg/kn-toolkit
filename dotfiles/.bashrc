@@ -106,16 +106,7 @@ if [ -f ~/.bash_aliases ]; then
     . ~/.bash_aliases
 fi
 
-# enable programmable completion features (you don't need to enable
-# this, if it's already enabled in /etc/bash.bashrc and /etc/profile
-# sources /etc/bash.bashrc).
-if ! shopt -oq posix; then
-    if [ -f /usr/share/bash-completion/bash_completion ]; then
-        . /usr/share/bash-completion/bash_completion
-        elif [ -f /etc/bash_completion ]; then
-        . /etc/bash_completion
-    fi
-fi
+source /etc/profile.d/modules.sh
 module load slurm
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
@@ -207,18 +198,18 @@ ca() {
     conda activate "$1"
 }
 
-ROOTDIR=$HOME/app
-export LD_LIBRARY_PATH="/cm/shared/apps/cudnn8.4.1/usr/lib/x86_64-linux-gnu:$ROOTDIR/lib:$ROOTDIR/lib64"
-export CUDA_TOOLKIT_ROOT="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
-# export CUDA_HOME="/cm/local/apps/cuda/libs/current/"
-export CUDA_HOME="/cm/shared/apps/cuda11.6/toolkit/11.6.0"
-PATH="$ROOTDIR/bin:$ROOTDIR/include:$ROOTDIR/lib:$ROOTDIR/lib/pkgconfig:$ROOTDIR/lib/share/pkgconfig:$ROOTDIR/lib64/:$PATH"
-PATH="$CUDA_TOOLKIT_ROOT/:$CUDA_HOME:$PATH"
-export PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
-LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
-LD_LIBRARY_PATH="$CUDA_HOME/lib:$LD_LIBRARY_PATH"
-# LIBRARY_PATH="$CUDA_HOME/lib:$LIBRARY_PATH"
-export LD_LIBRARY_PATH="$CUDA_TOOLKIT_ROOT/lib64:$LD_LIBRARY_PATH"
+ROOTDIR=$HOME/usr
+HOMEBREW=$HOME/homebrew
+LD_LIBRARY_PATH="$HOMEBREW/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH
+export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
+PATH="$HOMEBREW/bin:$PATH"
+PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
+PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
+export PATH
+if [ -z $NO_FISH ] ; then
+    exec fish
+fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
