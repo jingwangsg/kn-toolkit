@@ -107,7 +107,7 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-module load slurm
+module load  slurm cuda11.2/toolkit/11.2.0
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
@@ -196,6 +196,23 @@ knrun_mn() {
 }
 ca() {
     conda activate "$1"
+}
+kill_nfs() {
+  # 递归搜索当前文件夹内所有 .nfs 文件
+  nfs_files=$(find . -type f -name '*.nfs')
+
+  # 遍历所有 .nfs 文件
+  for nfs_file in $nfs_files; do
+    # 使用 lsof 命令找到正在使用这个文件的进程
+    processes=$(lsof "$nfs_file" | awk 'NR>1 {print $2}' | sort -u)
+
+    # 终止这些进程
+    for process in $processes; do
+      echo "Killing process: $process"
+      kill -9 "$process"
+    done
+  done
+  
 }
 
 ROOTDIR=$HOME/usr

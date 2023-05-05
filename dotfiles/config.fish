@@ -21,7 +21,7 @@ abbr pypdb "python -m pdb -c continue "
 # abbr aner "conda activate decouplener"
 abbr fgA "python ~/server_utils/query_cluster.py --task available -n -1 | sort -n"
 abbr knrsync "rsync -avur --progress --delete"
-abbr bash "export NO_FISH=1; bash"
+abbr bash_only "export NO_FISH=1; bash"
 
 abbr gk "gpukill"
 abbr g "gpu"
