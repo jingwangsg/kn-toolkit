@@ -1,11 +1,10 @@
-from pprint import pformat
-from yapf.yapflib.yapf_api import FormatCode
-import black
 import json
 import yaml
 
 
 def yapf_pformat(obj):
+    from pprint import pformat
+    from yapf.yapflib.yapf_api import FormatCode
     """pretty print object using yapf
     https://stackoverflow.com/questions/3229419/how-to-pretty-print-nested-dictionaries
 
@@ -19,6 +18,8 @@ def yapf_pformat(obj):
     return format_code
 
 def black_pformat(obj):
+    import black
+    from pprint import pformat
     string = pformat(obj)
     format_code = black.format_str(string, mode=black.FileMode(line_length=119))
 
