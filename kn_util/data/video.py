@@ -11,10 +11,7 @@ from torch.utils.data import DataLoader
 from kn_util.data.collate import collect_features_from_sample_list, merge_list_to_tensor
 from PIL import Image
 from functools import partial
-from einops import rearrange
 import numpy as np
-import yt_dlp
-# from pytube import YouTube
 from functools import partial
 import io
 import warnings
@@ -170,6 +167,7 @@ class FFMPEG:
 
 
 class YTDLPDownloader:
+    import yt_dlp
 
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):

@@ -79,7 +79,7 @@ if [ -x /usr/bin/dircolors ]; then
     alias ls='ls --color=auto'
     #alias dir='dir --color=auto'
     #alias vdir='vdir --color=auto'
-    
+
     alias grep='grep --color=auto'
     alias fgrep='fgrep --color=auto'
     alias egrep='egrep --color=auto'
@@ -163,6 +163,8 @@ export PS1="\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\
 export WANDB_DIR="$HOME/.wandb"
 export SLURM_TMPDIR="$HOME/.tmp"
 export TMUX_TMPDIR="$HOME/.tmp"
+export TMPDIR="$HOME/.tmp"
+export HOMEBREW_TEMP="$HOME/.tmp"
 
 show_gpu() {
     echo $CUDA_VISIBLE_DEVICES
@@ -212,22 +214,22 @@ kill_nfs() {
       kill -9 "$process"
     done
   done
-  
+
 }
 
 ROOTDIR=$HOME/usr
 HOMEBREW=$HOME/homebrew
-LD_LIBRARY_PATH="$HOMEBREW/lib:$LD_LIBRARY_PATH"
+LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH:$HOMEBREW/lib
 export LD_LIBRARY_PATH
 export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
-PATH="$HOMEBREW/bin:$PATH"
 PATH="$HOME/miniconda3/bin:$PATH"
+PATH="$HOMEBREW/bin:$PATH"
 # PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
 # PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
-if [ -z $NO_FISH ] ; then
-    exec fish
-fi
+# if [ -z $NO_FISH ] ; then
+#     exec fish
+# fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!

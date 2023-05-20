@@ -24,13 +24,11 @@ class TACoSParser(IterDataPipe):
 
 class ActivityNetParser(IterDataPipe):
 
-    def __init__(self, src_pipeline, by_sample=True) -> None:
+    def __init__(self, src_pipeline) -> None:
         super().__init__()
         self.src_pipeline = src_pipeline
 
-        self.by_sample=by_sample
-    
-    def iter_by_sample(self):
+    def __iter__(self):
         for json_data in self.src_pipeline:
             for video_id, annot in json_data.items():
                 duration = annot["duration"]
@@ -39,14 +37,10 @@ class ActivityNetParser(IterDataPipe):
                     text_id = f"{video_id}_{idx}"
 
                     yield dict(video_id=video_id, text_id=text_id, gt=gt, text=sentence, duration=duration)
-    
 
-    def __iter__(self):
-        iter = self.iter_by_sample() if self.by_sample else self.iter_by_video()
-        return iter
-        
-def build_nlvl_parser(dataset, dataset_dir, split="train"):
-    annot_file = osp.join(dataset_dir, "annot", split + ".json")
+
+def build_nlvl_parser(annot_dir, dataset, split="train"):
+    annot_file = osp.join(annot_dir, split + ".json")
     annot_file_wrapper = IterableWrapper([annot_file])
     dataset_dp = annot_file_wrapper.open_files("r", encoding="utf-8").parse_json_files().map(itemgetter(1))
     if dataset == "tacos":

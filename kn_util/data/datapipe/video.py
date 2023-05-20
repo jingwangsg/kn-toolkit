@@ -110,11 +110,10 @@ class DecordFrameLoader(IterDataPipe):
         self.to_images = to_images
         self.to_array = to_array
 
+
     def __iter__(self):
         for x in self.src_pipeline:
-            # video_path_raw = x[self.from_key]
-            # with open(video_path_raw, "rb") as f:
-            buffer = x[self.from_key]
+            buffer = x[self.from_key] if self.from_key else x
             vr = VideoReader(buffer, width=self.width, height=self.height)
 
             indices = list(range(0, len(vr), self.stride))
