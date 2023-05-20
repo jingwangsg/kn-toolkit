@@ -4,7 +4,7 @@ import pandas as pd
 from functools import partial
 from pathos.multiprocessing import Pool
 from tqdm.contrib.concurrent import thread_map
-from time import time
+import time
 from tqdm import tqdm
 import ipdb
 import io
@@ -12,21 +12,26 @@ import io
 from collections import OrderedDict
 
 
-def map_async(iterable, func, num_process=30, desc: object = ""):
-    p = Pool(num_process)
-    # ret = []
-    # for it in tqdm(iterable, desc=desc):
-    #     ret.append(p.apply_async(func, args=(it,)))
-    ret = p.map_async(func=func, iterable=iterable)
-    total = ret._number_left
-    # pbar = tqdm(total=total, desc=desc)
-    # while ret._number_left > 0:
-    #     pbar.n = total - ret._number_left
-    #     pbar.refresh()
-    #     time.sleep(0.1)
-    p.close()
+def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False):
+    """while test_flag=True, run sequentially"""
+    if test_flag:
+        ret = [func(x) for x in tqdm(iterable)]
+        return ret
+    else:
+        p = Pool(num_process)
+        # ret = []
+        # for it in tqdm(iterable, desc=desc):
+        #     ret.append(p.apply_async(func, args=(it,)))
+        ret = p.map_async(func=func, iterable=iterable)
+        total = ret._number_left
+        pbar = tqdm(total=total, desc=desc)
+        while ret._number_left > 0:
+            pbar.n = total - ret._number_left
+            pbar.refresh()
+            time.sleep(0.1)
+        p.close()
 
-    return ret.get()
+        return ret.get()
 
 
 class GPUCluster:
@@ -61,8 +66,6 @@ class GPUCluster:
 
         cmd_with_timeout = prefix + cmd
 
-        # print(cmd_with_timeout)
-
         result = subprocess.run(cmd_with_timeout, shell=True, capture_output=True, text=True)
         # print(cmd_with_timeout)
 
@@ -78,9 +81,9 @@ class GPUCluster:
             for _, row in self.server_info.iterrows()
         ]
 
-        st = time()
+        st = time.time()
         node_stdout = map_async(iterable=inputs_list, func=self._query_single_node)
-        print(f"query costs {time()-st}(s)")
+        print(f"query costs {time.time()-st}(s)")
         return node_stdout
 
     def find_gpu_available(self):
