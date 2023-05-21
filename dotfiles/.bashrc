@@ -107,7 +107,8 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-module load  slurm cuda11.2/toolkit/11.2.0
+LATEST_CUDA_MODULE=$(module avail --contains toolkit | tail -1 | tr ' ' '\n' | grep -v '^$' | tail -n 1)
+module load  slurm $LATEST_CUDA_MODULE
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
