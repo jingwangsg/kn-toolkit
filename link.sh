@@ -1,5 +1,4 @@
 #/bin/bash
-source dotfiles/variable.sh
 
 echo "=> create symlink for .bashrc"
 rm -rf ~/.bashrc
