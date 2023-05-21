@@ -219,7 +219,7 @@ kill_nfs() {
 
 ROOTDIR=$HOME/usr
 HOMEBREW=$HOME/homebrew
-LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH:$HOMEBREW/lib
+LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH:$HOMEBREW/lib
 export LD_LIBRARY_PATH
 export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
 PATH="$HOME/miniconda3/bin:$PATH"
