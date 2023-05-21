@@ -107,7 +107,7 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-LATEST_CUDA_MODULE=$(module avail | grep 'cuda'| tr ' ' '\n'  | grep -v '^$' | grep 'cuda11.*/toolkit' | tail -n 1)
+LATEST_CUDA_MODULE=$(module avail | grep 'cuda'| tr ' ' '\n'  | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
 module load  slurm $LATEST_CUDA_MODULE
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
