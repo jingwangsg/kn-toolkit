@@ -1,4 +1,4 @@
-from lazy import LazyCall as L
+from .lazy import LazyCall as L
 
 import copy
 from omegaconf import DictConfig

@@ -1,8 +1,6 @@
-import git
-
-
 #https://www.zhihu.com/question/269707221/answer/2677167861
 def commit(content):
+    import git
     repo = git.Repo(search_parent_directories=True)
     try:
         g = repo.git

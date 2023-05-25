@@ -228,9 +228,9 @@ PATH="$HOMEBREW/bin:$PATH"
 # PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
 # PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
-# if [ -z $NO_FISH ] ; then
-#     exec fish
-# fi
+if [ -z $NO_FISH ] ; then
+    exec fish
+fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!

@@ -5,5 +5,5 @@ from .multiproc import *
 from .pretty import *
 from .ops import add_prefix_dict, seed_everything, eval_env
 from .file import *
-from .signal import Signal
 from .git_utils import commit
+from .print import dict2str, max_memory_allocated

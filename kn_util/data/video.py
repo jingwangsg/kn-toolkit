@@ -166,9 +166,8 @@ class FFMPEG:
         map_async(args, func_single, num_process=64)
 
 
+import yt_dlp
 class YTDLPDownloader:
-    import yt_dlp
-
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # scale should be conditon like "<=224" or ">=224"

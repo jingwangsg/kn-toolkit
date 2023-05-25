@@ -6,7 +6,6 @@ import dill
 import pickle
 import csv
 import os
-import h5py
 import subprocess
 from typing import Sequence, Mapping
 import os.path as osp
@@ -73,6 +72,7 @@ def load_csv(fn, delimiter=",", has_header=True):
 
 
 def save_hdf5(obj, fn, **kwargs):
+    import h5py
     if isinstance(fn, str):
         with h5py.File(fn, "a") as f:
             save_hdf5_recursive(obj, f, **kwargs)
@@ -98,6 +98,7 @@ def save_hdf5_recursive(kv, cur_handler, **kwargs):
 
 
 def load_hdf5(fn):
+    import h5py
     if isinstance(fn, str):
         with h5py.File(fn, "r") as f:
             return load_hdf5_recursive(f)
