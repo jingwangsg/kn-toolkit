@@ -6,8 +6,8 @@ from pathos.multiprocessing import Pool
 from tqdm.contrib.concurrent import thread_map
 import time
 from tqdm import tqdm
-import ipdb
 import io
+import os
 
 from collections import OrderedDict
 
@@ -299,7 +299,7 @@ def update_server_list(server_info_fn):
 if __name__ == "__main__":
     args = read_args()
     server_info_fn = "~/server_utils/server_list.csv"
-    if args.update:
+    if args.update or not os.path.exists(server_info_fn):
         update_server_list(server_info_fn)
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)
 
