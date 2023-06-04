@@ -1,30 +1,29 @@
-from .logger import get_logger
+# from .logger import get_logger
 from omegaconf import OmegaConf
 import copy
 import hydra
-
-# class Registry:
-#     def __init__(self):
-#         self._cls_dict = dict()
-
-#     def register(self, name=None):
-#         def decorator(cls):
-#             # if name is None:
-#             #     name = cls.__name__
-#             self._cls_dict[name] = cls
-#             return cls
-
-#         return decorator
-
-#     def build(self, name, **kwargs):
-#         return self._cls_dict[name](**kwargs)
-
-#     def build_cls(self, name):
-#         return self._cls_dict[name]
-
-log = get_logger(__name__)
+from loguru import logger
 
 class Registry:
+    def __init__(self):
+        self._cls_dict = dict()
+
+    def register(self, name=None):
+        def decorator(cls):
+            # if name is None:
+            #     name = cls.__name__
+            self._cls_dict[name] = cls
+            return cls
+
+        return decorator
+
+    def build(self, name, **kwargs):
+        return self._cls_dict[name](**kwargs)
+
+    def build_cls(self, name):
+        return self._cls_dict[name]
+
+class RegistryGlobal:
     """mini version of https://github.com/facebookresearch/mmf/blob/main/mmf/common/registry.py"""
 
     mapping = dict()
@@ -41,7 +40,7 @@ class Registry:
                     raise Exception(f"conflict at [{domain}]{name}")
             else:
                 """only log at first import"""
-                log.info(f"[{domain}] {inp_cls.__name__} registered as {name}")
+                logger.info(f"[{domain}] {inp_cls.__name__} registered as {name}")
             cls.mapping[domain][name] = inp_cls
             return inp_cls
 
@@ -106,22 +105,6 @@ class Registry:
         return cls.build(_name, "collater", **kwargs)
 
     @classmethod
-    def register_processor(cls, _name):
-        return cls.register_cls(_name, "processor")
-
-    @classmethod
-    def build_processor(cls, _name, **kwargs):
-        return cls.build(_name, "processor", **kwargs)
-
-    @classmethod
-    def register_task(cls, _name):
-        return cls.register_cls(_name, "task")
-
-    @classmethod
-    def build_task(cls, _name, **kwargs):
-        return cls.build(_name, "task", **kwargs)
-
-    @classmethod
     def register_metric(cls, _name):
         return cls.register_cls(_name, "metric")
 
@@ -138,13 +121,13 @@ class Registry:
         return cls.build(_name, "loss", **kwargs)
 
     @classmethod
-    def register_pipeline(cls, _name):
-        return cls.register_cls(_name, "pipeline")
-
-    @classmethod
-    def build_pipeline(cls, _name, **kwargs):
-        return cls.build(_name, "pipeline", **kwargs)
+    def register_mapper(cls, _name):
+        return cls.register_cls(_name, "mapper")
     
+    @classmethod
+    def build_mapper(cls, _name, **kwargs):
+        return cls.build(_name, "mapper", **kwargs)
+
     @classmethod
     def register_function(cls, _name):
         return cls.register_cls(_name, "function")
@@ -169,7 +152,7 @@ class Registry:
             if id(obj) != id(cls.mapping["object"][name]):
                 raise Exception(f"conflict at [object]{name}")
         if verbose:
-            log.info(f"[object] {id(obj)} registered as {name}")
+            logger.info(f"[object] {id(obj)} registered as {name}")
 
         cls.mapping["object"][name] = obj
 
@@ -184,10 +167,10 @@ class Registry:
     @classmethod
     def destry_object(cls, name, verbose=False):
         if verbose:
-            log.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
+            logger.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
         del cls.mapping["object"][name]
 
-registry = Registry()
+registry = RegistryGlobal()
 global_upload = registry.register_object
 global_get = registry.get_object
 global_set = registry.set_object

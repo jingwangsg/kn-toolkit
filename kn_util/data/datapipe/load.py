@@ -7,7 +7,7 @@ import h5py
 @functional_datapipe("load_hdf5")
 class HDF5Loader(IterDataPipe):
 
-    def __init__(self, src_pipeline, hdf5_file, key_template="{}", output_key_prefix="") -> None:
+    def __init__(self, src_pipeline, hdf5_file, key_template="{key}", output_key_prefix="") -> None:
         super().__init__()
         self.src_pipeline = src_pipeline
         self.hdf5_file = hdf5_file

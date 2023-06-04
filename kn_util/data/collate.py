@@ -1,29 +1,47 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import List, Dict, Union
+from typing import List, Optional, Union
 import numpy as np
 from .tensor_ops import general_pad_arr
+from beartype import beartype
 
+ListOfArrayLike = List[Union[np.ndarray, torch.Tensor]]
+Scaler = Union[int, float]
+
+@beartype
 def general_pad(
-    arr_list: List[Union[np.ndarray, torch.Tensor]],
-    fill_value=None,
-    axis=None,
-    to_length=None,
-    to_multiple=None,
-    return_mask=True,
+    *, 
+    arr_list: ListOfArrayLike,
+    fill_value: Scaler,
+    axis: int,
+    to_length: Optional[int] = None,
+    to_multiple: Optional[int] = None,
+    return_mask: Optional[bool] = False
 ):
+    """ Pad a list of array-like objects to the same length along a given axis.
+    Args:
+        arr_list: A list of array-like objects.
+        fill_value: The value to fill the padded elements with.
+        axis: The axis to pad along.
+        to_length: The length to pad to. If None, the maximum length of the arrays in arr_list is used.
+        to_multiple: If not None, the length is padded to the smallest multiple of to_multiple that is greater than or equal to the length.
+        return_mask: If True, a mask is returned indicating which elements were padded.
+    Returns:
+        A tuple of (padded_arr_list, mask) if return_mask is True, otherwise just padded_arr_list.
+        Here padded_arr_list is a list of the padded array-like objects.
+    """
     assert axis is not None
     assert fill_value is not None
 
-    backend = None
+    # backend = None
 
-    if isinstance(arr_list[0], torch.Tensor):
-        backend = "pt"
-    elif isinstance(arr_list[0], np.ndarray):
-        backend = "np"
-    else:
-        raise ValueError("arr_list must be a list of torch.Tensor or np.ndarray")
+    # if isinstance(arr_list[0], torch.Tensor):
+    #     backend = "pt"
+    # elif isinstance(arr_list[0], np.ndarray):
+    #     backend = "np"
+    # else:
+    #     raise ValueError("arr_list must be a list of torch.Tensor or np.ndarray")
 
 
     if not isinstance(arr_list, list):
@@ -48,14 +66,12 @@ def general_pad(
         if return_mask:
             ret_mask.append(cur_mask)
     
-    if backend == "np":
-        ret_arr = np.stack(ret_arr, axis=0)
-    elif backend == "pt":
-        ret_arr = torch.stack(ret_arr, dim=0)
+    # if backend == "np":
+    #     ret_arr = np.stack(ret_arr, axis=0)
+    # elif backend == "pt":
+    #     ret_arr = torch.stack(ret_arr, dim=0)
     
     return ret_arr, ret_mask if return_mask else ret_arr
-    
-
 
 def fix_tensor_to_float32(feature_dict):
     for k, v in feature_dict.items():

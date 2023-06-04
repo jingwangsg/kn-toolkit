@@ -4,8 +4,8 @@ end
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-if test -f "$HOME/miniconda3/bin/conda"
-    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source 
+if test -f /export/home/kningtg/miniconda3/bin/conda
+    status is-interactive && eval /export/home/kningtg/miniconda3/bin/conda "shell.fish" "hook" $argv | source
 end
 # <<< conda initialize <<<
 
@@ -63,6 +63,12 @@ function knkill
     ps -u kningtg --no-headers -o pid,comm= | grep -v -E "^\$|((string echo $PPID))|slurmstepd|bash|tmux" | grep -- $filter | awk '{print $1}' | xargs kill -9
 end
 
+function gpukill
+    set variable $argv[1]
+    for i in (string split "," $variable)
+        nvidia-smi pmon -c 1 -d 1 -i $i | tail -n +3 | awk '{print $2}' | xargs kill -9
+    end
+end
 
 function copilot_what-the-shell
     set TMPFILE (mktemp)
