@@ -8,6 +8,7 @@ import time
 from tqdm import tqdm
 import io
 import os
+import os.path as osp
 
 from collections import OrderedDict
 
@@ -299,7 +300,8 @@ def update_server_list(server_info_fn):
 if __name__ == "__main__":
     args = read_args()
     server_info_fn = "~/server_utils/server_list.csv"
-    if args.update or not os.path.exists(server_info_fn):
+    import pudb; pu.db #FIXME pudb
+    if args.update or not osp.exists(osp.expanduser(server_info_fn)):
         update_server_list(server_info_fn)
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)
 
