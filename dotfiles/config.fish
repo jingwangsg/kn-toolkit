@@ -4,8 +4,8 @@ end
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-if test -f /export/home2/kningtg/miniconda3/bin/conda
-    eval /export/home2/kningtg/miniconda3/bin/conda "shell.fish" "hook" $argv | source
+if test -f /export/home/kningtg/miniconda3/bin/conda
+    eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
 end
 # <<< conda initialize <<<
 
