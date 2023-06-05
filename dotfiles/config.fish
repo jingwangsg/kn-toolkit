@@ -43,7 +43,7 @@ function fu
 end
 
 function sg
-  python $HOME/server_utils/dist_train.py --gpus $argv[1]
+  python $HOME/server_utils/dist_train.py --gpus $argv
 end
 
 function knkill
