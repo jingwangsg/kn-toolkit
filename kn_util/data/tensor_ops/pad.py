@@ -32,7 +32,9 @@ def _general_pad_arr_pt(arr, axis, to_length,fill_value=None, return_mask=False)
     return ret_arr, ret_mask if return_mask else ret_arr
 
 
-def _general_pad_arr_np(arr, axis, to_length,fill_value=None, return_mask=False):
+def general_pad_arr(arr, axis, to_length,fill_value=None, return_mask=False):
+    """ pad single array to to_length along axis
+    """
     to_shape = list(arr.shape)
     to_shape[axis] = to_length
     shape_dim = len(to_shape)
@@ -51,31 +53,13 @@ def _general_pad_arr_np(arr, axis, to_length,fill_value=None, return_mask=False)
     full_arr[sub_slices] = arr
     ret_arr = full_arr
 
+    ret_mask = []
     if return_mask:
         full_arr = np.zeros(to_shape, dtype=bool)
         full_arr[sub_slices] = True
         flatten_slices = tuple([slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)])
-        ret_mask += [full_arr[flatten_slices]]
+        ret_mask = full_arr[flatten_slices]
     
     return ret_arr, ret_mask if return_mask else ret_arr
-
-def general_pad_arr(arr, *args, **kwargs):
-    """ pad array to specified length
-    Args:
-        arr: array to pad
-        axis: axis to pad
-        to_length: length to pad to
-        fill_value: value to fill with
-        return_mask: whether to return mask
-    Returns:
-            padded array
-    """
-    backend =  "pt" if isinstance(arr, torch.Tensor) else "np"
-    if backend == "pt":
-        return _general_pad_arr_pt(arr, *args, **kwargs)
-    elif backend == "np":
-        return _general_pad_arr_np(arr,*args, **kwargs)
-    else:
-        raise ValueError(f"backend {backend} not supported")
 
 

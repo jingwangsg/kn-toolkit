@@ -6,18 +6,22 @@ import numpy as np
 
 from torchtext.data.utils import get_tokenizer
 
+
 def extend_vocab(pretrained_vocab, token, vector):
     pretrained_vocab.itos.extend([token])
     pretrained_vocab.stoi[token] = pretrained_vocab.vectors.shape[0]
     pretrained_vocab.vectors = torch.cat([pretrained_vocab.vectors, vector], dim=0)
 
+
 class GloveTokenizeProcessor:
+
     def __init__(
         self,
         glove="glove.6B.300d",
         vocab_file=None,
-        upload_vocab_key=None,
+        global_vocab_key=None,
         tokenizer="split",
+        cache_dir=None,
         to_words=False,
         to_indices=False,
         to_embeddings=False,
@@ -27,9 +31,9 @@ class GloveTokenizeProcessor:
         Args:
             glove (str, optional): Glove name. Defaults to "glove.6B.300d".
             vocab_file (str, optional): Path to vocab file. Defaults to None.
-            upload_vocab_key (str, optional): Global key to upload vocab. Defaults to None.
+            global_vocab_key (str, optional): Global key to upload vocab. Defaults to None.
             tokenizer (str, optional): Tokenizer name. Defaults to "split".
-            cache_dir (str, optional): Path to cache dir. Defaults to None.
+            cache_dir (str, optional): Path for storing downloaded glove file. Defaults to None.
             to_words (bool, optional): Whether to return words. Defaults to False.
             to_indices (bool, optional): Whether to return indices. Defaults to False.
             to_embeddings (bool, optional): Whether to return embeddings. Defaults to False.
@@ -39,10 +43,11 @@ class GloveTokenizeProcessor:
 
         self.vocab_file = vocab_file
         self.glove = glove
-        self.upload_vocab_key = upload_vocab_key
+        self.global_vocab_key = global_vocab_key
         self.to_words = to_words
         self.to_indices = to_indices
         self.to_embeddings = to_embeddings
+        self.cache_dir = cache_dir
 
         if tokenizer == "split":
             self.tokenizer = lambda s: delete_noisy_char(s).lower().split()
@@ -52,7 +57,7 @@ class GloveTokenizeProcessor:
         self._load_vocab()
 
     def _load_vocab(self):
-        global_vocab = global_get(self.upload_vocab_key)
+        global_vocab = global_get(self.global_vocab_key)
         if global_vocab:
             # vocab has been built and uploaded
             itos, vectors = global_vocab
@@ -84,9 +89,9 @@ class GloveTokenizeProcessor:
 
         print(f"glove vocab built with {len(itos)} words")
 
-        if global_vocab is None and self.upload_vocab_key is not None:
-            global_set(self.upload_vocab_key, (itos, vectors))
-
+        if global_vocab is None and self.global_vocab_key is not None:
+            cache = dict(itos=itos, stoi=stoi, vectors=vectors)
+            global_set(self.global_vocab_key, cache)
 
     def __call__(self, text):
         result = dict()
@@ -95,10 +100,10 @@ class GloveTokenizeProcessor:
         text_inds = np.array([self.stoi.get(w, self.stoi["<unk>"]) for w in text_tok])
         text_embeddings = np.stack([self.vectors[ind] for ind in text_inds], axis=0)
         if self.to_words:
-            result[self.from_key + ".tok"] = text_tok
+            result["tokens"] = text_tok
         if self.to_indices:
-            result[self.from_key + ".inds"] = text_inds
+            result["indicies"] = text_inds
         if self.to_embeddings:
-            result[self.from_key + ".embs"] = text_embeddings
-        
+            result["embeddings"] = text_embeddings
+
         return result

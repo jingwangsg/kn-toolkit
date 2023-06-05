@@ -2,12 +2,9 @@ if status is-interactive
     # Commands to run in interactive sessions can go here
 end
 
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
 if test -f /export/home/kningtg/miniconda3/bin/conda
-    eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
+    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
 end
-# <<< conda initialize <<<
 
 abbr sv "~/server_utils/server.sh"
 abbr lsq "python ~/server_utils/list_task.py"

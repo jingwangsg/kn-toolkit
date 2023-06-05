@@ -11,7 +11,6 @@ Scaler = Union[int, float]
 
 @beartype
 def general_pad(
-    *, 
     arr_list: ListOfArrayLike,
     fill_value: Scaler,
     axis: int,
