@@ -17,7 +17,6 @@ abbr pyipdb "python -m ipdb -c continue "
 abbr pypdb "python -m pdb -c continue "
 # abbr aner "conda activate decouplener"
 abbr fgA "python ~/server_utils/query_cluster.py --task available -n -1 | sort -n"
-abbr knrsync "rsync -avur --progress --delete"
 abbr bash_only "export NO_FISH=1; bash"
 
 abbr gk "gpukill"
@@ -25,6 +24,14 @@ abbr g "gpu"
 abbr dskill "knkill; and knkill deepspeed; and knkill acclerate"
 abbr 'git?' 'copilot_git-assist'
 abbr '??' 'copilot_what-the-shell'
+
+function knrsync
+    set src $argv[1]
+    set dst $argv[2]
+    set cmd "python $HOME/server_utils/rsync_tool.py $src $dst"
+    echo $cmd
+    eval $cmd
+end
 
 function gpu
     export CUDA_VISIBLE_DEVICES=$argv

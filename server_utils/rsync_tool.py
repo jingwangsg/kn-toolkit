@@ -4,8 +4,8 @@ import argparse
 def parse_args():
     args = argparse.ArgumentParser()
     format = "USER@IP:DIR"
-    args.add_argument("from_dir", type=str, required=True, help=format)
-    args.add_argument("to_dir", type=str, required=True, help=format)
+    args.add_argument("from_dir", type=str, help=format)
+    args.add_argument("to_dir", type=str, help=format)
 
     return args.parse_args()
 
@@ -33,10 +33,12 @@ def main(args):
 
     if from_is_remote and to_is_remote:
         print("using remote - remote")
-        subprocess.run(f"ssh -R 127.0.0.1:9999:{to_ip} {from_user}@${from_ip} 'rsync -au -avz -v -P -e \"ssh -p 9999\" {from_path} {to_user}@127.0.0.1:{to_path}'", shell=True)
+        cmd = f"ssh -R 127.0.0.1:9999:{to_ip} {from_user}@${from_ip} 'rsync -au -avz -v -P -e \"ssh -p 9999\" {from_path} {to_user}@127.0.0.1:{to_path}'"
     else:
         print("using local - remote")
-        subprocess.run(f"rsync -avzP {from_dir} {to_dir}")
+        cmd = f"rsync -avzP {from_dir} {to_dir}"
+    print(cmd)
+    subprocess.run(cmd, shell=True)
 
 if __name__ == "__main__":
     args = parse_args()

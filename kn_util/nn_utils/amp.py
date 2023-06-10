@@ -1,6 +1,4 @@
 import torch
-from torch._six import inf
-
 
 def ampscaler_get_grad_norm(parameters, norm_type: float = 2.0) -> torch.Tensor:
     if isinstance(parameters, torch.Tensor):
