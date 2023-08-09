@@ -25,13 +25,19 @@ abbr dskill "knkill; and knkill deepspeed; and knkill acclerate"
 abbr 'git?' 'copilot_git-assist'
 abbr '??' 'copilot_what-the-shell'
 
-function knrsync
-    set src $argv[1]
-    set dst $argv[2]
-    set cmd "python $HOME/server_utils/rsync_tool.py $src $dst"
-    echo $cmd
-    eval $cmd
+abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
+
+function rsync_delete
+    rsync --delete-before --force -r ~/.empty/ $argv
 end
+
+# function knrsync
+#     set src $argv[1]
+#     set dst $argv[2]
+#     set cmd "python $HOME/server_utils/rsync_tool.py $src $dst"
+#     echo $cmd
+#     eval $cmd
+# end
 
 function gpu
     export CUDA_VISIBLE_DEVICES=$argv
