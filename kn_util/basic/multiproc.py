@@ -5,7 +5,6 @@ from pathos.multiprocessing import Pool
 from pathos.helpers import mp
 from pathos.threading import ThreadPool
 from pathos.pools import ProcessPool
-import tqdm
 import time
 
 
