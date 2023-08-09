@@ -27,6 +27,10 @@ abbr '??' 'copilot_what-the-shell'
 
 abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
 
+function rsync_delete
+    rsync --delete-before --force -r ~/.empty/ $argv
+end
+
 # function knrsync
 #     set src $argv[1]
 #     set dst $argv[2]
