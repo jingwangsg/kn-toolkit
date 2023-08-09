@@ -11,6 +11,7 @@ def parse_args():
     format = "USER@IP:DIR"
     args.add_argument("from_dir", type=str, help=format)
     args.add_argument("to_dir", type=str, help=format)
+<<<<<<< HEAD
     args.add_argument(
         "--async-dir",
         default=False,
@@ -24,6 +25,8 @@ def parse_args():
         type=str,
         default="9999",
     )
+=======
+>>>>>>> origin/master
 
     return args.parse_args()
 
@@ -90,6 +93,7 @@ def main(args):
 
     if from_is_remote and to_is_remote:
         print("using remote - remote")
+<<<<<<< HEAD
 
         construct_cmd = lambda from_path_holder: cmd_ssh_relay(
             from_user=from_user,
@@ -144,6 +148,14 @@ def main(args):
             num_process=args.num_process,
         )
 
+=======
+        cmd = f"ssh -R 127.0.0.1:9999:{to_ip} {from_user}@${from_ip} 'rsync -au -avz -v -P -e \"ssh -p 9999\" {from_path} {to_user}@127.0.0.1:{to_path}'"
+    else:
+        print("using local - remote")
+        cmd = f"rsync -avzP {from_dir} {to_dir}"
+    print(cmd)
+    subprocess.run(cmd, shell=True)
+>>>>>>> origin/master
 
 if __name__ == "__main__":
     args = parse_args()
