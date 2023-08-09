@@ -2,6 +2,8 @@ if status is-interactive
     # Commands to run in interactive sessions can go here
 end
 
+set tide_context_always_display true
+
 if test -f $HOME/miniconda3/bin/conda
     status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
 end
@@ -17,6 +19,7 @@ abbr pyipdb "python -m ipdb -c continue "
 abbr pypdb "python -m pdb -c continue "
 # abbr aner "conda activate decouplener"
 abbr fgA "python ~/server_utils/query_cluster.py --task available -n -1 | sort -n"
+abbr fst "python ~/server_utils/query_cluster.py --task stat"
 abbr bash_only "export NO_FISH=1; bash"
 
 abbr gk "gpukill"

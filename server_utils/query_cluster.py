@@ -37,7 +37,9 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
 
 class GPUCluster:
     def __init__(self, server_info_fn, timeout):
-        server_info = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
+        server_info = pd.read_csv(
+            server_info_fn, names=["node_idx", "partition", "gpu_type"]
+        )
         server_info["partition"] = server_info["partition"].astype(str)
         server_info["gpu_type"] = server_info["gpu_type"].astype(str)
         self.server_info = server_info
@@ -67,10 +69,14 @@ class GPUCluster:
 
         cmd_with_timeout = prefix + cmd
 
-        result = subprocess.run(cmd_with_timeout, shell=True, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd_with_timeout, shell=True, capture_output=True, text=True
+        )
         # print(cmd_with_timeout)
 
-        if not result.stdout and ("revoke" in result.stderr or "error" in result.stderr):
+        if not result.stdout and (
+            "revoke" in result.stderr or "error" in result.stderr
+        ):
             print(f"[FAIL] node{node_idx:02d} | {result.stderr}")
             # pass
 
@@ -87,10 +93,8 @@ class GPUCluster:
         print(f"query costs {time.time()-st}(s)")
         return node_stdout
 
-    def find_gpu_available(self):
-        gpu_query_cmd = (
-            "nvidia-smi --query-gpu=gpu_name,memory.free,memory.total --format=csv,nounits"
-        )
+    def get_memory_dataframe(self):
+        gpu_query_cmd = "nvidia-smi --query-gpu=gpu_name,memory.free,memory.total --format=csv,nounits"
         node_stdouts = self.query_all_node(gpu_query_cmd)
 
         df_list = []
@@ -114,13 +118,13 @@ class GPUCluster:
 
         return df
 
-    def find_gpu_usage(self, username="kningtg", cmd_include=""):
-        gpu_query_cmd = (
-            f"py3smi -f --left -w $(($(tput cols)-30)) | grep {username}"
-            if not cmd_include
-            else f"py3smi -f --left -w $(($(tput cols)-30)) | grep {username} | grep {cmd_include}"
-        )
-        
+    def find_gpu_available(self):
+        df = self.get_memory_dataframe()
+        return df
+
+    def get_usage_dataframe(self):
+        gpu_query_cmd = f"py3smi -f --left -w $(($(tput cols)-30))"
+
         node_stdouts = self.query_all_node(gpu_query_cmd)
 
         item_list = []
@@ -129,29 +133,24 @@ class GPUCluster:
             if not node_out:
                 continue
 
-            for line in node_out.split("\n"):
-                if not line:
-                    continue
+            lines = [_.strip() for _ in node_out.split("\n")]
+            lines = lines[lines.index("") + 5 : -2]  # include process info only
 
+            for line in lines:
                 line = line.replace(" days", "-days")
-
                 _id, usr, pid, time, _ = line.strip("|").strip().split(maxsplit=4)
                 cmd, size = _.rsplit(maxsplit=1)
 
-                if cmd_include not in cmd:
-                    continue
-                # import ipdb; ipdb.set_trace() #FIXME ipdb
-
                 item = {
-                    "partition": self.server_info[self.server_info["node_idx"] == node_idx][
-                        "partition"
-                    ].item(),
+                    "partition": self.server_info[
+                        self.server_info["node_idx"] == node_idx
+                    ]["partition"].item(),
                     "gpu.id": f"node{node_idx:02d}_#" + _id,
                     "gpu.occupied": size,
                     "PID": pid,
                     "user": usr,
                     "time": time,
-                    "cmd": cmd
+                    "cmd": cmd,
                 }
 
                 item_list += [item]
@@ -160,101 +159,30 @@ class GPUCluster:
 
         return df
 
+    def find_gpu_usage(self, username="", cmd_include=""):
+        df = self.get_usage_dataframe()
+
+        if username:
+            df = df[df["user"].str.contains(username)]
+
+        if cmd_include:
+            df = df[df["cmd"].str.contains(cmd_include)]
+
+        return df
+
 
 def read_args():
     args = argparse.ArgumentParser()
     # args.add_argument("-m", "--mem_thre", default="0", type=str)
     args.add_argument("-t", "--task", type=str)
-    args.add_argument("-u", "--user", default="kningtg", type=str)
-    args.add_argument("-c", "--command_include", default="", type=str)
+    args.add_argument("-u", "--user", default="", type=str)
+    args.add_argument("-c", "--command", default="", type=str)
     args.add_argument("-n", "--n_gpu", default=20, type=int)
     args.add_argument("-l" "--long", action="store_true")
     args.add_argument("--output_all", action="store_true")
     args.add_argument("--timeout", default=15, type=int)
     args.add_argument("--update", action="store_true")
     return args.parse_args()
-
-
-'''
-def query_node(node_idx, partition_name, info, mem_thre, delay):
-    ret = []
-
-    # print(f"node_idx:{node_idx} | partition: {partition_name}")
-    cmd = f"""
-    module load cuda90/toolkit/9.0.176 && \
-    timeout {delay} srun -p {partition_name} -w node{node_idx} \
-    nvidia-smi --query-gpu=memory.free,memory.total\
-    --format=csv,nounits,noheader
-    """
-    result = subprocess.Popen(cmd, shell=True, capture_output=True, text=True)
-    if result.stdout != "":
-        lines = result.stdout.split("\n")
-        for idx, line in enumerate(lines):
-            if line == "":
-                continue
-            try:
-                mem_rest, mem_total = line.split(",")
-                mem_rest, mem_total = int(mem_rest.strip()), int(mem_total.strip())
-                if mem_rest > mem_thre:
-                    ret.append(
-                        (f"node_{node_idx}_gpu_{idx}", [mem_rest, mem_total, info])
-                    )
-            except:
-                pass
-    if ret == []:
-        print(f"node{node_idx} not available!")
-
-    return ret
-
-
-def query_node_wrap(args, mem_thre, delay):
-    return query_node(*args, mem_thre=mem_thre, delay=delay)
-
-
-def find_gpu(mem_thre, delay=5):
-
-    gpu_dict = {}
-
-    with open("/export/home/kningtg/server_utils/server_list.csv", "r") as f:
-        server_infos = f.readlines()
-
-    func_args_list = []
-
-    for server_info in server_infos:
-        node_idx, partition_name, info = server_info.split(",")
-        info = info.strip()
-        if partition_name == "NA":
-            continue
-        func_args_list += [(node_idx, partition_name, info)]
-
-    query_node_func = partial(query_node_wrap, mem_thre=mem_thre, delay=delay)
-    # ipdb.set_trace()
-
-    rets = map_async(func_args_list, query_node_func, num_process=len(func_args_list))
-    # rets = [query_node_func(x) for x in func_args_list]
-    flat_ret = []
-    for ret in rets:
-        flat_ret += ret
-    gpu_dict = dict(flat_ret)
-
-    df = pd.DataFrame.from_dict(
-        gpu_dict, orient="index", columns=["mem_rest", "mem_total", "info"]
-    )
-    return df
-
-
-def main():
-    args = read_args()
-    mem_thre = eval(args.mem_thre)
-    df = find_gpu(mem_thre)
-    # print(gpu_dict)
-    df.sort_values(by=["mem_rest"], ascending=False, inplace=True)
-    with pd.option_context("display.max_rows", None, "display.max_columns", None):
-        if args.n_gpu == -1:
-            print(df)
-        else:
-            print(df.iloc[: args.n_gpu, :])
-'''
 
 
 def update_server_list(server_info_fn):
@@ -279,10 +207,9 @@ def update_server_list(server_info_fn):
             item[k] = v
 
         # print(item)
-        if "Partitions" not in item:
-            continue
 
-        if item["NodeName"] == "fileserver":
+        not_gpu_node = item["NodeName"] == "fileserver" or "Partitions" not in item
+        if not_gpu_node:
             continue
 
         ordered_item = OrderedDict(
@@ -299,13 +226,14 @@ def update_server_list(server_info_fn):
 
 if __name__ == "__main__":
     args = read_args()
-    server_info_fn = "~/server_utils/server_list.csv"
-    if args.update or not osp.exists(osp.expanduser(server_info_fn)):
+    server_info_fn = osp.expanduser("~/server_utils/server_list.csv")
+
+    if args.update or not osp.exists(server_info_fn):
         update_server_list(server_info_fn)
     gpu_cluster = GPUCluster(server_info_fn=server_info_fn, timeout=args.timeout)
 
     if args.task == "usage":
-        df = gpu_cluster.find_gpu_usage(username=args.user, cmd_include=args.command_include)
+        df = gpu_cluster.find_gpu_usage(username=args.user, cmd_include=args.command)
         print(df.to_markdown(index=False))
     elif args.task == "available":
         df = gpu_cluster.find_gpu_available()
@@ -313,3 +241,12 @@ if __name__ == "__main__":
             print(df.to_markdown(index=False))
         else:
             print(df.iloc[: args.n_gpu, :].to_markdown(index=False))
+    elif args.task == "stat":
+        df = gpu_cluster.get_usage_dataframe()
+        df["gpu.occupied.value"] = df["gpu.occupied"].str.replace("MiB", "").astype(int)
+        result = df.groupby("user").agg(
+            {"gpu.id": ["nunique","count"], "gpu.occupied.value": "sum"}
+        )
+        result.columns = ['ngpu', 'nproc', 'mem']
+        result.sort_values(by=["ngpu", "nproc"], ascending=False, inplace=True)
+        print(result.to_markdown(index=True))
