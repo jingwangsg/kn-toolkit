@@ -144,7 +144,7 @@ void allocate_mem(char** array, size_t occupy_size, std::vector<int>& gpu_ids, i
                 size_t target_size = 0;
 
                 if (mode != 2) {  // fight and occupy/release
-                    target_size = avail_size;
+                    target_size = min(avail_size - size_t(bytes_per_gb * 0.01), occupy_size);
                 } else {
                     // peace mode
                     // first occupy: av > 5G
