@@ -5,6 +5,7 @@ from pathos.multiprocessing import Pool
 from pathos.helpers import mp
 from pathos.threading import ThreadPool
 from pathos.pools import ProcessPool
+import tqdm
 import time
 
 
@@ -30,9 +31,8 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
         return ret.get()
 
 
-def map_async_with_tolerance(
-    iterable, func, num_workers=32, level="thread", is_ready=lambda x: x
-):
+def map_async_with_tolerance(iterable, func, num_workers=32, level="thread", is_ready=lambda x: x):
+
     if level == "thread":
         p = ThreadPool(num_workers)
     elif level == "process":

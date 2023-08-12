@@ -3,21 +3,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Optional, Union
 import numpy as np
-from .tensor_ops import general_pad_arr
+from .tensor_ops import general_pad_np_arr, general_pad_pt_tensor
 from beartype import beartype
 
 ListOfArrayLike = List[Union[np.ndarray, torch.Tensor]]
 Scaler = Union[int, float]
 
+
 @beartype
-def general_pad(
-    arr_list: ListOfArrayLike,
-    fill_value: Scaler,
-    axis: int,
-    to_length: Optional[int] = None,
-    to_multiple: Optional[int] = None,
-    return_mask: Optional[bool] = False
-):
+def pad_sequence_general(arr_list: ListOfArrayLike,
+                         fill_value: Scaler,
+                         to_length: Optional[int] = None,
+                         to_multiple: Optional[int] = None,
+                         return_mask: Optional[bool] = False,
+                         axis: int = 0):
     """ Pad a list of array-like objects to the same length along a given axis.
     Args:
         arr_list: A list of array-like objects.
@@ -42,10 +41,9 @@ def general_pad(
     # else:
     #     raise ValueError("arr_list must be a list of torch.Tensor or np.ndarray")
 
-
     if not isinstance(arr_list, list):
         arr_list = [arr_list]
-    
+
     if to_length is None:
         to_length = 0
         for arr in arr_list:
@@ -54,23 +52,25 @@ def general_pad(
     if to_multiple:
         to_length = int(np.ceil(to_length / to_multiple)) * to_multiple
 
-
     ret_arr = []
     ret_mask = []
 
     shape_dim = len(arr_list[0].shape)
+    if torch.is_tensor(arr_list[0]):
+        _general_pad_fn = general_pad_pt_tensor
+    elif isinstance(arr_list[0], np.ndarray):
+        _general_pad_fn = general_pad_np_arr
+    else:
+        raise ValueError("arr_list must be a list of torch.Tensor or np.ndarray")
     for arr in arr_list:
-        cur_arr, cur_mask = general_pad_arr(arr, axis, to_length, fill_value, return_mask=True)
+        cur_arr, cur_mask = _general_pad_fn(arr, axis, to_length, fill_value, return_mask=True)
+
         ret_arr.append(cur_arr)
         if return_mask:
             ret_mask.append(cur_mask)
-    
-    # if backend == "np":
-    #     ret_arr = np.stack(ret_arr, axis=0)
-    # elif backend == "pt":
-    #     ret_arr = torch.stack(ret_arr, dim=0)
-    
-    return ret_arr, ret_mask if return_mask else ret_arr
+
+    return (ret_arr, ret_mask) if return_mask else ret_arr
+
 
 def fix_tensor_to_float32(feature_dict):
     for k, v in feature_dict.items():

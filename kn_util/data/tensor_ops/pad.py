@@ -3,13 +3,12 @@ import numpy as np
 import torch
 
 
-def _general_pad_arr_pt(arr, axis, to_length,fill_value=None, return_mask=False):
+def general_pad_pt_tensor(arr, axis, to_length, fill_value=None, return_mask=False):
     to_shape = list(arr.shape)
     to_shape[axis] = to_length
     shape_dim = len(to_shape)
-    meta = dict(device=arr.device,
-                dtype=arr.dtype)
-    
+    meta = dict(device=arr.device, dtype=arr.dtype)
+
     # create full array
     if fill_value == "last":
         # fill with last value
@@ -28,18 +27,18 @@ def _general_pad_arr_pt(arr, axis, to_length,fill_value=None, return_mask=False)
         full_arr[sub_slices] = True
         flatten_slices = tuple([slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)])
         ret_mask = full_arr[flatten_slices]
-    
-    return ret_arr, ret_mask if return_mask else ret_arr
+
+    return (ret_arr, ret_mask) if return_mask else ret_arr
 
 
-def general_pad_arr(arr, axis, to_length,fill_value=None, return_mask=False):
+def general_pad_np_arr(arr, axis, to_length, fill_value=None, return_mask=False):
     """ pad single array to to_length along axis
     """
     to_shape = list(arr.shape)
     to_shape[axis] = to_length
     shape_dim = len(to_shape)
     arr_dtype = arr.dtype
-    
+
     # create full array
     if fill_value == "last":
         # fill with last value
@@ -59,7 +58,5 @@ def general_pad_arr(arr, axis, to_length,fill_value=None, return_mask=False):
         full_arr[sub_slices] = True
         flatten_slices = tuple([slice(0, to_length) if _ == axis else 0 for _ in range(shape_dim)])
         ret_mask = full_arr[flatten_slices]
-    
-    return ret_arr, ret_mask if return_mask else ret_arr
 
-
+    return (ret_arr, ret_mask) if return_mask else ret_arr

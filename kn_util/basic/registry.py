@@ -4,26 +4,26 @@ import copy
 import hydra
 from loguru import logger
 
+# class Registry:
+#     def __init__(self):
+#         self._cls_dict = dict()
+
+#     def register(self, name=None):
+#         def decorator(cls):
+#             # if name is None:
+#             #     name = cls.__name__
+#             self._cls_dict[name] = cls
+#             return cls
+
+#         return decorator
+
+#     def build(self, name, **kwargs):
+#         return self._cls_dict[name](**kwargs)
+
+#     def build_cls(self, name):
+#         return self._cls_dict[name]
+
 class Registry:
-    def __init__(self):
-        self._cls_dict = dict()
-
-    def register(self, name=None):
-        def decorator(cls):
-            # if name is None:
-            #     name = cls.__name__
-            self._cls_dict[name] = cls
-            return cls
-
-        return decorator
-
-    def build(self, name, **kwargs):
-        return self._cls_dict[name](**kwargs)
-
-    def build_cls(self, name):
-        return self._cls_dict[name]
-
-class RegistryGlobal:
     """mini version of https://github.com/facebookresearch/mmf/blob/main/mmf/common/registry.py"""
 
     mapping = dict()
@@ -170,7 +170,7 @@ class RegistryGlobal:
             logger.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
         del cls.mapping["object"][name]
 
-registry = RegistryGlobal()
+registry = Registry()
 global_upload = registry.register_object
 global_get = registry.get_object
 global_set = registry.set_object

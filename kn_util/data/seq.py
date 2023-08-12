@@ -53,7 +53,7 @@ def reduce_segment(data, st_idx, ed_idx, axis=0, mode="avgpool"):
     return sampled_frame
 
 
-def general_sample_sequence(data, axis=0, stride="constant", seq_len=None, mode="avgpool"):
+def sample_sequence_general(data, axis=0, stride="round", seq_len=None, mode="avgpool"):
     """sample a sequence into fixed length segments
     
     Constant Stride Mode:
@@ -82,12 +82,14 @@ def general_sample_sequence(data, axis=0, stride="constant", seq_len=None, mode=
         if stride == "constant":
             assert seq_len is not None
             stride = np.ceil(tot_len / seq_len)
+            # in this case, final length cannot be gaurenteed
+            #! if a fixed length is required, please use "round" mode
         idxs = np.arange(0, tot_len, stride, dtype=int)
 
     # stride = "round"
     # length will be fixed to max_len
     else:
-        assert seq_len
+        assert seq_len, "seq_len must be given when stride is 'round'"
         idxs = np.arange(0, seq_len + 1, 1.0) / seq_len * tot_len
         idxs = np.round(idxs).astype(np.int32)
         idxs[idxs >= tot_len] = tot_len - 1

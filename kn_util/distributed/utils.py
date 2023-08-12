@@ -15,7 +15,7 @@ def rank_zero_only(fn: Callable) -> Callable:
 
     @wraps(fn)
     def wrapped_fn(*args: Any, **kwargs: Any) -> Optional[Any]:
-        rank = getattr(rank_zero_only, "rank", None)
+        rank = int(os.getenv("RANK", 0))
         if rank is None:
             raise RuntimeError("The `rank_zero_only.rank` needs to be set before use")
         if rank == 0:
@@ -28,6 +28,11 @@ def rank_zero_only(fn: Callable) -> Callable:
 def get_device(model):
     return next(model.parameters()).device
 
+def get_world_size():
+    return int(os.getenv("WORLD_SIZE", 1))
+
+def is_master_process():
+    return int(os.getenv("RANK", 0)) == 0
 
 def get_available_port():
     sock = socket.socket()
@@ -65,3 +70,6 @@ def initialize_ddp_from_env():
 
 def is_ddp_initialized_and_available():
     return dist.is_initialized() and dist.is_available()
+
+def get_rank():
+    return int(os.getenv("RANK", 0))

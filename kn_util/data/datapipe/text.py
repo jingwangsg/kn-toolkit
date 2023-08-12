@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
+from loguru import logger
 
 
 @functional_datapipe("tokenize_glove")
@@ -72,7 +73,7 @@ class GloveTokenizer(IterDataPipe):
         self.stoi = stoi
         self.vectors = vectors.float().numpy()
 
-        print(f"glove vocab built with {len(itos)} words")
+        logger.info(f"glove vocab built with {len(itos)} words")
 
         if self.upload_vocab_key:
             global_set(self.upload_vocab_key, (itos, vectors))

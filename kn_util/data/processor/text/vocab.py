@@ -3,7 +3,9 @@ from kn_util.basic import global_set, global_get
 import torchtext
 import torch
 import numpy as np
+from types import SimpleNamespace
 
+from loguru import logger
 from torchtext.data.utils import get_tokenizer
 
 
@@ -22,6 +24,7 @@ class GloveTokenizeProcessor:
         global_vocab_key=None,
         tokenizer="split",
         cache_dir=None,
+        special_tokens=["<pad>", "<unk>"],
         to_words=False,
         to_indices=False,
         to_embeddings=False,
@@ -48,6 +51,7 @@ class GloveTokenizeProcessor:
         self.to_indices = to_indices
         self.to_embeddings = to_embeddings
         self.cache_dir = cache_dir
+        self.special_tokens = special_tokens
 
         if tokenizer == "split":
             self.tokenizer = lambda s: delete_noisy_char(s).lower().split()
@@ -60,7 +64,8 @@ class GloveTokenizeProcessor:
         global_vocab = global_get(self.global_vocab_key)
         if global_vocab:
             # vocab has been built and uploaded
-            itos, vectors = global_vocab
+            itos = global_vocab.itos
+            vectors = global_vocab.vectors
         else:
             # build vocab
             pretrained_vocab = torchtext.vocab.pretrained_aliases[self.glove](cache=self.cache_dir)
@@ -69,16 +74,16 @@ class GloveTokenizeProcessor:
                 with open(self.vocab_file, "r") as f:
                     lines = f.readlines()
                 zero_vector = torch.zeros(1, pretrained_vocab.vectors.shape[-1])
-                extend_vocab(pretrained_vocab, "<pad>", zero_vector)
-                extend_vocab(pretrained_vocab, "<unk>", zero_vector)
+                for token in self.special_tokens:
+                    extend_vocab(pretrained_vocab, token, zero_vector)
                 itos = ["<pad>", "<unk>"] + [w.strip() for w in lines]
                 extracted_indicies = [pretrained_vocab.stoi.get(w, pretrained_vocab.stoi["<unk>"]) for w in itos]
                 vectors = pretrained_vocab.vectors[extracted_indicies]
             else:
                 # use original glove vocab
                 zero_vector = torch.zeros(1, pretrained_vocab.vectors.shape[-1])
-                extend_vocab(pretrained_vocab, "<pad>", zero_vector)
-                extend_vocab(pretrained_vocab, "<unk>", zero_vector)
+                for token in self.special_tokens:
+                    extend_vocab(pretrained_vocab, token, zero_vector)
                 itos = pretrained_vocab.itos
                 vectors = pretrained_vocab.vectors
 
@@ -87,10 +92,10 @@ class GloveTokenizeProcessor:
         self.stoi = stoi
         self.vectors = vectors.float().numpy()
 
-        print(f"glove vocab built with {len(itos)} words")
+        logger.info(f"glove vocab built with {len(itos)} words")
 
         if global_vocab is None and self.global_vocab_key is not None:
-            cache = dict(itos=itos, stoi=stoi, vectors=vectors)
+            cache = SimpleNamespace(itos=itos, stoi=stoi, vectors=vectors)
             global_set(self.global_vocab_key, cache)
 
     def __call__(self, text):
@@ -102,8 +107,8 @@ class GloveTokenizeProcessor:
         if self.to_words:
             result["tokens"] = text_tok
         if self.to_indices:
-            result["indicies"] = text_inds
+            result["indices"] = text_inds
         if self.to_embeddings:
             result["embeddings"] = text_embeddings
 
-        return result
+        return SimpleNamespace(**result)

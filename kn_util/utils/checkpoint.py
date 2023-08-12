@@ -29,7 +29,11 @@ class CheckPointer:
         else:
             raise NotImplementedError()
 
-    def save_checkpoint(self, model, optimizer, num_epochs, metric_vals=None, loss_scaler=None, lr_scheduler=None):
+    def save_if_exists(self, obj, name, save_dict):
+        if obj is not None:
+            save_dict[name] = obj.state_dict()
+
+    def save_checkpoint(self, model, optimizer, num_epochs, metric_vals=None, lr_scheduler=None):
         """save latest checkpoint only for metric_vals=None to resume latest epoch
         For metric_vals not None, update best checkpoint
         """
@@ -37,20 +41,18 @@ class CheckPointer:
                          optimizer=optimizer.state_dict(),
                          num_epochs=num_epochs,
                          metrics=metric_vals)
-        if lr_scheduler:
-            save_dict["lr_scheduler"] = lr_scheduler.state_dict()
-        if loss_scaler:
-            save_dict["loss_scaler"] = loss_scaler.state_dict()
+        self.save_if_exists(lr_scheduler, "lr_scheduler", save_dict)
         torch.save(save_dict, self.ckpt_latest)
+
         if metric_vals:
             if self.better(metric_vals[self.monitor], self.best_metric):
                 self.best_metric = metric_vals[self.monitor]
-                subprocess.run(f"rm -rf {self.ckpt_best}".format('*', '*'), shell=True)
+                subprocess.run(f"rm -rf {self.ckpt_best}".format('*', osp.basename(self.monitor), '*'), shell=True)
                 torch.save(save_dict, self.ckpt_best.format(num_epochs, np.round(self.best_metric, decimals=6)))
                 return True
         return False
 
-    def load_checkpoint(self, model, optimizer, lr_scheduler=None, loss_scaler=None, mode="latest"):
+    def load_checkpoint(self, model, optimizer, lr_scheduler=None, mode="latest"):
         if mode == "latest":
             fn = self.ckpt_latest
         elif mode == "best":
@@ -66,10 +68,5 @@ class CheckPointer:
             if "lr_scheduler" not in load_dict:
                 raise Exception("lr_scheduler not found")
             lr_scheduler.load_state_dict(load_dict["lr_scheduler"])
-
-        if loss_scaler:
-            if "loss_scaler" not in load_dict:
-                raise Exception("loss_scaler not found")
-            loss_scaler.load_state_dict(load_dict["loss_scaler"])
 
         return load_dict

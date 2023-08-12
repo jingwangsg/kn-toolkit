@@ -1,8 +1,16 @@
 import torch
 import torch.nn as nn
 import copy
-from .init import init_module
+from ..utils.init import init_module
 
+def list_to_dict(cur_dict):
+    """ convert a list of dict to a dict of list """
+    ret_dict = {}
+    for item in cur_dict:
+        for k,v in item.items():
+            ret_dict[k] = ret_dict.get(k, []) + [v]
+    
+    return ret_dict
 
 def clones(module, N):
     modules = nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
