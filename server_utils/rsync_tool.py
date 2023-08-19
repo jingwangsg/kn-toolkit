@@ -29,10 +29,16 @@ def parse_args():
 
 
 def combine(user=None, ip=None, path=None):
-    if user and ip:
-        return f"{user}@{ip}:{path}"
+    def _combine(user, ip, path):
+        if user and ip:
+            return f"{user}@{ip}:{path}"
+        else:
+            return path
+
+    if isinstance(path, list):
+        return _combine(user, ip, " :".join([it_path for it_path in path]))
     else:
-        return path
+        return _combine(user, ip, path)
 
 
 def parse(s):
@@ -69,19 +75,29 @@ def cmd_ssh_relay(from_user, from_ip, to_ip, cmd, port=9999, to_port=22):
     return f"ssh -R 127.0.0.1:{port}:{to_ip}:{to_port} {from_user}@{from_ip} '{cmd}'"
 
 
-def cmd_rsync(from_path, to_ip, to_user, to_path, port=None, relative_path=False):
+def cmd_rsync(
+    to_ip,
+    to_user,
+    to_path,
+    from_ip,
+    from_user,
+    from_path,
+    port=None,
+    relative=False,
+):
     rsync_args = "-auvP"
-    if relative_path:
-        rsync_args += " -R"
+
+    if relative:
+        rsync_args += " --relative "
 
     if port is not None:
         rsync_args += f' -e "ssh -p {port}"'
         to_ip = "127.0.0.1"
 
-    if isinstance(from_path, List):
-        from_path = " ".join(from_path)
+    from_path = combine(from_user, from_ip, from_path)
+    to_path = combine(to_user, to_ip, to_path)
 
-    return f"rsync {rsync_args} {from_path} {combine(to_user, to_ip, to_path)}"
+    return f"rsync {rsync_args} {from_path} {to_path}"
 
 
 def main(args):
@@ -90,36 +106,41 @@ def main(args):
     from_user, from_ip, from_path, from_is_remote = parse(from_dir)
     to_user, to_ip, to_path, to_is_remote = parse(to_dir)
 
-    use_async = args.async_dir
-
     if from_is_remote and to_is_remote:
         print("using remote - remote")
+        print("TODO - deprecated now")
+        raise NotImplementedError
 
-        def construct_cmd(from_path_holder): return cmd_ssh_relay(
-            from_user=from_user,
-            from_ip=from_ip,
-            to_ip=to_ip,
-            port=args.port,
-            cmd=cmd_rsync(
-                from_path=from_path_holder,
+        def construct_cmd(from_path_holder, to_path_holder):
+            return cmd_ssh_relay(
+                from_user=from_user,
+                from_ip=from_ip,
+                to_ip=to_ip,
+                port=args.port,
+                cmd=cmd_rsync(
+                    from_path=from_path_holder,
+                    to_ip=to_ip,
+                    to_user=to_user,
+                    to_path=to_path_holder,
+                    port=args.port,
+                ),
+            )
+
+    else:
+        from_platform = "remote" if from_is_remote else "local"
+        to_platform = "remote" if to_is_remote else "local"
+        print("using {} - {}".format(from_platform, to_platform))
+
+        def construct_cmd(from_path_):
+            return cmd_rsync(
                 to_ip=to_ip,
                 to_user=to_user,
                 to_path=to_path,
-                port=args.port,
-                relative_path=use_async,
-            ),
-        )
-
-    else:
-        print("using local - remote")
-
-        def construct_cmd(from_path_holder): return cmd_rsync(
-            from_path=from_path_holder,
-            to_ip=to_ip,
-            to_user=to_user,
-            to_path=to_path,
-            relative_path=use_async,
-        )
+                from_ip=from_ip,
+                from_user=from_user,
+                from_path=from_path_,
+                relative=args.async_dir,
+            )
 
     if not args.async_dir:
         cmd = construct_cmd(from_path)
@@ -128,26 +149,32 @@ def main(args):
     else:
         cur_cmd_list_files = cmd_list_files(from_path)
         if from_is_remote:
-            cur_cmd_list_files = cmd_on_ssh(
-                from_ip, from_user, cur_cmd_list_files)
-        out = subprocess.run(cur_cmd_list_files, shell=True,
-                             text=True, capture_output=True)
+            cur_cmd_list_files = cmd_on_ssh(from_ip, from_user, cur_cmd_list_files)
+        out = subprocess.run(
+            cur_cmd_list_files, shell=True, text=True, capture_output=True
+        )
         from_files = out.stdout.split("\0")
+        from_files = [x for x in from_files if len(x.strip()) > 0]
+        from_paths = [osp.join(split_path(from_path)[0], ".", x) for x in from_files]
 
         assert len(from_files) > 0, "no files found for async dir"
         print("using async dir")
-        from_file_chunks = [
-            from_files[i: i + args.chunk_size]
+
+        path_chunks = [
+            from_paths[i : i + args.chunk_size]
             for i in range(0, len(from_files), args.chunk_size)
         ]
 
-        parent_dir, name = split_path(from_path)
+        def _apply(path_chunk):
+            cmd = construct_cmd(path_chunk)
+            print(cmd)
+            subprocess.run(cmd, shell=True)
+
         map_async(
-            func=lambda from_path_holder: subprocess.run(
-                f"cd {parent_dir} && " + construct_cmd(from_path_holder), shell=True, capture_output=True
-            ),
-            iterable=from_file_chunks,
+            func=_apply,
+            iterable=path_chunks,
             num_process=args.num_process,
+            test_flag=True,
         )
 
 
