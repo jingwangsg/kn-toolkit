@@ -168,7 +168,7 @@ def main(args):
         def _apply(path_chunk):
             cmd = construct_cmd(path_chunk)
             # print(cmd)
-            subprocess.run(cmd, shell=True)
+            subprocess.run(cmd, shell=True, capture_output=True)
 
         map_async(
             func=_apply,
