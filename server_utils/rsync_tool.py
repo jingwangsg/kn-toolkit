@@ -35,8 +35,10 @@ def combine(user=None, ip=None, path=None):
         else:
             return path
 
+    path_delimiter = " " if user is None and ip is None else " :"
+
     if isinstance(path, list):
-        return _combine(user, ip, " :".join([it_path for it_path in path]))
+        return _combine(user, ip, path_delimiter.join([it_path for it_path in path]))
     else:
         return _combine(user, ip, path)
 
@@ -54,6 +56,9 @@ def parse(s):
     else:
         dir_path = s
         is_remote = False
+    
+    if is_remote:
+        dir_path = subprocess.run(cmd_on_ssh(ip, user, cmd_get_path(dir_path)), shell=True, text=True, capture_output=True).stdout.strip()
 
     return user, ip, dir_path, is_remote
 
@@ -66,6 +71,8 @@ def cmd_list_files(path):
     parent_dir, name = split_path(path)
     return f"cd {parent_dir} && find {name}/ -type f -print0"
 
+def cmd_get_path(path):
+    return f"readlink -f {path}"
 
 def cmd_on_ssh(ip, user, cmd):
     return f"ssh {user}@{ip} '{cmd}'"
