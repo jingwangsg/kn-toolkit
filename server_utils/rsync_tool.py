@@ -8,9 +8,9 @@ import os
 
 def parse_args():
     args = argparse.ArgumentParser()
-    format = "USER@IP:DIR"
-    args.add_argument("from_dir", type=str, help=format)
-    args.add_argument("to_dir", type=str, help=format)
+    format_help = "USER@IP:DIR"
+    args.add_argument("from_dir", type=str, help=format_help)
+    args.add_argument("to_dir", type=str, help=format_help)
     args.add_argument(
         "--async-dir",
         default=False,
@@ -28,10 +28,12 @@ def parse_args():
     return args.parse_args()
 
 
-def combine(user=None, ip=None, path=None):
+def combine(user=None, ip=None, hostname=None, path=None):
     def _combine(user, ip, path):
         if user and ip:
             return f"{user}@{ip}:{path}"
+        elif hostname:
+            return f"{hostname}:{path}"
         else:
             return path
 
@@ -48,10 +50,14 @@ def parse(s):
     ip = None
     dir_path = None
     is_remote = None
+    hostname = None
 
-    if len(s.split("@")) == 2:
-        user, _ = s.split("@")
-        ip, dir_path = _.split(":")
+    if len(s.split(":")) == 2:
+        ssh_node, dir_path = s.split(":")
+        if "@" in ssh_node:
+            user, ip = ssh_node.split("@")
+        else:
+            hostname = ssh_node
         is_remote = True
     else:
         dir_path = s
@@ -60,7 +66,7 @@ def parse(s):
     if is_remote:
         dir_path = subprocess.run(cmd_on_ssh(ip, user, cmd_get_path(dir_path)), shell=True, text=True, capture_output=True).stdout.strip()
 
-    return user, ip, dir_path, is_remote
+    return user, ip, hostname, dir_path, is_remote
 
 
 def split_path(path):
