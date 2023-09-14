@@ -30,7 +30,7 @@ def parse_args():
 
 def combine(user=None, ip=None, hostname=None, path=None):
 
-    def _combine(user, ip, path):
+    def _combine(user, ip, hostname, path):
         if user and ip:
             return f"{user}@{ip}:{path}"
         elif hostname:
@@ -38,12 +38,14 @@ def combine(user=None, ip=None, hostname=None, path=None):
         else:
             return path
 
-    path_delimiter = " " if user is None and ip is None else " :"
+    is_remote = (ip and user) or hostname
+
+    path_delimiter = " :" if is_remote else " "
 
     if isinstance(path, list):
-        return _combine(user, ip, path_delimiter.join([it_path for it_path in path]))
+        return _combine(user, ip, hostname, path_delimiter.join([it_path for it_path in path]))
     else:
-        return _combine(user, ip, path)
+        return _combine(user, ip, hostname, path)
 
 
 def parse(s):
@@ -65,7 +67,7 @@ def parse(s):
         is_remote = False
 
     if is_remote:
-        dir_path = subprocess.run(cmd_on_ssh(ip, user, cmd_get_path(dir_path)),
+        dir_path = subprocess.run(cmd_on_ssh(ip, user, hostname, cmd_get_path(dir_path)),
                                   shell=True,
                                   text=True,
                                   capture_output=True).stdout.strip()
@@ -86,8 +88,13 @@ def cmd_get_path(path):
     return f"readlink -f {path}"
 
 
-def cmd_on_ssh(ip, user, cmd):
-    return f"ssh {user}@{ip} '{cmd}'"
+def cmd_on_ssh(ip, user, hostname, cmd):
+    if ip and user:
+        return f"ssh {user}@{ip} '{cmd}'"
+    elif hostname:
+        return f"ssh {hostname} '{cmd}'"
+    else:
+        raise NotImplementedError
 
 
 def cmd_ssh_relay(from_user, from_ip, to_ip, cmd, port=9999, to_port=22):
@@ -172,7 +179,7 @@ def main(args):
     else:
         cur_cmd_list_files = cmd_list_files(from_path)
         if from_is_remote:
-            cur_cmd_list_files = cmd_on_ssh(from_ip, from_user, cur_cmd_list_files)
+            cur_cmd_list_files = cmd_on_ssh(from_ip, from_user, from_host, cur_cmd_list_files)
         out = subprocess.run(cur_cmd_list_files, shell=True, text=True, capture_output=True)
         from_files = out.stdout.split("\0")
         from_files = [x for x in from_files if len(x.strip()) > 0]
@@ -185,7 +192,6 @@ def main(args):
 
         def _apply(path_chunk):
             cmd = construct_cmd(path_chunk)
-            # print(cmd)
             subprocess.run(cmd, shell=True, capture_output=True)
 
         map_async(
