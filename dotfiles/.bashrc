@@ -115,7 +115,7 @@ alias lsq="python ~/server_utils/list_task.py"
 alias fg="conda activate torch && python ~/server_utils/query_cluster.py --task available"
 alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task usage"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
-# alias nvp="conda activate torch && nvidia-htop.py -c"
+# alias nvp="gpustat -f"
 alias nvp="py3smi -f --left -w $(($(tput cols)-20))"
 # pip install py3nvml
 alias tc='conda activate torch'

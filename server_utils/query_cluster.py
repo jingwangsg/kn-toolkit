@@ -10,6 +10,7 @@ import io
 import os
 import os.path as osp
 
+
 from collections import OrderedDict
 
 
@@ -122,7 +123,7 @@ class GPUCluster:
         df = self.get_memory_dataframe()
         return df
 
-    def get_usage_dataframe(self):
+    def get_usage_dataframe_by_py3smi(self):
         gpu_query_cmd = f"py3smi -f --left -w $(($(tput cols)-30))"
 
         node_stdouts = self.query_all_node(gpu_query_cmd)
@@ -158,6 +159,36 @@ class GPUCluster:
         df = pd.DataFrame(item_list)
 
         return df
+
+    def get_usage_dataframe(self):
+        pycmd = "from gpustat.core import GPUStatCollection; gpustat = GPUStatCollection.new_query().jsonify(); print(gpustat)"
+        cmd = f"python -c '{pycmd}'"
+
+        node_stdouts = self.query_all_node(cmd)
+        item_list = []
+
+        for node_idx, node_stdout in node_stdouts:
+            if not node_stdout:
+                continue
+            import datetime
+
+            node_stdout = eval(node_stdout)
+
+            for gpu in node_stdout["gpus"]:
+                for process in gpu["processes"]:
+                    item = {
+                        "partition": self.server_info[
+                            self.server_info["node_idx"] == node_idx
+                        ]["partition"].item(),
+                        "gpu.id": f"{node_stdout['hostname']}_#{gpu['index']}",
+                        "gpu.occupied": process["gpu_memory_usage"],
+                        "PID": process["pid"],
+                        "user": process["username"],
+                        "cmd": " ".join(process["full_command"]),
+                    }
+                    item_list += [item]
+
+        return pd.DataFrame(item_list)
 
     def find_gpu_usage(self, username="", cmd_include=""):
         df = self.get_usage_dataframe()
@@ -234,7 +265,9 @@ if __name__ == "__main__":
 
     if args.task == "usage":
         df = gpu_cluster.find_gpu_usage(username=args.user, cmd_include=args.command)
-        print(df.to_markdown(index=False))
+        pd.set_option("display.max_colwidth", 50)
+        print(df)
+        # print(df.to_markdown(index=False))
     elif args.task == "available":
         df = gpu_cluster.find_gpu_available()
         if args.output_all:
@@ -243,10 +276,14 @@ if __name__ == "__main__":
             print(df.iloc[: args.n_gpu, :].to_markdown(index=False))
     elif args.task == "stat":
         df = gpu_cluster.get_usage_dataframe()
-        df["gpu.occupied.value"] = df["gpu.occupied"].str.replace("MiB", "").astype(int)
-        result = df.groupby("user").agg(
-            {"gpu.id": ["nunique","count"], "gpu.occupied.value": "sum"}
+        df["gpu.occupied.value"] = (
+            df["gpu.occupied"]
+            if "int" in str(df["gpu.occupied"].dtype)
+            else df["gpu.occupied"].str.replace("MiB", "").astype(int)
         )
-        result.columns = ['ngpu', 'nproc', 'mem']
+        result = df.groupby("user").agg(
+            {"gpu.id": ["nunique", "count"], "gpu.occupied.value": "sum"}
+        )
+        result.columns = ["ngpu", "nproc", "mem"]
         result.sort_values(by=["ngpu", "nproc"], ascending=False, inplace=True)
         print(result.to_markdown(index=True))
