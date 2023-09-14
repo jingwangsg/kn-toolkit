@@ -29,6 +29,7 @@ def parse_args():
 
 
 def combine(user=None, ip=None, hostname=None, path=None):
+
     def _combine(user, ip, path):
         if user and ip:
             return f"{user}@{ip}:{path}"
@@ -62,9 +63,12 @@ def parse(s):
     else:
         dir_path = s
         is_remote = False
-    
+
     if is_remote:
-        dir_path = subprocess.run(cmd_on_ssh(ip, user, cmd_get_path(dir_path)), shell=True, text=True, capture_output=True).stdout.strip()
+        dir_path = subprocess.run(cmd_on_ssh(ip, user, cmd_get_path(dir_path)),
+                                  shell=True,
+                                  text=True,
+                                  capture_output=True).stdout.strip()
 
     return user, ip, hostname, dir_path, is_remote
 
@@ -77,8 +81,10 @@ def cmd_list_files(path):
     parent_dir, name = split_path(path)
     return f"cd {parent_dir} && find {name}/ -type f -print0"
 
+
 def cmd_get_path(path):
     return f"readlink -f {path}"
+
 
 def cmd_on_ssh(ip, user, cmd):
     return f"ssh {user}@{ip} '{cmd}'"
@@ -109,8 +115,8 @@ def cmd_rsync(
         rsync_args += f' -e "ssh -p {port}"'
         to_ip = "127.0.0.1"
 
-    from_path = combine(from_user, from_ip, from_path)
-    to_path = combine(to_user, to_ip, to_path)
+    from_path = combine(from_user, from_ip, from_host, from_path)
+    to_path = combine(to_user, to_ip, to_host, to_path)
 
     return f"rsync {rsync_args} {from_path} {to_path}"
 
@@ -167,9 +173,7 @@ def main(args):
         cur_cmd_list_files = cmd_list_files(from_path)
         if from_is_remote:
             cur_cmd_list_files = cmd_on_ssh(from_ip, from_user, cur_cmd_list_files)
-        out = subprocess.run(
-            cur_cmd_list_files, shell=True, text=True, capture_output=True
-        )
+        out = subprocess.run(cur_cmd_list_files, shell=True, text=True, capture_output=True)
         from_files = out.stdout.split("\0")
         from_files = [x for x in from_files if len(x.strip()) > 0]
         from_paths = [osp.join(split_path(from_path)[0], ".", x) for x in from_files]
@@ -177,10 +181,7 @@ def main(args):
         assert len(from_files) > 0, "no files found for async dir"
         print("using async dir")
 
-        path_chunks = [
-            from_paths[i : i + args.chunk_size]
-            for i in range(0, len(from_files), args.chunk_size)
-        ]
+        path_chunks = [from_paths[i:i + args.chunk_size] for i in range(0, len(from_files), args.chunk_size)]
 
         def _apply(path_chunk):
             cmd = construct_cmd(path_chunk)
