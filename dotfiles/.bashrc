@@ -4,10 +4,9 @@
 
 # If not running interactively, don't do anything
 case $- in
-    *i*) ;;
-    *) return;;
+*i*) ;;
+*) return ;;
 esac
-
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -38,7 +37,7 @@ fi
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "$TERM" in
-    xterm-color|*-256color) color_prompt=yes;;
+xterm-color | *-256color) color_prompt=yes ;;
 esac
 
 # uncomment for a colored prompt, if the terminal has the capability; turned
@@ -66,11 +65,10 @@ unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
-    xterm*|rxvt*)
-        PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+xterm* | rxvt*)
+    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
     ;;
-    *)
-    ;;
+*) ;;
 esac
 
 # enable color support of ls and also add handy aliases
@@ -107,8 +105,8 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-LATEST_CUDA_MODULE=$(module avail | grep 'cuda'| tr ' ' '\n'  | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
-module load  slurm $LATEST_CUDA_MODULE
+LATEST_CUDA_MODULE=$(module avail | grep 'cuda' | tr ' ' '\n' | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
+module load slurm $LATEST_CUDA_MODULE
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
@@ -116,7 +114,7 @@ alias fg="conda activate torch && python ~/server_utils/query_cluster.py --task 
 alias fu="conda activate torch && python ~/server_utils/query_cluster.py --task usage"
 alias nv='nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 # alias nvp="gpustat -f"
-alias nvp="py3smi -f --left -w $(($(tput cols)-20))"
+alias nvp="py3smi -f --left -w $(($(tput cols) - 20))"
 # pip install py3nvml
 alias tc='conda activate torch'
 alias pyipdb="python -m ipdb -c continue "
@@ -128,7 +126,7 @@ alias sg="python $HOME/server_utils/dist_train.py --gpus"
 
 alias gk="gpukill"
 alias g="gpu"
-alias kps="ps --no-header -eo ppid,user,stime,cmd | sort -u -k1,1 | cut -c 1-$(($(tput cols)-50)) | grep -viE 'root|postfix'"
+alias kps="ps --no-header -eo ppid,user,stime,cmd | sort -u -k1,1 | cut -c 1-$(($(tput cols) - 50)) | grep -viE 'root|postfix'"
 
 knkill() {
     # conda activate torch
@@ -144,14 +142,12 @@ upl() {
 }
 
 pcmd() {
-    ps -p $1 -o command | tail -n +2 | fold -w $(($(tput cols)-20))
+    ps -p $1 -o command | tail -n +2 | fold -w $(($(tput cols) - 20))
 }
-
 
 gpukill() {
     variable=$1
-    for i in ${variable//,/ }
-    do
+    for i in ${variable//,/ }; do
         nvidia-smi pmon -c 1 -d 1 -i $i | tail -n +3 | awk '{print $2}' | xargs kill -9
     done
 }
@@ -179,7 +175,7 @@ gpu() {
     export CUDA_VISIBLE_DEVICES="$1"
 }
 # https://stackoverflow.com/questions/58707855/how-to-use-alias-to-simplify-cuda-visible-devices
-cuda () {
+cuda() {
     local devs=$1
     shift
     CUDA_VISIBLE_DEVICES="$devs" "$@"
@@ -205,26 +201,27 @@ ca() {
     conda activate "$1"
 }
 kill_nfs() {
-  # 递归搜索当前文件夹内所有 .nfs 文件
-  nfs_files=$(find . -type f -name '*.nfs')
+    # 递归搜索当前文件夹内所有 .nfs 文件
+    nfs_files=$(find . -type f -name '*.nfs')
 
-  # 遍历所有 .nfs 文件
-  for nfs_file in $nfs_files; do
-    # 使用 lsof 命令找到正在使用这个文件的进程
-    processes=$(lsof "$nfs_file" | awk 'NR>1 {print $2}' | sort -u)
+    # 遍历所有 .nfs 文件
+    for nfs_file in $nfs_files; do
+        # 使用 lsof 命令找到正在使用这个文件的进程
+        processes=$(lsof "$nfs_file" | awk 'NR>1 {print $2}' | sort -u)
 
-    # 终止这些进程
-    for process in $processes; do
-      echo "Killing process: $process"
-      kill -9 "$process"
+        # 终止这些进程
+        for process in $processes; do
+            echo "Killing process: $process"
+            kill -9 "$process"
+        done
     done
-  done
 
 }
 
 ROOTDIR=$HOME/usr
 HOMEBREW=$HOME/homebrew
 LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH:$HOMEBREW/lib
+export HOMEBREW_NO_INSTALL_FROM_API=1
 export LD_LIBRARY_PATH
 export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
 PATH="$HOME/miniconda3/bin:$PATH"
@@ -232,13 +229,13 @@ PATH="$HOMEBREW/bin:$PATH"
 # PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
 # PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
-if [ -z $NO_FISH ] ; then
+if [ -z $NO_FISH ]; then
     exec fish
 fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2>/dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
