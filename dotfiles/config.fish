@@ -11,7 +11,7 @@ end
 abbr sv "~/server_utils/server.sh"
 abbr lsq "python ~/server_utils/list_task.py"
 abbr nv 'nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
-abbr nvp "py3smi -f --left -w (math (tput cols)-20)"
+abbr nvp "gpustat -f"
 # pip install py3nvml
 abbr tc 'conda activate torch'
 abbr zh 'conda activate zh'
