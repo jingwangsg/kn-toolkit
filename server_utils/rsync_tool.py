@@ -91,9 +91,11 @@ def cmd_ssh_relay(from_user, from_ip, to_ip, cmd, port=9999, to_port=22):
 def cmd_rsync(
     to_ip,
     to_user,
+    to_host,
     to_path,
     from_ip,
     from_user,
+    from_host,
     from_path,
     port=None,
     relative=False,
@@ -116,8 +118,8 @@ def cmd_rsync(
 def main(args):
     from_dir = args.from_dir
     to_dir = args.to_dir
-    from_user, from_ip, from_path, from_is_remote = parse(from_dir)
-    to_user, to_ip, to_path, to_is_remote = parse(to_dir)
+    from_user, from_ip, from_host, from_path, from_is_remote = parse(from_dir)
+    to_user, to_ip, to_host, to_path, to_is_remote = parse(to_dir)
 
     if from_is_remote and to_is_remote:
         print("using remote - remote")
@@ -148,9 +150,11 @@ def main(args):
             return cmd_rsync(
                 to_ip=to_ip,
                 to_user=to_user,
+                to_host=to_host,
                 to_path=to_path,
                 from_ip=from_ip,
                 from_user=from_user,
+                from_host=from_host,
                 from_path=from_path_,
                 relative=args.async_dir,
             )
