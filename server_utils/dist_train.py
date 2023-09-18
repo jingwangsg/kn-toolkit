@@ -68,7 +68,7 @@ def main():
         memories = get_vailable_memory()
         while (not all(launched)):
             for id in gpus:
-                if not launched[id] and memories[id][1] / memories[id][0] > 0.5:
+                if not launched[id] and memories[id][1] / memories[id][0] > 0.7:
                     launch(id)
                     launched[id] = True
             from time import sleep
