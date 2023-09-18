@@ -4,6 +4,7 @@ import subprocess
 import numpy as np
 import time
 import random
+from kn_util.tools import send_email
 
 
 def parse_args():
@@ -15,6 +16,7 @@ def parse_args():
     parser.add_argument("--mem", type=int, default=-1)
     parser.add_argument("--delay", type=float, default=0.0)
     parser.add_argument("-s", "--sleep", action="store_true", default=False)
+    parser.add_argument("--email", action="store_true", default=False)
     #  mode = 0: fight and occupy
     #  mode = 1: fight and exit
     #  mode = 2: peace
@@ -22,9 +24,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_vailable_memory():
+def query_nvidia():
     cmd = "nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv,noheader"
-    outs = subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout.strip().split("\n")
+    outs = subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout
+    return outs
+
+
+def get_vailable_memory():
+    outs = query_nvidia().strip().split("\n")
     memories = [outs[i].split(",")[-2:] for i in range(len(outs))]
 
     def _parse_value(mem):
@@ -77,9 +84,11 @@ def main():
         for id in gpus:
             launch(id)
 
-    if args.sleep:
-        while True:
-            pass
+    if args.email:
+        hostname = subprocess.run("hostname", shell=True, capture_output=True).strip()
+        subject = f"#Node{hostname} {len(gpus)} GPUs finished"
+
+        send_email(subject=subject, text=query_nvidia())
 
 
 if __name__ == "__main__":
