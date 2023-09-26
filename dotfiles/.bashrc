@@ -105,8 +105,8 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-LATEST_CUDA_MODULE=$(module avail | grep 'cuda' | tr ' ' '\n' | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
-module load slurm $LATEST_CUDA_MODULE
+# LATEST_CUDA_MODULE=$(module avail | grep 'cuda' | tr ' ' '\n' | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
+module load slurm cuda11.2/toolkit/11.2.0
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
@@ -220,7 +220,7 @@ kill_nfs() {
 
 ROOTDIR=$HOME/usr
 HOMEBREW=$HOME/homebrew
-LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH:$HOMEBREW/lib
+LD_LIBRARY_PATH=/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:$HOMEBREW/lib:$LD_LIBRARY_PATH:
 export HOMEBREW_NO_INSTALL_FROM_API=1
 export LD_LIBRARY_PATH
 export CUDA_TOOLKIT_ROOT=$(which nvcc | sed 's/\/bin\/nvcc//g')
