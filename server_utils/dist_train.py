@@ -72,12 +72,12 @@ def main():
 
     launched = [False for _ in range(len(gpus))]
     if args.mode == "peace":
-        memories = get_vailable_memory()
         while (not all(launched)):
-            for id in gpus:
-                if not launched[id] and memories[id][1] / memories[id][0] > 0.7:
+            memories = get_vailable_memory()
+            for slot_idx, id in enumerate(gpus):
+                if not launched[slot_idx] and memories[id][1] / memories[id][0] > 0.7:
                     launch(id)
-                    launched[id] = True
+                    launched[slot_idx] = True
             from time import sleep
             sleep(1)
     else:
@@ -85,10 +85,10 @@ def main():
             launch(id)
 
     if args.email:
-        hostname = subprocess.run("hostname", shell=True, capture_output=True).strip()
+        hostname = subprocess.run("hostname", shell=True, capture_output=True).stdout.strip()
         subject = f"#Node{hostname} {len(gpus)} GPUs finished"
 
-        send_email(subject=subject, text=query_nvidia())
+        send_email(subject=subject, text=query_nvidia(), to_addr="kningtg@gmail.com")
 
 
 if __name__ == "__main__":

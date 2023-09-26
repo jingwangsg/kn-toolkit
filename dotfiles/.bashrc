@@ -105,7 +105,6 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-# LATEST_CUDA_MODULE=$(module avail | grep 'cuda' | tr ' ' '\n' | grep -v '^$' | grep 'cuda11.*/toolkit' | sort -n | tail -n 1)
 module load slurm cuda11.2/toolkit/11.2.0
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
@@ -235,14 +234,14 @@ fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2>/dev/null)"
+__conda_setup="$('/export/home2/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/export/home/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/export/home/kningtg/miniconda3/etc/profile.d/conda.sh"
+    if [ -f "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/export/home/kningtg/miniconda3/bin:$PATH"
+        export PATH="/export/home2/kningtg/miniconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup

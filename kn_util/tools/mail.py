@@ -4,10 +4,9 @@ from email.utils import formataddr
 import smtplib
 
 
-def send_email(to_addr, subject, text=""):
+def send_email(to_addr, subject, text="", from_addr="scsegpu@163.com"):
     username = "scsegpu@163.com"
     password = "XTTCUQCCXXEYIVBG"
-    from_addr = "scsegpu@163.com"
     # to_addr = "knjingwang@gmail.com"
 
     # subject = f"[SG] {hostname} GPU#{gpu_id}:{gpu_info['name']}"
