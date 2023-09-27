@@ -4,7 +4,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(description='tools for lfs')
-    parser.add_argument("command", type="str", help="The command to run")
+    parser.add_argument("command", type=str, help="The command to run")
     return parser
 
 
@@ -60,7 +60,7 @@ def track(parser):
 
 if __name__ == "__main__":
     parser = parse_args()
-    command = parser.parse_args().command
+    command = parser.parse_known_args()[0].command
 
     if command == "pull":
         pull(parser)
