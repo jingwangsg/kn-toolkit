@@ -3,6 +3,7 @@ import pickle
 import torch
 import torch.distributed as dist
 
+
 def all_gather_picklable(data):
     """
     Run all_gather on arbitrary picklable data (not necessarily tensors)
@@ -14,9 +15,8 @@ def all_gather_picklable(data):
     world_size = get_world_size()
     if world_size == 1:
         return [data]
-    
+
     buffer = pickle.dumps(data)
-    # storage = torch.ByteStorage.from_buffer(buffer)
     storage = torch.UntypedStorage.from_buffer(buffer, dtype=torch.uint8)
     tensor = torch.ByteTensor(storage).to("cuda")
     # obtain Tensor size of each rank
