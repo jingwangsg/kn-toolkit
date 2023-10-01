@@ -167,7 +167,10 @@ class FFMPEG:
 
 
 import yt_dlp
+
+
 class YTDLPDownloader:
+
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # scale should be conditon like "<=224" or ">=224"
@@ -184,7 +187,7 @@ class YTDLPDownloader:
             error_code = ydl.download(url)
 
         return error_code == 0
-    
+
     @classmethod
     def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
@@ -200,9 +203,24 @@ class YTDLPDownloader:
         buffer = io.BytesIO()
         with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([youtube_id])
-        
+
         buffer.seek(0)
 
         # write out the buffer for demonstration purposes
         # Path(f"{youtube_id}.mp4").write_bytes(buffer.getvalue())
         return buffer, error_code == 0
+
+
+from decord import VideoReader
+
+
+class DecordFrameLoader:
+
+    @classmethod
+    def load_frames(self, buffer, stride=1, width=-1, height=-1):
+        vr = VideoReader(buffer, width=self.width, height=self.height)
+
+        indices = list(range(0, len(vr), self.stride))
+        arr = vr.get_batch(indices).asnumpy()
+
+        return arr

@@ -163,7 +163,8 @@ if [ ! -d "$HOME/.tmp/$(hostname)" ]; then
 fi
 export SLURM_TMPDIR="$HOME/.tmp/$(hostname)"
 export TMUX_TMPDIR="$HOME/.tmp/$(hostname)"
-export TMPDIR="$HOME/.tmp/$(hostname)"
+# export TMPDIR="$HOME/.tmp/$(hostname)"
+export TMPDIR="/tmp/"
 export HOMEBREW_TEMP="$HOME/.tmp/$(hostname)"
 
 show_gpu() {
