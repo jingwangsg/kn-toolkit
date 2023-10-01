@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument("--delay", type=float, default=0.0)
     parser.add_argument("-s", "--sleep", action="store_true", default=False)
     parser.add_argument("--email", action="store_true", default=False)
+    parser.add_argument("--threshold", type=float, default=0.7)
     #  mode = 0: fight and occupy
     #  mode = 1: fight and exit
     #  mode = 2: peace
@@ -75,7 +76,7 @@ def main():
         while (not all(launched)):
             memories = get_vailable_memory()
             for slot_idx, id in enumerate(gpus):
-                if not launched[slot_idx] and memories[id][1] / memories[id][0] > 0.7:
+                if not launched[slot_idx] and memories[id][1] / memories[id][0] > args.threshold:
                     launch(id)
                     launched[slot_idx] = True
             from time import sleep
