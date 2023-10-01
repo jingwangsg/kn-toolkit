@@ -27,6 +27,8 @@ abbr g "gpu"
 abbr dskill "knkill; and knkill deepspeed; and knkill acclerate"
 abbr 'git?' 'copilot_git-assist'
 abbr '??' 'copilot_what-the-shell'
+abbr kntar 'tar -C DIR --use-compress-program=pigz -cvpf - . | split -b 4G -d - OUTPUT.tgz.'
+abbr knuntar 'cat ./INPUT.tgz.* | tar --use-compress-program=unpigz -xvpf -'
 
 abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
 

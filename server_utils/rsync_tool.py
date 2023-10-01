@@ -192,13 +192,14 @@ def main(args):
 
         def _apply(path_chunk):
             cmd = construct_cmd(path_chunk)
+            print(cmd)
             subprocess.run(cmd, shell=True, capture_output=True)
 
         map_async(
             func=_apply,
             iterable=path_chunks,
             num_process=args.num_process,
-            # test_flag=True,
+            test_flag=True
         )
 
 
