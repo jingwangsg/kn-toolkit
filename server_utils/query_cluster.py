@@ -104,8 +104,6 @@ class GPUCluster:
 
         df = pd.concat(df_list, ignore_index=True)
         df.sort_values(by=[" memory.free [MiB]"], ascending=False, inplace=True)
-        import ipdb
-        ipdb.set_trace()
 
         return df
 
