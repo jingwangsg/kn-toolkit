@@ -1,1 +1,1 @@
-from .heatmap import *
+from .heatmap import plot_heatmap

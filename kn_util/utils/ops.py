@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import copy
-from ..utils.init import init_module
+from ..nn.init import init_module
 
 def list_to_dict(cur_dict):
     """ convert a list of dict to a dict of list """
