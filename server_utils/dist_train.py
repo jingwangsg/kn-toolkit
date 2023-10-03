@@ -4,7 +4,7 @@ import subprocess
 import numpy as np
 import time
 import random
-from kn_util.tools import send_email
+from kn_util.utils import send_email
 
 
 def parse_args():
