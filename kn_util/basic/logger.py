@@ -7,6 +7,7 @@ import torch.distributed as dist
 
 logger_initialized = dict()
 
+
 @functools.lru_cache()
 def get_logger(name="", output_dir=None, to_console=True):
     if name in logger_initialized:
@@ -23,12 +24,8 @@ def get_logger(name="", output_dir=None, to_console=True):
 
     # create formatter
     fmt = "[%(asctime)s]" + "(%(name)s:%(lineno)d)" + "%(levelname)s" + " %(message)s"
-    color_fmt = (
-        colored("[%(asctime)s]", "green")
-        + colored("(%(name)s:%(lineno)d)", "blue")
-        + colored("%(levelname)s", "yellow")
-        + " %(message)s"
-    )
+    color_fmt = (colored("[%(asctime)s]", "green") + colored("(%(name)s:%(lineno)d)", "blue") +
+                 colored("%(levelname)s", "yellow") + " %(message)s")
     # fmt = '[%(asctime)s %(name)s] (%(filename)s %(lineno)d): %(levelname)s %(message)s'
     # color_fmt = colored('[%(asctime)s %(name)s]', 'green') + \
     #             colored('(%(filename)s %(lineno)d)', 'yellow') + ': %(levelname)s %(message)s'
@@ -43,13 +40,11 @@ def get_logger(name="", output_dir=None, to_console=True):
     # create file handlers
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)
-        file_handler = logging.FileHandler(
-            os.path.join(output_dir, f"log_rank{dist_rank}.txt"), mode="a"
-        )
+        file_handler = logging.FileHandler(os.path.join(output_dir, f"log_rank{dist_rank}.txt"), mode="a")
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S"))
         logger.addHandler(file_handler)
-    
+
     logger_initialized[name] = logger
 
     return logger

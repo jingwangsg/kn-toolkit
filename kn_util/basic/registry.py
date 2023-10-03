@@ -23,6 +23,7 @@ from loguru import logger
 #     def build_cls(self, name):
 #         return self._cls_dict[name]
 
+
 class Registry:
     """mini version of https://github.com/facebookresearch/mmf/blob/main/mmf/common/registry.py"""
 
@@ -123,7 +124,7 @@ class Registry:
     @classmethod
     def register_mapper(cls, _name):
         return cls.register_cls(_name, "mapper")
-    
+
     @classmethod
     def build_mapper(cls, _name, **kwargs):
         return cls.build(_name, "mapper", **kwargs)
@@ -169,6 +170,7 @@ class Registry:
         if verbose:
             logger.info(f"[object] {id(cls.mapping['object'][name])} with name {name} destroyed")
         del cls.mapping["object"][name]
+
 
 registry = Registry()
 global_upload = registry.register_object

@@ -74,6 +74,7 @@ def reset_seed() -> None:
     workers = os.environ.get("PL_SEED_WORKERS", "0")
     seed_everything(int(seed), workers=bool(int(workers)))
 
+
 def eval_env(name, default=False):
     try:
         return eval(os.getenv(name, str(default)))

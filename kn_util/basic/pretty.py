@@ -17,6 +17,7 @@ def yapf_pformat(obj):
 
     return format_code
 
+
 def black_pformat(obj):
     import black
     from pprint import pformat

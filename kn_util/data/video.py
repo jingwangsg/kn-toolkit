@@ -215,12 +215,20 @@ from decord import VideoReader
 
 
 class DecordFrameLoader:
+    @classmethod
+    def get_fps(cls, buffer):
+        return VideoReader(buffer).get_avg_fps()
 
     @classmethod
-    def load_frames(self, buffer, stride=1, width=-1, height=-1):
-        vr = VideoReader(buffer, width=self.width, height=self.height)
+    def load_frames(cls, buffer, stride=1, width=-1, height=-1):
+        vr = VideoReader(buffer, width=width, height=height, num_threads=16)
 
-        indices = list(range(0, len(vr), self.stride))
+        indices = list(range(0, len(vr), stride))
         arr = vr.get_batch(indices).asnumpy()
 
         return arr
+    
+    @classmethod
+    def get_frame_count(cls, buffer):
+        vr = VideoReader(buffer, num_threads=16)
+        return len(vr)
