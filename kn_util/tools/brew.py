@@ -62,7 +62,8 @@ def check_brew_available():
 
 def get_dependencies(app):
     ret = run_cmd(f"brew deps -n --missing {app}").stdout  # in typological order
-    return [_ for _ in ret.split("\n") if _ != ""]
+    ret = [_ for _ in ret.split("\n") if _ != ""].reverse()
+    return ret
 
 
 def install(app):
