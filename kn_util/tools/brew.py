@@ -95,13 +95,13 @@ if __name__ == "__main__":
         args = parser.parse_args()
         install(args.app)
     elif command == "self_install":
-        if check_app_available():
+        if check_brew_available():
             print("=> brew already installed!")
             exit(0)
         parser.add_argument("dir", type=str, default="~/")
         args = parser.parse_args()
         run_cmd(f"cd {args.dir} && git clone ")
-        if not check_app_available():
+        if not check_brew_available():
             print("add ~/homebrew/bin and lib/ to ~/.bashrc")
             run_cmd('echo "PATH=/homebrew/bin:$PATH" >> ~/.bashrc')
             run_cmd('echo "LD_LIBRARY_PATH=/homebrew/lib:$LD_LIBRARY_PATH" >> ~/.bashrc')
