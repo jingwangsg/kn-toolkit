@@ -68,7 +68,7 @@ class GPUCluster:
 
         output = result.stdout
 
-        if result.stderr.strip() != "":
+        if result.stderr.strip() != "" and "has been allocated resources" not in result.stderr:
             print(f"[FAIL] node{node_idx:02d} | {result.stderr} | {result.stdout}")
             output = ""
 
