@@ -11,7 +11,7 @@ import time
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False):
     """while test_flag=True, run sequentially"""
     if test_flag:
-        ret = [func(x) for x in tqdm(iterable)]
+        ret = [func(x) for x in tqdm(iterable, desc=desc)]
         return ret
     else:
         p = Pool(num_process)

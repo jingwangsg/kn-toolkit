@@ -2,7 +2,11 @@
 from omegaconf import OmegaConf
 import copy
 import hydra
-from loguru import logger
+
+try:
+    from loguru import logger
+except:
+    print("loguru not found")
 
 # class Registry:
 #     def __init__(self):
