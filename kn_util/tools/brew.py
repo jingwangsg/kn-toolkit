@@ -103,7 +103,7 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
     print(f"=> Patched {executable}")
 
 
-def patch(homebrew_bin="~/homebrew/bin", app=None, need_check=True):
+def patch(homebrew_bin="~/homebrew/bin", app=None, path=None, need_check=True):
     assert run_cmd("which patchelf").returncode == 0, "patchelf not found!"
 
     if app is not None:
@@ -118,6 +118,8 @@ def patch(homebrew_bin="~/homebrew/bin", app=None, need_check=True):
             return app_path
 
         all_executable = [_which(app) for app in app.split() if _which(app) is not None]
+    elif path is not None:
+        all_executable = [path]
     else:
         all_executable = glob.glob(homebrew_bin + "/*")
 
@@ -263,6 +265,7 @@ if __name__ == "__main__":
     if command == "patch":
         parser.add_argument("--homebrew_bin", type=str, default=osp.expanduser("~/homebrew/bin"))
         parser.add_argument("--app", type=str, default=None)
+        parser.add_argument("--path", type=str, default=None)
         args = parser.parse_args()
         patch(homebrew_bin=args.homebrew_bin, app=args.app)
     elif command == "install":
