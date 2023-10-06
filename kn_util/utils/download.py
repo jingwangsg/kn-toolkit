@@ -91,7 +91,7 @@ class Downloader:
             pass
 
         transport = httpx.AsyncHTTPTransport(retries=5)
-        client = httpx.AsyncClient(transport=transport, timeout=60)
+        client = httpx.AsyncClient(transport=transport)
         loop = asyncio.get_event_loop()
 
         pbar = tqdm_asyncio(total=filesize,
