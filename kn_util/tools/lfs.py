@@ -79,12 +79,6 @@ def _parse_repo_url(url):
 
 def download(args):
     # clone the repo
-    run_cmd(f"GIT_LFS_SKIP_SMUDGE=1 git clone {args.url}")
-    folder_name = osp.basename(args.url)
-    if folder_name.endswith(".git"):
-        folder_name = folder_name[:-4]
-    os.chdir(folder_name)
-
     paths = lfs_list_files(include=args.include)
     print(f"=> Found {len(paths)} files to download")
 
@@ -99,14 +93,18 @@ def download(args):
 
     def _download_fn(url_path_pair):
         url, path = url_path_pair
+        finish_flag = osp.dirname(path) + "." + osp.basename(path) + ".finish"
 
+        if osp.exists(finish_flag):
+            return
         if osp.exists(path):
             os.remove(path)
+
         Downloader.async_sharded_download(url=url, headers=headers, verbose=True, save_name=path)
+        subprocess(f"touch {finish_flag}")
 
     for pair in url_path_pairs:
         _download_fn(pair)
-
 
 
 if __name__ == "__main__":

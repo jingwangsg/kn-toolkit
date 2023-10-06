@@ -31,6 +31,7 @@ abbr kntar 'tar -C DIR --use-compress-program=pigz -cvpf - . | split -b 4G -d - 
 abbr knuntar 'cat ./INPUT.tgz.* | tar --use-compress-program=unpigz -xvpf -'
 
 abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
+abbr "skip_clone" "GIT_LFS_SKIP_SMUDGE=1 git clone"
 
 function rsync_delete
     rsync --delete-before --force -r ~/.empty/ $argv
