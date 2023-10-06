@@ -129,11 +129,12 @@ class Downloader:
 
         loop.close()
 
-        ret_buffer = io.BytesIO()
-        for buffer in result:
-            ret_buffer.write(buffer.getvalue())
+        if to_buffer:
+            ret_buffer = io.BytesIO()
+            for buffer in result:
+                ret_buffer.write(buffer.getvalue())
 
-        return ret_buffer
+            return ret_buffer
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, verbose=True):

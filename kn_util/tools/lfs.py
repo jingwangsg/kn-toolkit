@@ -9,6 +9,7 @@ from ..utils.download import Downloader, get_headers
 from ..utils.git_utils import get_origin_url
 from ..basic import map_async
 from functools import partial
+import re
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -32,7 +33,7 @@ def lfs_list_files(include=None):
     if include:
         cmd += " --include=\"{}\"".format(args.include)
     paths = run_cmd(cmd, return_output=True).splitlines()
-    paths = [_.split(" - ")[-1] for _ in paths]
+    paths = [_.split(" ")[-1].strip() for _ in paths]
     return paths
 
 
@@ -70,7 +71,7 @@ def _parse_repo_url(url):
     """parse org, repo from url
     url like https://huggingface.co/TheBloke/stable-vicuna-13B-GGUF
     """
-    items = url.split("/")
+    items = [_ for _ in url.split("/") if _ != ""]
     org, repo = items[-2:]
     if items[-3] == "datasets":
         org = "datasets/" + org
@@ -95,7 +96,7 @@ def download(args):
 
     def _download_fn(url_path_pair):
         url, path = url_path_pair
-        finish_flag = osp.dirname(path) + "." + osp.basename(path) + ".finish"
+        finish_flag = osp.dirname(path) + "/." + osp.basename(path) + ".finish"
 
         if osp.exists(finish_flag):
             print(f"=> {path} already downloaded")
@@ -107,6 +108,7 @@ def download(args):
         subprocess.run(f"touch {finish_flag}", shell=True)
 
     for pair in url_path_pairs:
+        print(pair)
         _download_fn(pair)
 
 
