@@ -5,7 +5,7 @@ sys.path.insert(0, os.getcwd())
 import subprocess
 import argparse
 import os.path as osp
-from ..utils.download import Downloader
+from ..utils.download import Downloader, get_headers
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -71,7 +71,6 @@ def _parse_repo_url(url):
     return org, repo
 
 def download(args):
-
     # clone the repo
     run_cmd(f"GIT_LFS_SKIP_SMUDGE=1 git clone {args.url}")
     folder_name = osp.basename(args.url)
@@ -83,6 +82,7 @@ def download(args):
     print(f"=> Found {len(paths)} files to download")
 
     org, repo = _parse_repo_url(args.url)
+    headers = get_headers(from_hf=True)
 
     for path in paths:
         if osp.exists(path):
