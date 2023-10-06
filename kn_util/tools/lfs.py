@@ -6,6 +6,8 @@ import subprocess
 import argparse
 import os.path as osp
 from ..utils.download import Downloader, get_headers
+from ..basic import map_async
+from functools import partial
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -62,6 +64,7 @@ def track(args):
         cmd = "git lfs track \"{}\"".format(path)
         run_cmd(cmd)
 
+
 def _parse_repo_url(url):
     """parse org, repo from url
     url like https://huggingface.co/TheBloke/stable-vicuna-13B-GGUF
@@ -69,6 +72,7 @@ def _parse_repo_url(url):
     org, repo = url.split("/")[-2:]
 
     return org, repo
+
 
 def download(args):
     # clone the repo
@@ -84,12 +88,22 @@ def download(args):
     org, repo = _parse_repo_url(args.url)
     headers = get_headers(from_hf=True)
 
+    url_path_pairs = []
+
     for path in paths:
+        url = args.template.format(org=org, repo=repo, path=path)
+        url_path_pairs += [(url, path)]
+
+    def _download_fn(url_path_pair):
+        url, path = url_path_pair
+
         if osp.exists(path):
             os.remove(path)
+        Downloader.async_sharded_download(url=url, headers=headers, verbose=True, save_name=path)
 
-        url = args.template.format(org=org, repo=repo, path=path)
-        Downloader.async_sharded_download(url, verbose=True)
+    for pair in url_path_pairs:
+        _download_fn(pair)
+
 
 
 if __name__ == "__main__":
