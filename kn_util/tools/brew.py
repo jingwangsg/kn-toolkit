@@ -267,7 +267,7 @@ if __name__ == "__main__":
         parser.add_argument("--app", type=str, default=None)
         parser.add_argument("--path", type=str, default=None)
         args = parser.parse_args()
-        patch(homebrew_bin=args.homebrew_bin, app=args.app)
+        patch(homebrew_bin=args.homebrew_bin, app=args.app, path=args.path)
     elif command == "install":
         parser.add_argument("app", type=str, default="")
         parser.add_argument("--post_patch", action="store_true", default=False, help="patch after install")

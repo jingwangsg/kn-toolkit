@@ -98,11 +98,12 @@ def download(args):
         finish_flag = osp.dirname(path) + "." + osp.basename(path) + ".finish"
 
         if osp.exists(finish_flag):
+            print(f"=> {path} already downloaded")
             return
         if osp.exists(path):
             os.remove(path)
 
-        Downloader.async_sharded_download_to_file(url=url, headers=headers, verbose=True, save_name=path)
+        Downloader.async_sharded_download(url=url, headers=headers, verbose=True, out=path)
         subprocess(f"touch {finish_flag}")
 
     for pair in url_path_pairs:

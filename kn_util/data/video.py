@@ -17,6 +17,7 @@ import io
 import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
+from einops import rearrange
 
 
 class HFImageModelWrapper(nn.Module):
@@ -189,7 +190,51 @@ class YTDLPDownloader:
         return error_code == 0
 
     @staticmethod
-    def _download_ydl(youtube_id, buffer, video_format, quiet):
+    def _check_format_dict(format_dict,
+                           is_storyboad=False,
+                           has_video=True,
+                           has_audio=True,
+                           h_min=0,
+                           h_max=np.inf,
+                           w_min=0,
+                           w_max=np.inf,
+                           ext=None):
+        if is_storyboad:
+            if format_dict["ext"] == "mhtml":
+                return True
+            else:
+                return False
+
+        if has_video and format_dict["vcodec"] == "none":
+            return False
+
+        if has_audio and format_dict["acodec"] == "none":
+            return False
+
+        if format_dict["height"] < h_min or format_dict["height"] > h_max:
+            return False
+
+        if format_dict["width"] < w_min or format_dict["width"] > w_max:
+            return False
+
+        if ext is not None and format_dict["ext"] != ext:
+            return False
+
+        return True
+
+    @classmethod
+    def extract_formats(cls, youtube_id, quiet=True, **format_kwargs):
+        ydl_opts = {'ignoreerrors': True, 'logtostderr': True, 'quiet': quiet, 'noprogress': quiet}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            infos = ydl.extract_info(youtube_id, download=False)
+            formats = [_ for _ in infos["formats"] if cls._check_format_dict(_, **format_kwargs)]
+
+        formats = sorted(formats, key=lambda _: _["height"])
+
+        return formats
+
+    @staticmethod
+    def _download_ydl(youtube_id, buffer, video_format, quiet=True):
         ydl_opts = {
             'ignoreerrors': True,
             'format': video_format,
@@ -211,7 +256,7 @@ class YTDLPDownloader:
         # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
 
         buffer = io.BytesIO()
-        error_code = cls._download_ydl(youtube_id=youtube_id,buffer=buffer,video_format=video_format,quiet=quiet)
+        error_code = cls._download_ydl(youtube_id=youtube_id, buffer=buffer, video_format=video_format, quiet=quiet)
 
         buffer.seek(0)
 
