@@ -104,7 +104,7 @@ def download(args):
             os.remove(path)
 
         Downloader.async_sharded_download(url=url, headers=headers, verbose=True, out=path)
-        subprocess(f"touch {finish_flag}")
+        subprocess.run(f"touch {finish_flag}", shell=True)
 
     for pair in url_path_pairs:
         _download_fn(pair)
