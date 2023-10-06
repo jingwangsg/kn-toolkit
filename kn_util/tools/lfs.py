@@ -26,6 +26,10 @@ def run_cmd(cmd, return_output=False):
         subprocess.run(cmd, shell=True, check=True)
 
 
+def _get_url_from_git():
+    return run_cmd("git config --get remote.origin.url").strip()
+
+
 def lfs_list_files(include=None):
     cmd = "git lfs ls-files"
     if include:
@@ -82,7 +86,8 @@ def download(args):
     paths = lfs_list_files(include=args.include)
     print(f"=> Found {len(paths)} files to download")
 
-    org, repo = _parse_repo_url(args.url)
+    url = _get_url_from_git()
+    org, repo = _parse_repo_url(url)
     headers = get_headers(from_hf=True)
 
     url_path_pairs = []
@@ -120,7 +125,6 @@ if __name__ == "__main__":
         args = parser.parse_args()
         track(args)
     elif command == "download":
-        parser.add_argument("url", type=str, help="The url to download")
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
         args = parser.parse_args()
