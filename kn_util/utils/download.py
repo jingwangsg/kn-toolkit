@@ -36,21 +36,19 @@ def get_headers(from_hf=False):
 class Downloader:
 
     @staticmethod
-    async def _async_range_download(url, save_name, s_pos, e_pos, client, chunk_size, headers=None, pbar=None):
+    async def _async_range_download(url, buffer, s_pos, e_pos, client, chunk_size, headers=None, pbar=None):
         range_headers = {"Range": f"bytes={s_pos}-{e_pos}"}
         if headers:
             range_headers.update(headers)
         headers = range_headers
 
-        f = open(save_name, "rb+")
         async with client.stream('GET', url=url, headers=headers) as r:
-            f.seek(s_pos)
+            buffer.seek(s_pos)
             async for chunk in r.aiter_bytes():
                 if chunk:  # prevent keep-alive chunks
-                    f.write(chunk)
+                    buffer.write(chunk)
                     if pbar:
                         pbar.update(len(chunk))
-        f.close()
 
     @staticmethod
     def _calc_divisional_range(filesize, chuck=10):
@@ -64,22 +62,41 @@ class Downloader:
         return result
 
     @classmethod
-    def async_sharded_download(cls,
-                               url,
-                               save_name=None,
-                               chunk_size=1024 * 100,
-                               num_shards=10,
-                               headers=None,
-                               verbose=True):
+    def async_sharded_download_to_file(cls,
+                                       url,
+                                       save_name,
+                                       chunk_size=1024 * 100,
+                                       num_shards=10,
+                                       headers=None,
+                                       verbose=True):
         if save_name is None:
             save_name = url.split("/")[-1]
+        with open(save_name, "wb"):
+            pass
+
+        with open(save_name, "rb+") as f:
+            cls.async_sharded_download_to_buffer(url,
+                                                 buffer=f,
+                                                 headers=headers,
+                                                 num_shards=num_shards,
+                                                 chunk_size=chunk_size,
+                                                 verbose=verbose)
+
+    @classmethod
+    def async_sharded_download_to_buffer(cls,
+                                         url,
+                                         buffer,
+                                         chunk_size=1024 * 100,
+                                         num_shards=10,
+                                         headers=None,
+                                         verbose=True):
 
         # resolve redirect
         res = head_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
             print("File does not support range download, use direct download")
-            cls.download(url, save_name, headers=headers, verbose=verbose)
+            cls.download_to_buffer(url, buffer, headers=headers, verbose=verbose)
             return
 
         # get filesize
@@ -87,16 +104,13 @@ class Downloader:
         filesize = int(res.headers["Content-Length"])
         divisional_ranges = cls._calc_divisional_range(filesize, num_shards)
 
-        with open(save_name, "wb") as f:
-            pass
-
         transport = httpx.AsyncHTTPTransport(retries=5)
         client = httpx.AsyncClient(transport=transport)
         loop = asyncio.get_event_loop()
 
         pbar = tqdm_asyncio(total=filesize,
                             dynamic_ncols=True,
-                            desc=f"Downloading {save_name}",
+                            desc=f"Downloading",
                             unit="B",
                             unit_scale=True,
                             smoothing=0.1,
@@ -107,7 +121,7 @@ class Downloader:
         with context:
             tasks = [
                 cls._async_range_download(url,
-                                          save_name,
+                                          buffer,
                                           s_pos,
                                           e_pos,
                                           chunk_size=chunk_size,
@@ -118,7 +132,7 @@ class Downloader:
             loop.run_until_complete(asyncio.wait(tasks))
 
     @classmethod
-    def download(cls, url, chunk_size=1024 * 100, save_name=None, headers=None, verbose=True):
+    def download_to_buffer(cls, url, buffer, chunk_size=1024 * 100, headers=None, verbose=True):
         if save_name is None:
             save_name = url.split("/")[-1]
 
@@ -147,3 +161,10 @@ class Downloader:
                             f.write(chunk)
                             if pbar:
                                 pbar.update(len(chunk))
+
+    @classmethod
+    def download_to_file(cls, url, save_name=None, chunk_size=1024 * 100, headers=None, verbose=True):
+        if save_name is None:
+            save_name = url.split("/")[-1]
+        with open(save_name, "wb") as f:
+            cls.download_to_buffer(url=url, buffer=f, chunk_size=chunk_size, headers=headers, verbose=verbose)

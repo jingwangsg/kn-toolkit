@@ -15,7 +15,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    Downloader.async_sharded_download(url=args.url,
-                                      save_name=args.output,
-                                      num_shards=args.num_shards,
-                                      chunk_size=args.chunk_size)
+    Downloader.async_sharded_download_to_file(url=args.url,
+                                              save_name=args.output,
+                                              num_shards=args.num_shards,
+                                              chunk_size=args.chunk_size)

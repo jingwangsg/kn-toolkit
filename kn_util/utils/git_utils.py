@@ -9,3 +9,10 @@ def commit(content):
         print(res)
     except Exception as e:
         print("no need to commit")
+
+def get_origin_url():
+    import git
+    repo = git.Repo(search_parent_directories=True)
+    remote = repo.remote()
+    remote_url = remote.url
+    return remote_url

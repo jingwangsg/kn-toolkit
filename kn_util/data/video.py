@@ -188,9 +188,8 @@ class YTDLPDownloader:
 
         return error_code == 0
 
-    @classmethod
-    def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
-        # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+    @staticmethod
+    def _download_ydl(youtube_id, buffer, video_format, quiet):
         ydl_opts = {
             'ignoreerrors': True,
             'format': video_format,
@@ -199,22 +198,37 @@ class YTDLPDownloader:
             'quiet': quiet,
             'noprogress': quiet
         }
-
-        buffer = io.BytesIO()
         with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([youtube_id])
+        return error_code
+
+    @staticmethod
+    def _download_async(youtubu_id, buffer, video_format, quiet):
+        pass
+
+    @classmethod
+    def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
+        # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+
+        buffer = io.BytesIO()
+        error_code = cls._download_ydl(youtube_id=youtube_id,buffer=buffer,video_format=video_format,quiet=quiet)
 
         buffer.seek(0)
 
         # write out the buffer for demonstration purposes
         # Path(f"{youtube_id}.mp4").write_bytes(buffer.getvalue())
+
         return buffer, error_code == 0
 
 
-from decord import VideoReader
+try:
+    from decord import VideoReader
+except:
+    warnings.warn("decord is not installed, video loading is not available")
 
 
 class DecordFrameLoader:
+
     @classmethod
     def get_fps(cls, buffer):
         return VideoReader(buffer).get_avg_fps()
@@ -227,7 +241,7 @@ class DecordFrameLoader:
         arr = vr.get_batch(indices).asnumpy()
 
         return arr
-    
+
     @classmethod
     def get_frame_count(cls, buffer):
         vr = VideoReader(buffer, num_threads=16)

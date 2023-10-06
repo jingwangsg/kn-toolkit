@@ -6,6 +6,7 @@ import subprocess
 import argparse
 import os.path as osp
 from ..utils.download import Downloader, get_headers
+from ..utils.git_utils import get_origin_url
 from ..basic import map_async
 from functools import partial
 
@@ -24,10 +25,6 @@ def run_cmd(cmd, return_output=False):
         return subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True).stdout
     else:
         subprocess.run(cmd, shell=True, check=True)
-
-
-def _get_url_from_git():
-    return run_cmd("git config --get remote.origin.url").strip()
 
 
 def lfs_list_files(include=None):
@@ -86,7 +83,7 @@ def download(args):
     paths = lfs_list_files(include=args.include)
     print(f"=> Found {len(paths)} files to download")
 
-    url = _get_url_from_git()
+    url = get_origin_url()
     org, repo = _parse_repo_url(url)
     headers = get_headers(from_hf=True)
 
@@ -105,7 +102,7 @@ def download(args):
         if osp.exists(path):
             os.remove(path)
 
-        Downloader.async_sharded_download(url=url, headers=headers, verbose=True, save_name=path)
+        Downloader.async_sharded_download_to_file(url=url, headers=headers, verbose=True, save_name=path)
         subprocess(f"touch {finish_flag}")
 
     for pair in url_path_pairs:
