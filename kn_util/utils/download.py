@@ -12,7 +12,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 
-def get_head_with_redirects(url, verbose=False, headers=None):
+def head_with_redirects(url, verbose=False, headers=None):
     with httpx.Client(follow_redirects=False) as client:
         response = client.head(url, headers=headers)
         while response.status_code in (301, 302):
@@ -75,7 +75,7 @@ class Downloader:
             save_name = url.split("/")[-1]
 
         # resolve redirect
-        res = get_head_with_redirects(url, headers=headers)
+        res = head_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
             print("File does not support range download, use direct download")

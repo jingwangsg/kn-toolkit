@@ -69,7 +69,10 @@ def _parse_repo_url(url):
     """parse org, repo from url
     url like https://huggingface.co/TheBloke/stable-vicuna-13B-GGUF
     """
-    org, repo = url.split("/")[-2:]
+    items = url.split("/")
+    org, repo = items[-2:]
+    if items[-3] == "datasets":
+        org = "datasets/" + org
 
     return org, repo
 
