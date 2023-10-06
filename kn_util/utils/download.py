@@ -123,7 +123,7 @@ class Downloader:
             save_name = url.split("/")[-1]
 
         # resolve redirect
-        res = get_head_with_redirects(url, headers=headers)
+        res = head_with_redirects(url, headers=headers)
         url = res.url
         filesize = int(res.headers["Content-Length"])
 
