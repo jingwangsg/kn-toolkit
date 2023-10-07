@@ -83,7 +83,7 @@ def _parse_repo_url(url):
 
 def _download_fn(url_path_pair, headers=None, verbose=True):
     url, path = url_path_pair
-    finish_flag = osp.dirname(path) + "/." + osp.basename(path) + ".finish"
+    finish_flag = osp.join(os.getcwd(), osp.dirname(path), "." + osp.basename(path) + ".finish")
 
     if osp.exists(finish_flag):
         print(f"=> {path} already downloaded")
@@ -119,6 +119,7 @@ def download(url_template, include=None, queue=None, verbose=True):
 
     if queue:
         queue.put(None)  # ending signal for download process
+
 
 class RsyncDownloadManager:
 
@@ -158,10 +159,8 @@ class RsyncDownloadManager:
 
             if pair is None:
                 break
-    
+
     @classmethod
-
-
     @classmethod
     def download_and_rsync(cls, url_template, include, dest):
         dest = cls.get_abspath(dest)
