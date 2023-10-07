@@ -7,6 +7,7 @@ import argparse
 import os.path as osp
 from ..utils.download import Downloader, get_headers
 from ..utils.git_utils import get_origin_url
+from ..utils.rsync import RsyncTool
 from ..basic import map_async
 from functools import partial
 import re
@@ -32,7 +33,7 @@ def run_cmd(cmd, return_output=False):
 def lfs_list_files(include=None):
     cmd = "git lfs ls-files"
     if include:
-        cmd += " --include=\"{}\"".format(args.include)
+        cmd += " --include=\"{}\"".format(include)
     paths = run_cmd(cmd, return_output=True).splitlines()
     paths = [_.split(" ")[-1].strip() for _ in paths]
     return paths
@@ -95,9 +96,9 @@ def _download_fn(url_path_pair, headers=None, verbose=True):
     return True
 
 
-def download(url_template, queue=None, verbose=True):
+def download(url_template, include=None, queue=None, verbose=True):
     # clone the repo
-    paths = lfs_list_files(include=args.include)
+    paths = lfs_list_files(include=include)
     print(f"=> Found {len(paths)} files to download")
 
     url = get_origin_url()
@@ -117,33 +118,66 @@ def download(url_template, queue=None, verbose=True):
             queue.put(pair)
 
     if queue:
-        queue.put(None)
+        queue.put(None)  # ending signal for download process
 
 
-class RsyncDownloader:
+class RsyncDownloadManager:
 
     @staticmethod
-    def rsync_listen(queue,):
+    def get_abspath(dest):
+        if len(dest.split(":")) < 2:
+            # local
+            cmd = f"readlink -f {dest}"
+            abspath = run_cmd(cmd, return_output=True).stdout.strip()
+            return abspath
+        else:
+            # remote
+            host, path = dest.split(":")
+            cmd = f"ssh {host} 'readlink -f {path}'"
+            abspath = run_cmd(cmd, return_output=True).stdout.strip()
+            return f"{host}:{abspath}"
+
+    @staticmethod
+    def initial_rsync(dest):
+        src_dir = os.getcwd()
+        print(f"=> Initial rsync to {dest}")
+        RsyncTool.launch_rsync(src_dir,
+                               to_addr=dest,
+                               async_dir=True,
+                               exclude="**/.*.finish,*.git",
+                               remove_source_files=True)
+
+    @staticmethod
+    def rsync_listen(queue, dest):
         while True:
             pair = queue.get()
 
-            subprocess.run(f"rsync -vaur --exclude='**/.*.finish' {pair[1]} {args.rsync}{pair[1]}", shell=True)
+            print(f"=> Incremental rsync {pair[1]} => {dest}")
+
+            subprocess.run(f"rsync -vaurP --remove-source-files --relative {pair[1]} {dest}", shell=True)
             # prevent rsync .finish file
 
             if pair is None:
                 break
 
     @classmethod
-    def download_and_rsync(cls, url_template):
+    def download_and_rsync(cls, url_template, include, dest):
+        dest = cls.get_abspath(dest)
+        cls.initial_rsync(dest)
+
         queue = mp.Queue()
 
-        dl_proc = mp.Process(target=download, args=(url_template, queue, False))
+        dl = partial(download, url_template=url_template, include=include, queue=queue, verbose=True)
+        rsync = partial(cls.rsync_listen, queue=queue, dest=dest)
+
+        dl_proc = mp.Process(target=dl)
         dl_proc.start()
-        rsync_proc = mp.Process(target=cls.rsync_listen, args=(queue,))
+        rsync_proc = mp.Process(target=rsync)
         rsync_proc.start()
 
         dl_proc.join()
         rsync_proc.join()
+
 
 if __name__ == "__main__":
     parser = parse_args()
@@ -160,9 +194,9 @@ if __name__ == "__main__":
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
-        parser.add_argument("--rsync", action="store_true", default=False, help="Use rsync to push to remote")
+        parser.add_argument("--rsync", type=str, help="The rsync path", default=None)
         args = parser.parse_args()
         if not args.rsync:
-            download(url_template=args.template)
+            download(url_template=args.template, include=args.include, verbose=True)
         else:
-            RsyncDownloader.download_and_rsync(args)
+            RsyncDownloadManager.download_and_rsync(url_template=args.template, include=args.include, dest=args.rsync)
