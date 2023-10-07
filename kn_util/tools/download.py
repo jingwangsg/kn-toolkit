@@ -18,7 +18,7 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     if args.direct:
-        Downloader.download(url=args.url, out=args.output)
+        Downloader.download(url=args.url, out=args.output, proxy=args.proxy)
     else:
         Downloader.async_sharded_download(url=args.url,
                                           out=args.output,
