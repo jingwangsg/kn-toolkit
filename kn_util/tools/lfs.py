@@ -10,6 +10,7 @@ from ..utils.git_utils import get_origin_url
 from ..basic import map_async
 from functools import partial
 import re
+import multiprocessing as mp
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -79,7 +80,22 @@ def _parse_repo_url(url):
     return org, repo
 
 
-def download(args):
+def _download_fn(url_path_pair, headers=None, verbose=True):
+    url, path = url_path_pair
+    finish_flag = osp.dirname(path) + "/." + osp.basename(path) + ".finish"
+
+    if osp.exists(finish_flag):
+        print(f"=> {path} already downloaded")
+        return
+    if osp.exists(path):
+        os.remove(path)
+
+    Downloader.async_sharded_download(url=url, headers=headers, verbose=verbose, out=path)
+    subprocess.run(f"touch {finish_flag}", shell=True)
+    return True
+
+
+def download(url_template, queue=None, verbose=True):
     # clone the repo
     paths = lfs_list_files(include=args.include)
     print(f"=> Found {len(paths)} files to download")
@@ -91,26 +107,43 @@ def download(args):
     url_path_pairs = []
 
     for path in paths:
-        url = args.template.format(org=org, repo=repo, path=path)
+        url = url_template.format(org=org, repo=repo, path=path)
         url_path_pairs += [(url, path)]
-
-    def _download_fn(url_path_pair):
-        url, path = url_path_pair
-        finish_flag = osp.dirname(path) + "/." + osp.basename(path) + ".finish"
-
-        if osp.exists(finish_flag):
-            print(f"=> {path} already downloaded")
-            return
-        if osp.exists(path):
-            os.remove(path)
-
-        Downloader.async_sharded_download(url=url, headers=headers, verbose=True, out=path)
-        subprocess.run(f"touch {finish_flag}", shell=True)
 
     for pair in url_path_pairs:
         print(pair)
-        _download_fn(pair)
+        ret = _download_fn(pair, headers=headers, verbose=verbose)
+        if queue and ret:
+            queue.put(pair)
 
+    if queue:
+        queue.put(None)
+
+
+class RsyncDownloader:
+
+    @staticmethod
+    def rsync_listen(queue,):
+        while True:
+            pair = queue.get()
+
+            subprocess.run(f"rsync -vaur --exclude='**/.*.finish' {pair[1]} {args.rsync}{pair[1]}", shell=True)
+            # prevent rsync .finish file
+
+            if pair is None:
+                break
+
+    @classmethod
+    def download_and_rsync(cls, url_template):
+        queue = mp.Queue()
+
+        dl_proc = mp.Process(target=download, args=(url_template, queue, False))
+        dl_proc.start()
+        rsync_proc = mp.Process(target=cls.rsync_listen, args=(queue,))
+        rsync_proc.start()
+
+        dl_proc.join()
+        rsync_proc.join()
 
 if __name__ == "__main__":
     parser = parse_args()
@@ -127,5 +160,9 @@ if __name__ == "__main__":
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
+        parser.add_argument("--rsync", action="store_true", default=False, help="Use rsync to push to remote")
         args = parser.parse_args()
-        download(args)
+        if not args.rsync:
+            download(url_template=args.template)
+        else:
+            RsyncDownloader.download_and_rsync(args)
