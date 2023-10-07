@@ -89,8 +89,16 @@ class RsyncTool:
         return returncode == 0
 
     @classmethod
-    def launch_rsync(cls, from_addr, to_addr, async_dir=False, chunk_size=100, num_process=30, **rsync_kwargs):
+    def launch_rsync(cls,
+                     from_addr,
+                     to_addr,
+                     async_dir=False,
+                     path_filter=lambda x: True,
+                     chunk_size=100,
+                     num_process=30,
+                     **rsync_kwargs):
         # async_dir: rsync all files in from_addr to to_addr asychronously
+        # path_filter: custom function for filtering files, or all files in dir will be rsynced
 
         from_host, from_path = parse(from_addr)
         to_host, to_path = parse(to_addr)
@@ -124,13 +132,14 @@ class RsyncTool:
             print(cmd)
             subprocess.run(cmd, shell=True)
         else:
-            # list all files in from_path
+            # list all files recursively in from_path
             cmd = cmd_list_files(from_path)
             if from_mode == "remote":
                 cmd = cmd_on_ssh(from_host, cmd)
             out = run_cmd(cmd, return_output=True).stdout.strip()
             from_files = out.split("\0")
             from_files = [x for x in from_files if len(x.strip()) > 0]
+            from_files = [x for x in from_files if path_filter(x)]
 
             # construct as relative path for --relative rsync
             from_paths = [osp.join(split_path(from_path)[0], ".", x) for x in from_files]

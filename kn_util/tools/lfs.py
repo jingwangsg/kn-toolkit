@@ -120,7 +120,6 @@ def download(url_template, include=None, queue=None, verbose=True):
     if queue:
         queue.put(None)  # ending signal for download process
 
-
 class RsyncDownloadManager:
 
     @staticmethod
@@ -138,9 +137,9 @@ class RsyncDownloadManager:
             return f"{host}:{abspath}"
 
     @staticmethod
-    def initial_rsync(dest):
+    def rsync_finished(dest):
         src_dir = os.getcwd()
-        print(f"=> Initial rsync to {dest}")
+        print(f"=> rsync finished to {dest}")
         RsyncTool.launch_rsync(src_dir,
                                to_addr=dest,
                                async_dir=True,
@@ -159,6 +158,9 @@ class RsyncDownloadManager:
 
             if pair is None:
                 break
+    
+    @classmethod
+
 
     @classmethod
     def download_and_rsync(cls, url_template, include, dest):
