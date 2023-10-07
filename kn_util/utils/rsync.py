@@ -54,14 +54,14 @@ class RsyncTool:
         """path can be a list of paths or a single path"""
 
         def _combine(hostname, path):
-            return f"{hostname}:{path}"
+            return f"{hostname}:{path}" if hostname is not None else path
 
         is_remote = (hostname is not None)
 
         path_delimiter = " :" if is_remote else " "
 
         if isinstance(path, list):
-            return _combine(hostname, path_delimiter.join([it_path for it_path in path]))
+            return _combine(hostname, path_delimiter.join([f"'{it_path}'" for it_path in path]))
         else:
             return _combine(hostname, path)
 
@@ -154,9 +154,7 @@ class RsyncTool:
                 cmd = construct_cmd(path_chunk)
                 subprocess.run(cmd, shell=True, capture_output=True)
 
-            map_async(
-                func=_apply,
-                iterable=path_chunks,
-                num_process=num_process,
-                desc=f"Rsync {from_addr} -> {to_addr}",
-            )
+            map_async(func=_apply,
+                      iterable=path_chunks,
+                      num_process=num_process,
+                      desc=f"Rsync {from_addr} -> {to_addr}")
