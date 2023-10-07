@@ -9,6 +9,7 @@ def get_args():
     parser.add_argument("--output", type=str, default="_AUTO", help="The output path")
     parser.add_argument("--num_shards", type=int, default=10, help="The number of shards to download")
     parser.add_argument("--chunk_size", type=int, default=1024, help="The chunk size to download")
+    parser.add_argument("--proxy", type=str, default=None, help="The proxy to use")
     parser.add_argument("--direct", action="store_true", default=False, help="Direct download")
 
     return parser.parse_args()
@@ -22,4 +23,5 @@ if __name__ == "__main__":
         Downloader.async_sharded_download(url=args.url,
                                           out=args.output,
                                           num_shards=args.num_shards,
-                                          chunk_size=args.chunk_size)
+                                          chunk_size=args.chunk_size,
+                                          proxy=args.proxy)

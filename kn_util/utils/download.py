@@ -75,7 +75,14 @@ class Downloader:
         return ranges
 
     @classmethod
-    def async_sharded_download(cls, url, out=None, chunk_size=1024 * 100, num_shards=10, headers=None, verbose=True):
+    def async_sharded_download(cls,
+                               url,
+                               out=None,
+                               chunk_size=1024 * 100,
+                               num_shards=10,
+                               headers=None,
+                               proxy=None,
+                               verbose=True):
         to_buffer = (out is None)
 
         if out == "_AUTO":
@@ -89,7 +96,7 @@ class Downloader:
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
             print("File does not support range download, use direct download")
-            cls.download(url, out=out, headers=headers, verbose=verbose)
+            cls.download(url, out=out, headers=headers, proxy=proxy, verbose=verbose)
             return
 
         # get filesize
@@ -98,7 +105,8 @@ class Downloader:
         divisional_ranges = cls._calc_divisional_range(filesize, num_shards)
 
         transport = httpx.AsyncHTTPTransport(retries=5)
-        client = httpx.AsyncClient(transport=transport, timeout=None)
+        proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
+        client = httpx.AsyncClient(transport=transport, timeout=None, proxies=proxy)
 
         pbar = tqdm_asyncio(total=filesize,
                             dynamic_ncols=True,
@@ -132,7 +140,7 @@ class Downloader:
             return ret_buffer
 
     @classmethod
-    def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, verbose=True):
+    def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
         if out == "_AUTO":
             out = url.split("/")[-1]
 
@@ -157,7 +165,8 @@ class Downloader:
         buffer = io.BytesIO() if to_buffer else open(out, "wb")
 
         with context:
-            client = httpx.Client(timeout=None)
+            proxy = {"http": f"http://{proxy}"} if proxy else None
+            client = httpx.Client(timeout=None, proxies=proxy)
             with client.stream('GET', url=url, headers=headers) as r:
                 for chunk in r.iter_bytes(chunk_size=chunk_size):
                     if chunk:
