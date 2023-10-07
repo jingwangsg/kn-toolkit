@@ -41,7 +41,7 @@ def parse(s):
         dir_path = s
 
     if hostname is not None:
-        dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path)))
+        dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path)), return_output=True).stdout.strip()
 
     return hostname, dir_path
 

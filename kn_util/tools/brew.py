@@ -5,6 +5,7 @@ import subprocess
 import glob
 import sys
 from kn_util.basic import map_async
+from functools import partial
 
 
 def run_cmd(cmd, verbose=False):
@@ -67,9 +68,17 @@ def check_patchable(executable, library_names, link_library_homebrew_paths):
     return True
 
 
+def get_homebrew_root():
+    if osp.exists("/home/linuxbrew/.linuxbrew"):
+        return "/home/linuxbrew/.linuxbrew"
+    else:
+        return osp.expanduser("~/homebrew")
+
+
 def patch_single(executable, library_names, link_library_homebrew_paths):
     # prepare appended rpath
     appended_rpath = get_appended_rpath(library_names, link_library_homebrew_paths)
+    homebrew_root = get_homebrew_root()
 
     # start patching
     print(f"=> Appended rpath: {appended_rpath}")
@@ -87,7 +96,7 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
 
     # patching
     run_cmd(f"LD_LIBRARY_PATH={rpath} patchelf --remove-rpath {new_fn}")
-    interpreter_path = "$HOME/homebrew/opt/glibc/lib/ld-linux-x86-64.so.2"
+    interpreter_path = f"{homebrew_root}/opt/glibc/lib/ld-linux-x86-64.so.2"
     run_cmd(
         f"LD_LIBRARY_PATH={rpath} patchelf --set-interpreter {interpreter_path} --force-rpath --set-rpath {rpath} {new_fn}",
         verbose=True)
@@ -103,7 +112,7 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
     print(f"=> Patched {executable}")
 
 
-def patch(homebrew_bin="~/homebrew/bin", app=None, path=None, need_check=True):
+def patch(app=None, path=None, need_check=True):
     assert run_cmd("which patchelf").returncode == 0, "patchelf not found!"
 
     if app is not None:
@@ -121,7 +130,8 @@ def patch(homebrew_bin="~/homebrew/bin", app=None, path=None, need_check=True):
     elif path is not None:
         all_executable = [path]
     else:
-        all_executable = glob.glob(homebrew_bin + "/*")
+        homebrew_root = get_homebrew_root()
+        all_executable = glob.glob(f"{homebrew_root}/bin/*")
 
     all_executable = list(set([run_cmd(f"readlink -f {executable}").stdout.strip() for executable in all_executable]))
 
@@ -129,7 +139,8 @@ def patch(homebrew_bin="~/homebrew/bin", app=None, path=None, need_check=True):
                                func=get_link_library_single_app,
                                desc="Getting link librarys for each Apps")
     library_by_app_mapping = dict(zip(all_executable, library_by_app))
-    link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app)
+    link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app,
+                                                               homebrew_root=homebrew_root)
     print(f"Link librarys found: {list(link_library_homebrew_paths.keys())}")
 
     # filter
@@ -204,7 +215,7 @@ def prepare_link_library_mapping(library_by_app, homebrew_root="~/homebrew"):
     all_library = list(set(all_library))
 
     library_homebrew = map_async(iterable=all_library,
-                                 func=get_link_library_homebrew,
+                                 func=partial(get_link_library_homebrew, homebrew_root=homebrew_root),
                                  desc="Getting library homebrew paths for each Apps")
 
     for lib_hb, lib_name in zip(library_homebrew, all_library):
@@ -263,11 +274,10 @@ if __name__ == "__main__":
     parser.add_argument("command", type=str, choices=["patch", "install", "self_install"])
     command = parser.parse_known_args()[0].command
     if command == "patch":
-        parser.add_argument("--homebrew_bin", type=str, default=osp.expanduser("~/homebrew/bin"))
         parser.add_argument("--app", type=str, default=None)
         parser.add_argument("--path", type=str, default=None)
         args = parser.parse_args()
-        patch(homebrew_bin=args.homebrew_bin, app=args.app, path=args.path)
+        patch(app=args.app, path=args.path)
     elif command == "install":
         parser.add_argument("app", type=str, default="")
         parser.add_argument("--post_patch", action="store_true", default=False, help="patch after install")
