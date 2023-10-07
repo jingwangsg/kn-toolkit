@@ -33,7 +33,6 @@ def cmd_ssh_relay(from_user, from_ip, to_ip, cmd, port=9999, to_port=22):
 
 def parse(s):
     dir_path = None
-    is_remote = None
     hostname = None
 
     if len(s.split(":")) == 2:
@@ -41,7 +40,7 @@ def parse(s):
     else:
         dir_path = s
 
-    if is_remote:
+    if hostname is not None:
         dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path)))
 
     return hostname, dir_path
@@ -152,6 +151,8 @@ class RsyncTool:
 
             def _apply(path_chunk):
                 cmd = construct_cmd(path_chunk)
+                # print(cmd)
+                # print("=====================================")
                 subprocess.run(cmd, shell=True, capture_output=True)
 
             map_async(func=_apply,
