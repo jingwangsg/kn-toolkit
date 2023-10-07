@@ -7,6 +7,7 @@ from huggingface_hub.utils._headers import build_hf_headers
 from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
 import io
+from functools import partial
 
 import nest_asyncio
 
@@ -111,23 +112,17 @@ class Downloader:
 
         loop = asyncio.get_event_loop()
 
+        async def download_shard(s_pos, e_pos):
+            return await cls._async_range_download(url, s_pos, e_pos, client, chunk_size, out, headers, pbar)
+
         with context:
-            tasks = [
-                cls._async_range_download(url,
-                                          s_pos,
-                                          e_pos,
-                                          out=out,
-                                          chunk_size=chunk_size,
-                                          headers=headers,
-                                          client=client,
-                                          pbar=pbar) for s_pos, e_pos in divisional_ranges
-            ]
 
             # https://zhuanlan.zhihu.com/p/575243634
-            tasks = asyncio.gather(*tasks)
+
+            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for s_pos, e_pos in divisional_ranges])
             result = loop.run_until_complete(tasks)
 
-        loop.close()
+        # loop.close()
 
         if to_buffer:
             ret_buffer = io.BytesIO()
