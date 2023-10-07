@@ -165,7 +165,7 @@ class Downloader:
         buffer = io.BytesIO() if to_buffer else open(out, "wb")
 
         with context:
-            proxy = {"http": f"http://{proxy}"} if proxy else None
+            proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
             client = httpx.Client(timeout=None, proxies=proxy)
             with client.stream('GET', url=url, headers=headers) as r:
                 for chunk in r.iter_bytes(chunk_size=chunk_size):
