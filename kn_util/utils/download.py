@@ -38,7 +38,15 @@ def get_headers(from_hf=False):
 class Downloader:
 
     @staticmethod
-    async def _async_range_download(url, s_pos, e_pos, client, chunk_size, out=None, headers=None, pbar=None):
+    async def _async_range_download(url,
+                                    s_pos,
+                                    e_pos,
+                                    client,
+                                    chunk_size,
+                                    out=None,
+                                    headers=None,
+                                    pbar=None,
+                                    max_retries=5):
         #! should initiate separate file handler for each coroutine, or speed will be slow
         to_buffer = (out is None)
 
@@ -54,13 +62,25 @@ class Downloader:
             buffer = open(out, "rb+")
             buffer.seek(s_pos)
 
-        async with client.stream('GET', url=url, headers=headers) as r:
-            async for chunk in r.aiter_bytes():
-                if chunk:  # prevent keep-alive chunks
-                    chunk_size = len(chunk)
-                    buffer.write(chunk)
-                    if pbar:
-                        pbar.update(chunk_size)
+        while retries < max_retries:
+            try:
+                async with client.stream('GET', url=url, headers=headers) as r:
+                    async for chunk in r.aiter_bytes():
+                        if chunk:  # prevent keep-alive chunks
+                            chunk_size = len(chunk)
+                            buffer.write(chunk)
+                            if pbar:
+                                pbar.update(chunk_size)
+                break  # Break the retry loop if download is successful
+            except httpx.NetworkError:
+                retries += 1
+                if retries < max_retries:
+                    print(f"Network error, retrying ({retries}/{max_retries})...")
+                else:
+                    print("Max retries reached. Download failed.")
+                    if not to_buffer:
+                        buffer.close()
+                    raise  # Re-raise the exception after max retries
 
         if not to_buffer:
             buffer.close()
