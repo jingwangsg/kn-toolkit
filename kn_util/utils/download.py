@@ -37,23 +37,23 @@ def get_headers(from_hf=False):
 
 class Downloader:
 
-    @staticmethod
-    async def _async_range_download(url,
-                                    s_pos,
-                                    e_pos,
-                                    client,
-                                    chunk_size,
-                                    out=None,
-                                    headers=None,
-                                    pbar=None,
-                                    max_retries=5):
+    @classmethod
+    async def _async_range_download(
+        cls,
+        url,
+        s_pos,
+        e_pos,
+        client,
+        chunk_size,
+        out=None,
+        headers=None,
+        pbar=None,
+        max_retries=5,
+    ):
         #! should initiate separate file handler for each coroutine, or speed will be slow
         to_buffer = (out is None)
 
-        range_headers = {"Range": f"bytes={s_pos}-{e_pos}"}
-        if headers:
-            range_headers.update(headers)
-        headers = range_headers
+        headers = headers or {}
 
         if to_buffer:
             buffer = io.BytesIO()
@@ -62,25 +62,31 @@ class Downloader:
             buffer = open(out, "rb+")
             buffer.seek(s_pos)
 
+        retries = 0
+        written_bytes = 0
+
         while retries < max_retries:
             try:
+                headers["Range"] = f"bytes={s_pos + written_bytes}-{e_pos}"
                 async with client.stream('GET', url=url, headers=headers) as r:
                     async for chunk in r.aiter_bytes():
                         if chunk:  # prevent keep-alive chunks
                             chunk_size = len(chunk)
                             buffer.write(chunk)
+                            written_bytes += chunk_size
                             if pbar:
                                 pbar.update(chunk_size)
                 break  # Break the retry loop if download is successful
             except httpx.NetworkError:
                 retries += 1
                 if retries < max_retries:
-                    print(f"Network error, retrying ({retries}/{max_retries})...")
+                    print(
+                        f"=> Network error at {written_bytes}/{e_pos-s_pos + 1}, retrying ({retries}/{max_retries})...")
                 else:
-                    print("Max retries reached. Download failed.")
+                    print("=> Max retries reached. Download failed.")
                     if not to_buffer:
                         buffer.close()
-                    raise  # Re-raise the exception after max retries
+                    raise
 
         if not to_buffer:
             buffer.close()
@@ -141,13 +147,18 @@ class Downloader:
         loop = asyncio.get_event_loop()
 
         async def download_shard(s_pos, e_pos):
-            return await cls._async_range_download(url, s_pos, e_pos, client, chunk_size, out, headers, pbar)
+            return await cls._async_range_download(url=url,
+                                                   s_pos=s_pos,
+                                                   e_pos=e_pos,
+                                                   client=client,
+                                                   chunk_size=chunk_size,
+                                                   out=out,
+                                                   headers=headers,
+                                                   pbar=pbar)
 
         with context:
-
             # https://zhuanlan.zhihu.com/p/575243634
-
-            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for s_pos, e_pos in divisional_ranges])
+            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for (s_pos, e_pos) in divisional_ranges])
             result = loop.run_until_complete(tasks)
 
         # loop.close()
