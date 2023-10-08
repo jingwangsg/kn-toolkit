@@ -180,6 +180,17 @@ class RsyncDownloadManager:
         rsync_proc.join()
 
 
+def download_recursive():
+    cwd = os.getcwd()
+    repos = run_cmd("find ./ -name '.git' -type d", return_output=True).splitlines()
+    repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
+    print(f"=> Found {len(repos)} repos")
+    for repo in repos:
+        print(f"=> Downloading {repo}")
+        os.chdir(repo)
+        download(url_template=HF_DOWNLOAD_TEMPLATE, verbose=True)
+
+
 if __name__ == "__main__":
     parser = parse_args()
     command = parser.parse_known_args()[0].command
@@ -195,9 +206,10 @@ if __name__ == "__main__":
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
-        parser.add_argument("--rsync", type=str, help="The rsync path", default=None)
+        parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
         args = parser.parse_args()
-        if not args.rsync:
+        if not args.recursive:
             download(url_template=args.template, include=args.include, verbose=True)
         else:
-            RsyncDownloadManager.download_and_rsync(url_template=args.template, include=args.include, dest=args.rsync)
+            print("=> Downloading recursively! only supports huggingface git repos for now")
+            download_recursive()
