@@ -11,6 +11,7 @@ import os.path as osp
 from functools import partial
 import aiofiles
 import json
+import subprocess
 
 import nest_asyncio
 
@@ -69,11 +70,16 @@ class Downloader:
             await f.write(binary_data)
 
     @staticmethod
-    async def write_buffer_async(out, s_pos, tmp_path):
+    def get_shard_path(out, s_pos, e_pos):
+        return osp.join(osp.dirname(out), "." + osp.basename(out) + f".tmp{s_pos}-{e_pos}")
+
+    @staticmethod
+    async def write_shard_async(out, s_pos, shard_path, chunk_size=1024 * 100):
         async with aiofiles.open(out, "rb+") as f:
             await f.seek(s_pos)
-            async with aiofiles.open(tmp_path, "rb") as buffer:
-                await f.write(await buffer.read())
+            async with aiofiles.open(shard_path, "rb") as buffer:
+                while chunk := await buffer.read(chunk_size):
+                    await f.write(chunk)
 
     @classmethod
     async def _async_range_download(
@@ -83,8 +89,6 @@ class Downloader:
         e_pos,
         client,
         chunk_size,
-        shard_id=None,
-        skip_bytes=0,
         out=None,
         headers=None,
         pbar=None,
@@ -103,15 +107,16 @@ class Downloader:
             buffer.seek(0)
         else:
             # file path
-            buffer = open(out, "rb+")
+            out = cls.get_shard_path(out, s_pos, e_pos)
+            buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
+            buffer.seek(0, 2)  # seek to end
+            skip_bytes = buffer.tell()
             written_bytes += skip_bytes
             if pbar:
                 pbar.update(skip_bytes)  # update progress bar
 
             if written_bytes == e_pos - s_pos + 1:
                 return
-
-        print(f"=> Downloading {s_pos}-{e_pos}...")
 
         while retries < max_retries:
             try:
@@ -122,9 +127,6 @@ class Downloader:
                             chunk_size = len(chunk)
                             buffer.write(chunk)
                             written_bytes += chunk_size
-
-                            # if written_bytes % (100 * 1024 * 1024) == 0:
-                            #     await cls._write_chunk_progress(out, written_bytes, shard_id=shard_id)
 
                             if pbar:
                                 pbar.update(chunk_size)
@@ -201,19 +203,12 @@ class Downloader:
 
         loop = asyncio.get_event_loop()
 
-        shard_size = divisional_ranges[0][1] - divisional_ranges[0][0] + 1
-        cls.record_size = _get_byte_length(shard_size)
-        cls.num_shards = num_shards
-        progresses = cls._read_chunk_progress(out)
-
-        async def download_shard(s_pos, e_pos, shard_id):
+        async def download_shard(s_pos, e_pos):
             return await cls._async_range_download(url=url,
                                                    s_pos=s_pos,
                                                    e_pos=e_pos,
                                                    client=client,
                                                    chunk_size=chunk_size,
-                                                   skip_bytes=progresses[shard_id],
-                                                   shard_id=shard_id,
                                                    out=out,
                                                    headers=headers,
                                                    pbar=pbar)
@@ -221,7 +216,7 @@ class Downloader:
         with context:
             # https://zhuanlan.zhihu.com/p/575243634
             tasks = asyncio.gather(
-                *[download_shard(s_pos, e_pos, shard_id=idx) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
+                *[download_shard(s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
             result = loop.run_until_complete(tasks)
 
         # loop.close()
@@ -231,6 +226,12 @@ class Downloader:
             for buffer in result:
                 ret_buffer.write(buffer.getvalue())
             return ret_buffer
+        else:
+            # 3. linux cat ! fastest
+            shard_paths = [
+                cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)
+            ]
+            subprocess.run(f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}", shell=True)
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
@@ -255,7 +256,10 @@ class Downloader:
 
         context = pbar if verbose else nullcontext()
 
-        buffer = io.BytesIO() if to_buffer else open(out, "wb")
+        if to_buffer:
+            buffer = io.BytesIO()
+        else:
+            buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
 
         with context:
             proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
