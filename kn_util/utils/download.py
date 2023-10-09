@@ -246,8 +246,6 @@ class Downloader:
         to_buffer = (out is None)
 
         # resolve redirect
-        import ipdb
-        ipdb.set_trace()
         res = get_response_with_redirects(url, headers=headers)
         url = res.url
         filesize = int(res.headers["Content-Length"])
