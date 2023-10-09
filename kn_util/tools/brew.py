@@ -114,6 +114,7 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
 
 def patch(app=None, path=None, need_check=True):
     assert run_cmd("which patchelf").returncode == 0, "patchelf not found!"
+    homebrew_root = get_homebrew_root()
 
     if app is not None:
 
@@ -130,7 +131,6 @@ def patch(app=None, path=None, need_check=True):
     elif path is not None:
         all_executable = [path]
     else:
-        homebrew_root = get_homebrew_root()
         all_executable = glob.glob(f"{homebrew_root}/bin/*")
 
     all_executable = list(set([run_cmd(f"readlink -f {executable}").stdout.strip() for executable in all_executable]))
