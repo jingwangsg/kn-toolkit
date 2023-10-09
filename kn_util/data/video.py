@@ -18,6 +18,7 @@ import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
 from einops import rearrange
+import ffmpeg
 
 
 class HFImageModelWrapper(nn.Module):
@@ -166,6 +167,22 @@ class FFMPEG:
 
         map_async(args, func_single, num_process=64)
 
+    @staticmethod
+    def _get_hw_with_cv2(video_path):
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        return height, width
+
+    @classmethod
+    def load_frames(cls, video_path):
+        h, w = cls._get_hw_with_cv2(video_path)
+        buffer, _ = (ffmpeg.input(video_path).output('pipe:', format='rawvideo', pix_fmt='rgb24').run(capture_stdout=True,
+                                                                                                   quiet=True))
+        frames = np.frombuffer(buffer, np.uint8).reshape([-1, h, w, 3])
+        return frames
+
 
 import yt_dlp
 
@@ -280,6 +297,7 @@ class DecordFrameLoader:
 
     @classmethod
     def load_frames(cls, buffer, stride=1, width=-1, height=-1):
+        raise Warning("deprecated, decord seems buggy, use ffmpeg instead")
         vr = VideoReader(buffer, width=width, height=height, num_threads=16)
 
         indices = list(range(0, len(vr), stride))
