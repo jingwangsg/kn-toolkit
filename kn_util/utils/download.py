@@ -18,14 +18,19 @@ import nest_asyncio
 nest_asyncio.apply()
 
 
-def head_with_redirects(url, verbose=False, headers=None):
+def get_response_with_redirects(url, verbose=False, headers=None):
     with httpx.Client(follow_redirects=False, timeout=None) as client:
         response = client.head(url, headers=headers)
         while response.status_code in (301, 302):
             if verbose:
                 print("Redirected to:", response.headers['Location'])
             response = client.head(response.headers['Location'])
-        return response
+
+        if response.status_code == 200:
+            return response
+        else:
+            with client.stream('GET', url=url, headers=headers) as r:
+                return r
 
 
 # async download
@@ -170,7 +175,7 @@ class Downloader:
         if out == "_AUTO":
             out = url.split("/")[-1]
 
-        res = head_with_redirects(url, headers=headers)
+        res = get_response_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
             print("File does not support range download, use direct download")
@@ -241,7 +246,9 @@ class Downloader:
         to_buffer = (out is None)
 
         # resolve redirect
-        res = head_with_redirects(url, headers=headers)
+        import ipdb
+        ipdb.set_trace()
+        res = get_response_with_redirects(url, headers=headers)
         url = res.url
         filesize = int(res.headers["Content-Length"])
 
