@@ -7,7 +7,10 @@ from huggingface_hub.utils._headers import build_hf_headers
 from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
 import io
+import os.path as osp
 from functools import partial
+import aiofiles
+import json
 
 import nest_asyncio
 
@@ -35,7 +38,42 @@ def get_headers(from_hf=False):
     return headers
 
 
+def _get_byte_length(obj):
+    return (obj.bit_length() + 7) // 8
+
+
 class Downloader:
+
+    @classmethod
+    def _read_chunk_progress(cls, out):
+        progress_file = osp.join(osp.dirname(out), "." + osp.basename(out) + ".progress")
+        numbers = []
+        if osp.exists(progress_file):
+            with open(progress_file, 'rb') as f:
+                for _ in range(cls.num_shards):
+                    chunk = f.read(cls.record_size)
+                    numbers.append(int.from_bytes(chunk, 'big'))
+        else:
+            with open(progress_file, 'wb') as f:
+                for _ in range(cls.num_shards):
+                    f.write((0).to_bytes(cls.record_size, 'big'))
+            return [0] * cls.num_shards
+        return numbers
+
+    @classmethod
+    async def _write_chunk_progress(cls, out, written_bytes, shard_id):
+        progress_file = osp.join(osp.dirname(out), "." + osp.basename(out) + ".progress")
+        async with aiofiles.open(progress_file, 'rb+') as f:
+            await f.seek(shard_id * cls.record_size)
+            binary_data = written_bytes.to_bytes(_get_byte_length(written_bytes), 'big')
+            await f.write(binary_data)
+
+    @staticmethod
+    async def write_buffer_async(out, s_pos, tmp_path):
+        async with aiofiles.open(out, "rb+") as f:
+            await f.seek(s_pos)
+            async with aiofiles.open(tmp_path, "rb") as buffer:
+                await f.write(await buffer.read())
 
     @classmethod
     async def _async_range_download(
@@ -45,6 +83,8 @@ class Downloader:
         e_pos,
         client,
         chunk_size,
+        shard_id=None,
+        skip_bytes=0,
         out=None,
         headers=None,
         pbar=None,
@@ -54,16 +94,24 @@ class Downloader:
         to_buffer = (out is None)
 
         headers = headers or {}
+        retries = 0
+        written_bytes = 0
 
         if to_buffer:
+            # byteio
             buffer = io.BytesIO()
             buffer.seek(0)
         else:
+            # file path
             buffer = open(out, "rb+")
-            buffer.seek(s_pos)
+            written_bytes += skip_bytes
+            if pbar:
+                pbar.update(skip_bytes)  # update progress bar
 
-        retries = 0
-        written_bytes = 0
+            if written_bytes == e_pos - s_pos + 1:
+                return
+
+        print(f"=> Downloading {s_pos}-{e_pos}...")
 
         while retries < max_retries:
             try:
@@ -74,6 +122,10 @@ class Downloader:
                             chunk_size = len(chunk)
                             buffer.write(chunk)
                             written_bytes += chunk_size
+
+                            # if written_bytes % (100 * 1024 * 1024) == 0:
+                            #     await cls._write_chunk_progress(out, written_bytes, shard_id=shard_id)
+
                             if pbar:
                                 pbar.update(chunk_size)
                 break  # Break the retry loop if download is successful
@@ -110,14 +162,12 @@ class Downloader:
                                proxy=None,
                                verbose=True):
         to_buffer = (out is None)
+        if isinstance(out, io.BufferedRandom):
+            out = out.name
 
         if out == "_AUTO":
             out = url.split("/")[-1]
 
-        if not to_buffer:
-            with open(out, "wb"):
-                pass
-        # resolve redirect
         res = head_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
@@ -134,6 +184,11 @@ class Downloader:
         proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
         client = httpx.AsyncClient(transport=transport, timeout=None, proxies=proxy)
 
+        if not to_buffer:
+            # create file
+            with open(out, "wb") as f:
+                pass
+
         pbar = tqdm_asyncio(total=filesize,
                             dynamic_ncols=True,
                             desc=f"Downloading",
@@ -146,19 +201,27 @@ class Downloader:
 
         loop = asyncio.get_event_loop()
 
-        async def download_shard(s_pos, e_pos):
+        shard_size = divisional_ranges[0][1] - divisional_ranges[0][0] + 1
+        cls.record_size = _get_byte_length(shard_size)
+        cls.num_shards = num_shards
+        progresses = cls._read_chunk_progress(out)
+
+        async def download_shard(s_pos, e_pos, shard_id):
             return await cls._async_range_download(url=url,
                                                    s_pos=s_pos,
                                                    e_pos=e_pos,
                                                    client=client,
                                                    chunk_size=chunk_size,
+                                                   skip_bytes=progresses[shard_id],
+                                                   shard_id=shard_id,
                                                    out=out,
                                                    headers=headers,
                                                    pbar=pbar)
 
         with context:
             # https://zhuanlan.zhihu.com/p/575243634
-            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for (s_pos, e_pos) in divisional_ranges])
+            tasks = asyncio.gather(
+                *[download_shard(s_pos, e_pos, shard_id=idx) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
             result = loop.run_until_complete(tasks)
 
         # loop.close()
@@ -167,7 +230,6 @@ class Downloader:
             ret_buffer = io.BytesIO()
             for buffer in result:
                 ret_buffer.write(buffer.getvalue())
-
             return ret_buffer
 
     @classmethod
