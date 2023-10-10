@@ -89,7 +89,7 @@ class VisionCLIPWrapper(HFImageModelWrapper):
         return outputs
 
 
-class FFMPEG:
+class VideoProcessor:
 
     @classmethod
     def single_video_process(cls, video_path, output_video_path, frame_scale=None, fps=None, quiet=True):
@@ -168,16 +168,31 @@ class FFMPEG:
         map_async(args, func_single, num_process=64)
 
     @staticmethod
-    def _get_hw_with_cv2(video_path):
+    def get_hw(video_path):
         import cv2
         cap = cv2.VideoCapture(video_path)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         return height, width
+    
+    @staticmethod
+    def get_fps(video_path):
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        return fps
+    
+    @staticmethod
+    def get_length(video_path):
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        return length
 
     @classmethod
     def load_frames(cls, video_path):
-        h, w = cls._get_hw_with_cv2(video_path)
+        # using ffmpeg to load video
+        h, w = cls.get_hw(video_path)
         buffer, _ = (ffmpeg.input(video_path).output('pipe:', format='rawvideo', pix_fmt='rgb24').run(capture_stdout=True,
                                                                                                    quiet=True))
         frames = np.frombuffer(buffer, np.uint8).reshape([-1, h, w, 3])

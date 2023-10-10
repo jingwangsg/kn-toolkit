@@ -11,14 +11,14 @@ from .text import draw_text, draw_text_line
 from .utils import color_val
 
 
-def merge_by_fid(bboxs_list, num_frames, texts=None):
+def merge_by_fid(bboxs_list, texts=None):
     """
     Return:
         ret: dict(fid: dict(xyxy: text))
     """
     ret = dict()
     for idx, bbox in enumerate(bboxs_list):
-        xyxy = bbox["bbox"]
+        xyxy = tuple(bbox["bbox"])
         fid = bbox["fid"]
         fid_dict = ret.get(fid, dict())
         if texts is not None:
@@ -38,8 +38,14 @@ class VideoVisualizer:
 
     @classmethod
     def draw_bbox_on_video(cls, video, bboxs_list, texts=None, **bbox_args):
+        """
+        Args:
+            video: list of images
+            bboxs_list: list of dict(fid, bbox)
+            texts: list of dict(fid, text)
+        """
         video = copy.deepcopy(video)
-        content_by_frame = merge_by_fid(bboxs_list, len(video), texts=texts)
+        content_by_frame = merge_by_fid(bboxs_list, texts=texts)
 
         for fid, content in content_by_frame.items():
             cur_bboxes = []
@@ -121,7 +127,8 @@ class Visualizer:
                                        point=(bbox_int[0], bbox_int[1] - 2),
                                        text_line=text,
                                        font_scale=font_scale,
-                                       bg_color=bg_color)
+                                       bg_color=bg_color,
+                                       text_color=text_color)
             return image
 
         if texts is None:

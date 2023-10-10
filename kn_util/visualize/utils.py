@@ -16,6 +16,7 @@ class Color(Enum):
     magenta = (255, 0, 255)
     white = (255, 255, 255)
     black = (0, 0, 0)
+    dark_green = (1, 50, 32)
 
 
 def color_val(color) -> tuple:

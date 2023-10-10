@@ -7,6 +7,7 @@ def draw_text(img,
               text,
               draw_type="custom",
               font_scale=0.4,
+              text_color=(255, 255, 255),
               thickness=5,
               text_thickness=1,
               bg_color=(0, 0, 255)):
@@ -19,7 +20,6 @@ def draw_text(img,
     '''
     font_face = cv2.FONT_HERSHEY_SIMPLEX
     # fontFace=cv2.FONT_HERSHEY_SIMPLEX
-    font_color = (255, 255, 255)
     if draw_type == "custom":
         text_size, baseline = cv2.getTextSize(str(text), font_face, font_scale, thickness)
         text_loc = (point[0], point[1] + text_size[1])
@@ -27,12 +27,11 @@ def draw_text(img,
             img = draw_opaque_mask(img, (text_loc[0] - 2 // 2, text_loc[1] - 2 - baseline),
                                    (text_loc[0] + text_size[0], text_loc[1] + text_size[1]),
                                    alpha=0.5)
-            font_color = (0, 0, 255)
         else:
             cv2.rectangle(img, (text_loc[0] - 2 // 2, text_loc[1] - 2 - baseline),
                           (text_loc[0] + text_size[0], text_loc[1] + text_size[1]), bg_color, -1)
         # draw score value
-        cv2.putText(img, str(text), (text_loc[0], text_loc[1] + baseline), font_face, font_scale, font_color,
+        cv2.putText(img, str(text), (text_loc[0], text_loc[1] + baseline), font_face, font_scale, text_color,
                     text_thickness, 8)
 
     elif draw_type == "simple":
@@ -44,6 +43,7 @@ def draw_text_line(img,
                    point,
                    text_line: str,
                    draw_type="custom",
+                   text_color=(255, 255, 255),
                    font_scale=0.4,
                    thickness=5,
                    text_thickness=1,
@@ -69,5 +69,6 @@ def draw_text_line(img,
                             draw_type,
                             thickness=thickness,
                             text_thickness=text_thickness,
-                            bg_color=bg_color)
+                            bg_color=bg_color,
+                            text_color=text_color)
     return img
