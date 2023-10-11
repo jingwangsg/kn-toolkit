@@ -2,12 +2,7 @@ import subprocess
 import os
 from ..basic import map_async
 import os.path as osp
-
-
-def run_cmd(cmd, return_output=False):
-    ret = subprocess.run(cmd, shell=True, check=True, capture_output=return_output, text=True)
-    if return_output:
-        return ret
+from .system import run_cmd
 
 
 def split_path(path):
@@ -15,8 +10,7 @@ def split_path(path):
 
 
 def cmd_list_files(path):
-    parent_dir, name = split_path(path)
-    return f"cd {parent_dir} && find {name}/ -type f -print0"
+    return f"cd {path} && find ./ -type f -print0"
 
 
 def cmd_get_path(path):
@@ -41,7 +35,9 @@ def parse(s):
         dir_path = s
 
     if hostname is not None:
-        dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path)), return_output=True).stdout.strip()
+        dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path))).stdout.strip()
+    else:
+        dir_path = osp.realpath(dir_path)
 
     return hostname, dir_path
 
@@ -84,7 +80,7 @@ class RsyncTool:
 
     @staticmethod
     def check_hostname_available(hostname):
-        returncode = run_cmd(cmd_on_ssh(hostname, "echo 1"), return_output=True).returncode
+        returncode = run_cmd(cmd_on_ssh(hostname, "echo 1")).returncode
         return returncode == 0
 
     @classmethod
@@ -135,13 +131,13 @@ class RsyncTool:
             cmd = cmd_list_files(from_path)
             if from_mode == "remote":
                 cmd = cmd_on_ssh(from_host, cmd)
-            out = run_cmd(cmd, return_output=True).stdout.strip()
+            out = run_cmd(cmd).stdout.strip()
             from_files = out.split("\0")
             from_files = [x for x in from_files if len(x.strip()) > 0]
             from_files = [x for x in from_files if path_filter(x)]
 
             # construct as relative path for --relative rsync
-            from_paths = [osp.join(split_path(from_path)[0], ".", x) for x in from_files]
+            from_paths = [osp.join(from_path, x) for x in from_files]
 
             assert len(from_files) > 0, "no files found for async dir"
             print("=> using async dir")
@@ -153,7 +149,7 @@ class RsyncTool:
                 cmd = construct_cmd(path_chunk)
                 # print(cmd)
                 # print("=====================================")
-                subprocess.run(cmd, shell=True, capture_output=True)
+                run_cmd(cmd, verbose=False)
 
             map_async(func=_apply,
                       iterable=path_chunks,
