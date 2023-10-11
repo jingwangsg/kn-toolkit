@@ -87,7 +87,7 @@ class RsyncTool:
     def delete(cls, dir_path):
         empty_dir = osp.expanduser("~/.empty")
         run_cmd(f"rm -rf {empty_dir} && mkdir {empty_dir}")
-        run_cmd(~ "rsync --delete-before --force -r ~/.empty {dir_path}", verbose=False)
+        run_cmd("rsync --delete-before --force -r ~/.empty {dir_path}", verbose=False)
         run_cmd(f"rm -rf {empty_dir}")
 
     @classmethod
