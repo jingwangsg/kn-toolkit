@@ -157,7 +157,7 @@ class RsyncTool:
                 cmd = construct_cmd(path_chunk)
                 # print(cmd)
                 # print("=====================================")
-                run_cmd(cmd, verbose=False)
+                run_cmd(cmd, verbose=True)
 
             map_async(func=_apply,
                       iterable=path_chunks,
