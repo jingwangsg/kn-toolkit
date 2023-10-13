@@ -81,7 +81,7 @@ def _parse_repo_url(url):
     return org, repo
 
 
-def _download_fn(url_path_pair, headers=None, verbose=True):
+def _download_fn(url_path_pair, verbose=True, **kwargs):
     url, path = url_path_pair
     finish_flag = osp.join(os.getcwd(), osp.dirname(path), "." + osp.basename(path) + ".finish")
 
@@ -91,12 +91,12 @@ def _download_fn(url_path_pair, headers=None, verbose=True):
     if osp.exists(path):
         os.remove(path)
 
-    Downloader.async_sharded_download(url=url, headers=headers, verbose=verbose, out=path)
+    Downloader.async_sharded_download(url=url, verbose=verbose, out=path, **kwargs)
     subprocess.run(f"touch {finish_flag}", shell=True)
     return True
 
 
-def download(url_template, include=None, queue=None, verbose=True):
+def download(url_template, include=None, queue=None, proxy=None, verbose=True):
     # clone the repo
     paths = lfs_list_files(include=include)
     print(f"=> Found {len(paths)} files to download")
@@ -113,7 +113,7 @@ def download(url_template, include=None, queue=None, verbose=True):
 
     for pair in url_path_pairs:
         print(pair)
-        ret = _download_fn(pair, headers=headers, verbose=verbose)
+        ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose)
         if queue and ret:
             queue.put(pair)
 
@@ -206,10 +206,11 @@ if __name__ == "__main__":
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
+        parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
         args = parser.parse_args()
         if not args.recursive:
-            download(url_template=args.template, include=args.include, verbose=True)
+            download(url_template=args.template, include=args.include, proxy=args.proxy, verbose=True)
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive()

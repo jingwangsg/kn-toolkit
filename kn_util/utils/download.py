@@ -175,6 +175,9 @@ class Downloader:
         if out == "_AUTO":
             out = url.split("/")[-1]
 
+        if proxy == "auto":
+            proxy = "127.0.0.1:8091"
+
         res = get_response_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
