@@ -37,12 +37,6 @@ def is_master_process():
     return int(os.getenv("RANK", 0)) == 0
 
 
-def get_available_port():
-    sock = socket.socket()
-    sock.bind(('', 0))
-    return sock.getsockname()[1]
-
-
 def get_env(name):
     if name == "local_rank":
         return int(os.getenv("LOCAL_RANK", 0))

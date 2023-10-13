@@ -21,6 +21,7 @@ abbr pypdb "python -m pdb -c continue "
 abbr fgA "python ~/server_utils/query_cluster.py --task available -n -1 | sort -n"
 abbr fst "python ~/server_utils/query_cluster.py --task stat"
 abbr bash_only "export NO_FISH=1; bash"
+abbr tool "python -m kn_util.tools."
 
 abbr gk "gpukill"
 abbr g "gpu"
@@ -56,6 +57,7 @@ end
 function fg 
     python ~/server_utils/query_cluster.py --task available $argv
 end
+
 
 function fu 
     python ~/server_utils/query_cluster.py --task usage $argv
