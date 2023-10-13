@@ -16,7 +16,6 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
             return ret
         else:
             popen = subprocess.Popen(cmd, shell=True)
-            print("=> Running in background")
             return popen
 
 

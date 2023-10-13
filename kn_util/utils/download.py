@@ -12,6 +12,7 @@ from functools import partial
 import aiofiles
 import json
 import subprocess
+from ..utils.system import run_cmd
 
 import nest_asyncio
 
@@ -249,9 +250,12 @@ class Downloader:
                       ascii=True) as pbar:
                 f = open(out, "wb")
                 for shard_path in shard_paths:
-                    while chunk := open(shard_path, "rb").read(chunk_size):
-                        f.write(chunk)
-                        pbar.update(len(chunk))
+                    with open(shard_path, "rb") as f_shard:
+                        while chunk := f_shard.read(chunk_size):
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+                            run_cmd(f"> {shard_path} && rm {shard_path}", verbose=False, async_cmd=True)
+
                 f.close()
 
             # subprocess.run(f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}", shell=True)
