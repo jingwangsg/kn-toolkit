@@ -254,7 +254,8 @@ class Downloader:
                         while chunk := f_shard.read(chunk_size):
                             f.write(chunk)
                             pbar.update(len(chunk))
-                            run_cmd(f"> {shard_path} && rm {shard_path}", verbose=False, async_cmd=True)
+
+                    run_cmd(f"> {shard_path} && rm {shard_path}", verbose=False, async_cmd=True)
 
                 f.close()
 
