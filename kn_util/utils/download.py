@@ -235,11 +235,26 @@ class Downloader:
                 ret_buffer.write(buffer.getvalue())
             return ret_buffer
         else:
-            # 3. linux cat ! fastest
             shard_paths = [
                 cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)
             ]
-            subprocess.run(f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}", shell=True)
+            # merge shard files to out
+            with tqdm(total=filesize,
+                      dynamic_ncols=True,
+                      desc=f"Merging",
+                      unit="B",
+                      unit_scale=True,
+                      smoothing=0.1,
+                      miniters=1,
+                      ascii=True) as pbar:
+                f = open(out, "wb")
+                for shard_path in shard_paths:
+                    while chunk := open(shard_path, "rb").read(chunk_size):
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+                f.close()
+
+            # subprocess.run(f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}", shell=True)
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
