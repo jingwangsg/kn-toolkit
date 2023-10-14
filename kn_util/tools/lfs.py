@@ -96,7 +96,7 @@ def _download_fn(url_path_pair, verbose=True, **kwargs):
     return True
 
 
-def download(url_template, include=None, queue=None, proxy=None, verbose=True):
+def download(url_template, include=None, queue=None, proxy=None, verbose=True, **kwargs):
     # clone the repo
     paths = lfs_list_files(include=include)
     print(f"=> Found {len(paths)} files to download")
@@ -113,7 +113,7 @@ def download(url_template, include=None, queue=None, proxy=None, verbose=True):
 
     for pair in url_path_pairs:
         print(pair)
-        ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose)
+        ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose, **kwargs)
         if queue and ret:
             queue.put(pair)
 
@@ -208,9 +208,14 @@ if __name__ == "__main__":
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
+        parser.add_argument("--num_shards", type=int, help="The number of shards to use", default=1)
         args = parser.parse_args()
         if not args.recursive:
-            download(url_template=args.template, include=args.include, proxy=args.proxy, verbose=True)
+            download(url_template=args.template,
+                     include=args.include,
+                     proxy=args.proxy,
+                     verbose=True,
+                     num_shards=args.num_shards)
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive()
