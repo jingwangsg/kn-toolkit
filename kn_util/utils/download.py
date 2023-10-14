@@ -88,6 +88,27 @@ class Downloader:
                     await f.write(chunk)
 
     @classmethod
+    async def _merge_shard_files(cls, shard_paths, chunk_size, out=None, pbar=None):
+
+        async def _async_run_cmd(cmd):
+            process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, shell=True)
+            await process.communicate()
+
+        async with aiofiles.open(out, 'wb') as f:
+            for shard_path in shard_paths:
+                async with aiofiles.open(shard_path, 'rb') as f_shard:
+                    while True:
+                        chunk = await f_shard.read(chunk_size)
+                        if not chunk:
+                            break
+
+                        await f.write(chunk)
+                        pbar.update(len(chunk))
+
+                # Replace with asyncio-compatible command execution or delegate to a thread
+                await _async_run_cmd(f"> {shard_path} && rm {shard_path}")
+
+    @classmethod
     async def _async_range_download(
         cls,
         url,
@@ -169,6 +190,24 @@ class Downloader:
                                headers=None,
                                proxy=None,
                                verbose=True):
+        asyncio.run(
+            cls._async_sharded_download(url=url,
+                                        out=out,
+                                        chunk_size=chunk_size,
+                                        num_shards=num_shards,
+                                        headers=headers,
+                                        proxy=proxy,
+                                        verbose=verbose))
+
+    @classmethod
+    async def _async_sharded_download(cls,
+                                      url,
+                                      out=None,
+                                      chunk_size=1024 * 100,
+                                      num_shards=10,
+                                      headers=None,
+                                      proxy=None,
+                                      verbose=True):
         to_buffer = (out is None)
         if isinstance(out, io.BufferedRandom):
             out = out.name
@@ -240,26 +279,18 @@ class Downloader:
                 cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)
             ]
             # merge shard files to out
-            with tqdm(total=filesize,
-                      dynamic_ncols=True,
-                      desc=f"Merging",
-                      unit="B",
-                      unit_scale=True,
-                      smoothing=0.1,
-                      miniters=1,
-                      ascii=True) as pbar:
-                f = open(out, "wb")
-                for shard_path in shard_paths:
-                    with open(shard_path, "rb") as f_shard:
-                        while chunk := f_shard.read(chunk_size):
-                            f.write(chunk)
-                            pbar.update(len(chunk))
 
-                    run_cmd(f"> {shard_path} && rm {shard_path}", verbose=False, async_cmd=True)
-
-                f.close()
-
-            # subprocess.run(f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}", shell=True)
+            pbar = tqdm_asyncio(total=filesize,
+                                dynamic_ncols=True,
+                                desc=f"Merging",
+                                unit="B",
+                                unit_scale=True,
+                                smoothing=0.1,
+                                miniters=1,
+                                ascii=True) if verbose else None
+            context = pbar if verbose else nullcontext()
+            with context:
+                await cls._merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
