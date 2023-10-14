@@ -38,6 +38,9 @@ def parse(s):
         dir_path = run_cmd(cmd_on_ssh(hostname, cmd_get_path(dir_path))).stdout.strip()
     else:
         dir_path = osp.realpath(dir_path)
+    
+    if s.endswith("/") and not dir_path.endswith("/"):
+        dir_path += "/" # prevent readlink -f from removing the last slash
 
     return hostname, dir_path
 
