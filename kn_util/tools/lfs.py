@@ -208,14 +208,16 @@ if __name__ == "__main__":
         parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
-        parser.add_argument("--num_shards", type=int, help="The number of shards to use", default=1)
+        parser.add_argument("--num-shards", type=int, help="The number of shards to use", default=1)
+        parser.add_argument("--low-memory", action="store_true", help="Whether to use low memory", default=False)
         args = parser.parse_args()
         if not args.recursive:
             download(url_template=args.template,
                      include=args.include,
                      proxy=args.proxy,
                      verbose=True,
-                     num_shards=args.num_shards)
+                     num_shards=args.num_shards,
+                     low_memory=args.low_memory)
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive()

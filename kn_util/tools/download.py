@@ -8,11 +8,12 @@ def get_args():
 
     parser.add_argument("url", type=str, help="The url to parse")
     parser.add_argument("--output", type=str, default="_AUTO", help="The output path")
-    parser.add_argument("--num_shards", type=int, default=10, help="The number of shards to download")
-    parser.add_argument("--chunk_size", type=int, default=1024, help="The chunk size to download")
+    parser.add_argument("--num-shards", type=int, default=10, help="The number of shards to download")
+    parser.add_argument("--chunk-size", type=int, default=1024, help="The chunk size to download")
     parser.add_argument("--proxy", type=str, default=None, help="The proxy to use")
     parser.add_argument("--direct", action="store_true", default=False, help="Direct download")
     parser.add_argument("--hf", action="store_true", default=False, help="Download from huggingface")
+    parser.add_argument("--low-memory", action="store_true", default=False, help="Low memory usage")
 
     return parser.parse_args()
 
@@ -28,4 +29,5 @@ if __name__ == "__main__":
                                           num_shards=args.num_shards,
                                           chunk_size=args.chunk_size,
                                           headers=headers,
-                                          proxy=args.proxy)
+                                          proxy=args.proxy,
+                                          low_memory=args.low_memory)
