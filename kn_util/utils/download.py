@@ -183,7 +183,13 @@ class Downloader:
 
     @classmethod
     def async_sharded_download(cls, **kwargs):
-        asyncio.run(cls._async_sharded_download(**kwargs))
+        return asyncio.run(cls._async_sharded_download(**kwargs))
+
+    @staticmethod
+    def is_vailable(url):
+        ret = get_response_with_redirects(url)
+        if ret.status_code == 200:
+            return True
 
     @classmethod
     async def _async_sharded_download(cls,

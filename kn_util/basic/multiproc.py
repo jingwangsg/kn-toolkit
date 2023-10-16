@@ -5,7 +5,9 @@ from pathos.helpers import mp
 from pathos.threading import ThreadPool
 from pathos.pools import ProcessPool
 from tqdm import tqdm
+from tqdm.asyncio import tqdm_asyncio
 import time
+import asyncio
 
 
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False):
