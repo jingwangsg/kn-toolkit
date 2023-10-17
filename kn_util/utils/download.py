@@ -18,6 +18,24 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
+async def merge_shard_files(cls, shard_paths, chunk_size, out=None, pbar=None):
+
+    async with aiofiles.open(out, 'wb') as f:
+        for shard_path in shard_paths:
+            async with aiofiles.open(shard_path, 'rb') as f_shard:
+                while True:
+                    chunk = await f_shard.read(chunk_size)
+                    if not chunk:
+                        break
+
+                    await f.write(chunk)
+                    if pbar:
+                        pbar.update(len(chunk))
+
+            # Replace with asyncio-compatible command execution or delegate to a thread
+            await cls._async_run_cmd(f"> {shard_path} && rm {shard_path}")
+
+
 
 def get_response_with_redirects(url, verbose=False, headers=None):
     with httpx.Client(follow_redirects=False, timeout=None) as client:
@@ -90,23 +108,6 @@ class Downloader:
     @staticmethod
     async def _async_run_cmd(cmd):
         process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, shell=True)
-
-    @classmethod
-    async def _merge_shard_files(cls, shard_paths, chunk_size, out=None, pbar=None):
-
-        async with aiofiles.open(out, 'wb') as f:
-            for shard_path in shard_paths:
-                async with aiofiles.open(shard_path, 'rb') as f_shard:
-                    while True:
-                        chunk = await f_shard.read(chunk_size)
-                        if not chunk:
-                            break
-
-                        await f.write(chunk)
-                        pbar.update(len(chunk))
-
-                # Replace with asyncio-compatible command execution or delegate to a thread
-                await cls._async_run_cmd(f"> {shard_path} && rm {shard_path}")
 
     @classmethod
     async def _async_range_download(
@@ -286,7 +287,7 @@ class Downloader:
                                     ascii=True) if verbose else None
                 context = pbar if verbose else nullcontext()
                 with context:
-                    await cls._merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
+                    await merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
             else:
                 cmd = f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}"
                 # print(cmd)
