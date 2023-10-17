@@ -7,7 +7,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='tools for lfs')
 
     parser.add_argument("url", type=str, help="The url to parse")
-    parser.add_argument("--output", type=str, default="_AUTO", help="The output path")
+    parser.add_argument("--output", type=str, default="auto", help="The output path")
     parser.add_argument("--num-shards", type=int, default=10, help="The number of shards to download")
     parser.add_argument("--chunk-size", type=int, default=1024, help="The chunk size to download")
     parser.add_argument("--proxy", type=str, default=None, help="The proxy to use")

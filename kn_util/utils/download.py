@@ -19,9 +19,6 @@ import nest_asyncio
 nest_asyncio.apply()
 
 
-
-
-
 def get_response_with_redirects(url, verbose=False, headers=None):
     with httpx.Client(follow_redirects=False, timeout=None) as client:
         response = client.head(url, headers=headers)
@@ -53,6 +50,7 @@ def _get_byte_length(obj):
 
 
 class Downloader:
+
     @classmethod
     async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
 
@@ -183,6 +181,11 @@ class Downloader:
         ranges = [[i, i + step - 1] for i in range(0, filesize, step)]
         ranges[-1][-1] = filesize - 1
         return ranges
+    
+    @staticmethod
+    def get_output_path(url):
+        out = url.split("/")[-1]
+        return out
 
     @classmethod
     def async_sharded_download(cls, **kwargs):
@@ -208,8 +211,8 @@ class Downloader:
         if isinstance(out, io.BufferedRandom):
             out = out.name
 
-        if out == "_AUTO":
-            out = url.split("/")[-1]
+        if out == "auto":
+            out = cls.get_output_path(url)
 
         if proxy == "auto":
             proxy = "127.0.0.1:8091"
@@ -300,8 +303,8 @@ class Downloader:
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
-        if out == "_AUTO":
-            out = url.split("/")[-1]
+        if out == "auto":
+            out = cls.get_output_path(url)
 
         to_buffer = (out is None)
 
