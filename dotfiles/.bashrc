@@ -230,12 +230,16 @@ PATH="$HOMEBREW/bin:$PATH"
 # PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
 if [ -z $NO_FISH ]; then
-    exec fish
+    if [ -z $SLURM_JOB_ID ]; then
+        exec fish
+    else
+        exec python311
+    fi
 fi
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2>/dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
