@@ -10,7 +10,7 @@ import time
 import asyncio
 
 
-def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False):
+def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False, verbose=True):
     """while test_flag=True, run sequentially"""
     if test_flag:
         ret = [func(x) for x in tqdm(iterable, desc=desc)]
@@ -22,12 +22,16 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
         #     ret.append(p.apply_async(func, args=(it,)))
         ret = p.map_async(func=func, iterable=iterable)
         total = ret._number_left
-        pbar = tqdm(total=total, desc=desc)
+
+        pbar = tqdm(total=total, desc=desc) if verbose else None
+
         while ret._number_left > 0:
-            pbar.n = total - ret._number_left
-            pbar.refresh()
+            if pbar:
+                pbar.n = total - ret._number_left
+                pbar.refresh()
             time.sleep(0.1)
-        p.close()
+        if pbar:
+            p.close()
 
         return ret.get()
 

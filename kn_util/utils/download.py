@@ -295,7 +295,8 @@ class Downloader:
                 # print(cmd)
                 await cls._async_run_cmd(cmd)
 
-            print("=> Merging time:", time() - st)
+            if verbose:
+                print("=> Merging time:", time() - st)
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
