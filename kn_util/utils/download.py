@@ -18,22 +18,7 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-async def merge_shard_files(shard_paths, chunk_size=1024**3, out=None, pbar=None):
 
-    async with aiofiles.open(out, 'wb') as f:
-        for shard_path in shard_paths:
-            async with aiofiles.open(shard_path, 'rb') as f_shard:
-                while True:
-                    chunk = await f_shard.read(chunk_size)
-                    if not chunk:
-                        break
-
-                    await f.write(chunk)
-                    if pbar:
-                        pbar.update(len(chunk))
-
-            # Replace with asyncio-compatible command execution or delegate to a thread
-            await cls._async_run_cmd(f"> {shard_path} && rm {shard_path}")
 
 
 
@@ -68,6 +53,23 @@ def _get_byte_length(obj):
 
 
 class Downloader:
+    @classmethod
+    async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
+
+        async with aiofiles.open(out, 'wb') as f:
+            for shard_path in shard_paths:
+                async with aiofiles.open(shard_path, 'rb') as f_shard:
+                    while True:
+                        chunk = await f_shard.read(chunk_size)
+                        if not chunk:
+                            break
+
+                        await f.write(chunk)
+                        if pbar:
+                            pbar.update(len(chunk))
+
+                # Replace with asyncio-compatible command execution or delegate to a thread
+                await cls._async_run_cmd(f"> {shard_path} && rm {shard_path}")
 
     @classmethod
     def _read_chunk_progress(cls, out):
