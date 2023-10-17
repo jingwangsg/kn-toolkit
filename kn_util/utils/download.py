@@ -289,7 +289,7 @@ class Downloader:
                                     ascii=True) if verbose else None
                 context = pbar if verbose else nullcontext()
                 with context:
-                    await merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
+                    await cls.merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
             else:
                 cmd = f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}"
                 # print(cmd)
