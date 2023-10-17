@@ -18,7 +18,7 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
+async def merge_shard_files(shard_paths, chunk_size=1024**3, out=None, pbar=None):
 
     async with aiofiles.open(out, 'wb') as f:
         for shard_path in shard_paths:
