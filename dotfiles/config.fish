@@ -78,7 +78,7 @@ function knkill
         set filter $argv[1]
     end
 
-    ps -u kningtg --no-headers -o pid,comm= | grep -v -E "^\$|((string echo $PPID))|slurmstepd|python310|python39|tmux" | grep -- $filter | awk '{print $1}' | xargs kill -9
+    ps -u (whoami) --no-headers -o pid,comm= | grep -v -E "^\$|((string echo $PPID))|slurmstepd|python310|python39|tmux" | grep -- $filter | awk '{print $1}' | xargs kill -9
 end
 
 function gpukill

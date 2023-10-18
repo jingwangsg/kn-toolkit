@@ -130,7 +130,7 @@ alias kps="ps --no-header -eo ppid,user,stime,cmd | sort -u -k1,1 | cut -c 1-$((
 knkill() {
     # conda activate torch
     # python $HOME/server_utils/kill.py ${1:-python}
-    ps -u kningtg -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
+    ps -u $(whoami) -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
 }
 
 upl() {
