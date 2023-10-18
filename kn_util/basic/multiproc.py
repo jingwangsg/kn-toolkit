@@ -9,6 +9,25 @@ from tqdm.asyncio import tqdm_asyncio
 import time
 import asyncio
 
+def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
+    pbar = tqdm(total=len(iterable), desc=desc)
+
+    async def func_async(item):
+        loop = asyncio.get_running_loop()
+        if wrap_func:
+            result = await loop.run_in_executor(None, func, item)  # 在默认执行器中运行非异步函数
+        else:
+            result = await func(item)
+        pbar.update(1)
+        return result
+
+    async def _map_async_with_coroutine(iterable):
+        tasks = [func_async(item) for item in iterable]
+        results = await asyncio.gather(*tasks)
+        pbar.close()
+        return results
+
+    return asyncio.run(_map_async_with_coroutine(iterable))
 
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False, verbose=True):
     """while test_flag=True, run sequentially"""

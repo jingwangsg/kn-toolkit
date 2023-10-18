@@ -19,6 +19,17 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
+# https://www.iamhippo.com/2021-08/1546.html
+USER_AGENT_LIST = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"
+]
+
 
 def is_vailable(url):
     ret = get_response_with_redirects(url)
@@ -56,7 +67,15 @@ def _get_byte_length(obj):
     return (obj.bit_length() + 7) // 8
 
 
-class AsyncDownloader:
+class Downloader:
+
+    @staticmethod
+    def get_output_path(url):
+        out = url.split("/")[-1]
+        return out
+
+
+class AsyncDownloader(Downloader):
 
     @classmethod
     async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
@@ -189,11 +208,6 @@ class AsyncDownloader:
         ranges[-1][-1] = filesize - 1
         return ranges
 
-    @staticmethod
-    def get_output_path(url):
-        out = url.split("/")[-1]
-        return out
-
     @classmethod
     def download(cls, **kwargs):
         return asyncio.run(cls._async_sharded_download(**kwargs))
@@ -303,10 +317,18 @@ class AsyncDownloader:
                 print("=> Merging time:", time() - st)
 
 
-class CommandDownloader:
+class CommandDownloader(Downloader):
 
     @classmethod
-    def download_axel(cls, url, out=None, headers=None, proxy=None, num_shards=None, verbose=True):
+    def download_axel(cls,
+                      url,
+                      out=None,
+                      headers=None,
+                      proxy=None,
+                      num_shards=None,
+                      timeout=5,
+                      retries=3,
+                      verbose=True):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -324,9 +346,9 @@ class CommandDownloader:
         if num_shards:
             axel_args += f" --num-connections {num_shards}"
 
-        cmd = f"axel {axel_args} {url} -o {out}"
-        import ipdb
-        ipdb.set_trace()
+        axel_args += f" --max-redirect {retries} --timeout {timeout}"
+
+        cmd = f"axel {axel_args} '{url}' -o '{out}'"
         if out is not None:
             run_cmd(cmd, verbose=verbose)
         else:
@@ -336,7 +358,7 @@ class CommandDownloader:
             return buffer
 
     @classmethod
-    def downloader_wget(cls, url, out=None, headers=None, proxy=None, verbose=True):
+    def download_wget(cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -347,11 +369,13 @@ class CommandDownloader:
         if proxy:
             wget_args += f" --proxy=on --proxy http://{proxy}"
 
+        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate"
+
         if headers:
             for k, v in headers.items():
                 wget_args += f" --header \"{k}:{v}\""
 
-        cmd = f"wget {wget_args} {url} -O {out}"
+        cmd = f"wget {wget_args} '{url}' -O '{out}'"
 
         if out is not None:
             run_cmd(cmd, verbose=verbose)
@@ -362,7 +386,7 @@ class CommandDownloader:
             return buffer
 
 
-class SimpleDownloader:
+class SimpleDownloader(Downloader):
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
