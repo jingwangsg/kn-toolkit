@@ -5,7 +5,7 @@ sys.path.insert(0, os.getcwd())
 import subprocess
 import argparse
 import os.path as osp
-from ..utils.download import Downloader, get_headers
+from ..utils.download import get_headers, CommandDownloader, AsyncDownloader, SimpleDownloader
 from ..utils.git_utils import get_origin_url
 from ..utils.rsync import RsyncTool
 from ..basic import map_async
@@ -91,7 +91,7 @@ def _download_fn(url_path_pair, verbose=True, **kwargs):
     if osp.exists(path):
         os.remove(path)
 
-    Downloader.async_sharded_download(url=url, verbose=verbose, out=path, **kwargs)
+    AsyncDownloader.download(url=url, verbose=verbose, out=path, **kwargs)
     subprocess.run(f"touch {finish_flag}", shell=True)
     return True
 
@@ -209,15 +209,14 @@ if __name__ == "__main__":
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
         parser.add_argument("--num-shards", type=int, help="The number of shards to use", default=1)
-        parser.add_argument("--low-memory", action="store_true", help="Whether to use low memory", default=False)
         args = parser.parse_args()
+
         if not args.recursive:
             download(url_template=args.template,
                      include=args.include,
                      proxy=args.proxy,
                      verbose=True,
-                     num_shards=args.num_shards,
-                     low_memory=args.low_memory)
+                     num_shards=args.num_shards)
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive()

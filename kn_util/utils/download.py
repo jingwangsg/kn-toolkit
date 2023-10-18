@@ -12,11 +12,18 @@ from functools import partial
 import aiofiles
 import json
 import subprocess
+import tempfile
 from ..utils.system import run_cmd
 
 import nest_asyncio
 
 nest_asyncio.apply()
+
+
+def is_vailable(url):
+    ret = get_response_with_redirects(url)
+    if ret.status_code == 200:
+        return True
 
 
 def get_response_with_redirects(url, verbose=False, headers=None):
@@ -49,7 +56,7 @@ def _get_byte_length(obj):
     return (obj.bit_length() + 7) // 8
 
 
-class Downloader:
+class AsyncDownloader:
 
     @classmethod
     async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
@@ -181,21 +188,15 @@ class Downloader:
         ranges = [[i, i + step - 1] for i in range(0, filesize, step)]
         ranges[-1][-1] = filesize - 1
         return ranges
-    
+
     @staticmethod
     def get_output_path(url):
         out = url.split("/")[-1]
         return out
 
     @classmethod
-    def async_sharded_download(cls, **kwargs):
+    def download(cls, **kwargs):
         return asyncio.run(cls._async_sharded_download(**kwargs))
-
-    @staticmethod
-    def is_vailable(url):
-        ret = get_response_with_redirects(url)
-        if ret.status_code == 200:
-            return True
 
     @classmethod
     async def _async_sharded_download(cls,
@@ -300,6 +301,68 @@ class Downloader:
 
             if verbose:
                 print("=> Merging time:", time() - st)
+
+
+class CommandDownloader:
+
+    @classmethod
+    def download_axel(cls, url, out=None, headers=None, proxy=None, num_shards=None, verbose=True):
+        if out == "auto":
+            out = cls.get_output_path(url)
+
+        if proxy == "auto":
+            proxy = "127.0.0.1:8091"
+
+        axel_args = ""
+        if proxy:
+            axel_args += f" --proxy {proxy}"
+
+        if headers:
+            for k, v in headers.items():
+                axel_args += f" --header \"{k}:{v}\""
+
+        if num_shards:
+            axel_args += f" --num-connections {num_shards}"
+
+        cmd = f"axel {axel_args} {url} -o {out}"
+        import ipdb
+        ipdb.set_trace()
+        if out is not None:
+            run_cmd(cmd, verbose=verbose)
+        else:
+            with tempfile.NamedTemporaryFile() as f, io.BytesIO() as buffer:
+                run_cmd(cmd, verbose=verbose, out=f.name)
+                buffer.write(f.read())
+            return buffer
+
+    @classmethod
+    def downloader_wget(cls, url, out=None, headers=None, proxy=None, verbose=True):
+        if out == "auto":
+            out = cls.get_output_path(url)
+
+        if proxy == "auto":
+            proxy = "127.0.0.1:8091"
+
+        wget_args = ""
+        if proxy:
+            wget_args += f" --proxy=on --proxy http://{proxy}"
+
+        if headers:
+            for k, v in headers.items():
+                wget_args += f" --header \"{k}:{v}\""
+
+        cmd = f"wget {wget_args} {url} -O {out}"
+
+        if out is not None:
+            run_cmd(cmd, verbose=verbose)
+        else:
+            with tempfile.NamedTemporaryFile() as f, io.BytesIO() as buffer:
+                run_cmd(cmd, verbose=verbose, out=f.name)
+                buffer.write(f.read())
+            return buffer
+
+
+class SimpleDownloader:
 
     @classmethod
     def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):

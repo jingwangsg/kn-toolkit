@@ -15,7 +15,7 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
             ret = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             return ret
         else:
-            popen = subprocess.Popen(cmd, shell=True)
+            popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             return popen
 
 
