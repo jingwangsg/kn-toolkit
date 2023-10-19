@@ -369,7 +369,7 @@ class CommandDownloader(Downloader):
         if proxy:
             wget_args += f" --proxy=on --proxy http://{proxy}"
 
-        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate"
+        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
 
         if headers:
             for k, v in headers.items():

@@ -81,7 +81,7 @@ def _parse_repo_url(url):
     return org, repo
 
 
-def _download_fn(url_path_pair, verbose=True, **kwargs):
+def _download_fn(url_path_pair, verbose=True, queue=None, **kwargs):
     url, path = url_path_pair
     finish_flag = osp.join(os.getcwd(), osp.dirname(path), "." + osp.basename(path) + ".finish")
 
@@ -93,6 +93,10 @@ def _download_fn(url_path_pair, verbose=True, **kwargs):
 
     AsyncDownloader.download(url=url, verbose=verbose, out=path, **kwargs)
     subprocess.run(f"touch {finish_flag}", shell=True)
+
+    if queue:
+        queue.put(url_path_pair)
+
     return True
 
 
@@ -111,11 +115,15 @@ def download(url_template, include=None, queue=None, proxy=None, verbose=True, *
         url = url_template.format(org=org, repo=repo, path=path)
         url_path_pairs += [(url, path)]
 
-    for pair in url_path_pairs:
-        print(pair)
-        ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose, **kwargs)
-        if queue and ret:
-            queue.put(pair)
+    map_async(func=lambda pair: _download_fn(pair, headers=headers, proxy=proxy, queue=queue, verbose=False, **kwargs),
+              iterable=url_path_pairs,
+              num_process=16)
+
+    # for pair in url_path_pairs:
+    #     print(pair)
+    #     ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose, **kwargs)
+    #     if queue and ret:
+    #         queue.put(pair)
 
     if queue:
         queue.put(None)  # ending signal for download process

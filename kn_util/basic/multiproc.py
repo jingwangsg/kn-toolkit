@@ -8,6 +8,9 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 import time
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
+
 
 def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
     pbar = tqdm(total=len(iterable), desc=desc)
@@ -28,6 +31,7 @@ def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
         return results
 
     return asyncio.run(_map_async_with_coroutine(iterable))
+
 
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False, verbose=True):
     """while test_flag=True, run sequentially"""
@@ -53,6 +57,20 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
             p.close()
 
         return ret.get()
+
+
+def map_async_with_thread(iterable, func, num_thread=30, desc="", verbose=True):
+    with ThreadPoolExecutor(num_thread) as executor:
+        pbar = tqdm(total=len(iterable), desc=desc) if verbose else None
+        context = pbar if pbar else nullcontext()
+
+        with context:
+            futures = [executor.submit(func, x) for x in iterable]
+
+            for future in as_completed(futures):
+                if pbar:
+                    pbar.update(1)
+                future.result()  # 如果 func 抛出异常，这里会重新抛出
 
 
 def map_async_with_tolerance(iterable, func, num_workers=32, level="thread", is_ready=lambda x: x):
