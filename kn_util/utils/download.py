@@ -236,7 +236,6 @@ class AsyncDownloader(Downloader):
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
             print("File does not support range download, use direct download")
-            cls.download(url, out=out, headers=headers, proxy=proxy, verbose=verbose)
             return
 
         # get filesize
