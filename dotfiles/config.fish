@@ -36,13 +36,27 @@ abbr "skip_clone" "GIT_LFS_SKIP_SMUDGE=1 git clone"
 
 
 function rsync_to
+    set dst_ssh $argv[1]
     set src (pwd | sed "s|$HOME|~|")
-    rsync -vaurP $src $argv:$src
+    set dst (ssh $dst_ssh readlink -f $src)
+    set src (pwd)
+    set cmd "rsync -vaurP $src $dst_ssh:$dst"
+    ssh $dst_ssh mkdir -p $dst
+
+    echo $cmd
+    eval $cmd
 end
 
 function rsync_from
+    set dst_ssh $argv[1]
     set src (pwd | sed "s|$HOME|~|")
-    rsync -vaurP $argv:$src $src
+    set dst (ssh $dst_ssh readlink -f $src)
+    set src (pwd)
+    set cmd "rsync -vaurP $dst_ssh:$dst $src"
+    mkdir -p $src
+
+    echo $cmd
+    eval $cmd
 end
 
 function play
