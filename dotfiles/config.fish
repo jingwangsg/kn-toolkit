@@ -38,6 +38,17 @@ function rsync_delete
     rsync --delete-before --force -r ~/.empty/ $argv
 end
 
+function play
+    cd $HOME/WORKSPACE/playground
+    mkdir -p $argv[1]
+    cd $argv[1]
+end
+
+function new
+    touch $argv
+    readlink -f $argv
+end
+
 # function knrsync
 #     set src $argv[1]
 #     set dst $argv[2]
