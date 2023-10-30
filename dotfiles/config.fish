@@ -40,7 +40,7 @@ function rsync_to
     set src (pwd | sed "s|$HOME|~|")
     set dst (ssh $dst_ssh readlink -f $src)
     set src (pwd)
-    set cmd "rsync -vaurP $src $dst_ssh:$dst"
+    set cmd "rsync -vaurP $src/ $dst_ssh:$dst/"
     ssh $dst_ssh mkdir -p $dst
 
     echo $cmd
@@ -52,7 +52,7 @@ function rsync_from
     set src (pwd | sed "s|$HOME|~|")
     set dst (ssh $dst_ssh readlink -f $src)
     set src (pwd)
-    set cmd "rsync -vaurP $dst_ssh:$dst $src"
+    set cmd "rsync -vaurP $dst_ssh:$dst/ $src/"
     mkdir -p $src
 
     echo $cmd
