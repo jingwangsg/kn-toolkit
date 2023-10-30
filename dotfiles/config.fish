@@ -34,8 +34,15 @@ abbr knuntar 'cat ./INPUT.tgz.* | tar --use-compress-program=unpigz -xvpf -'
 abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
 abbr "skip_clone" "GIT_LFS_SKIP_SMUDGE=1 git clone"
 
-function rsync_delete
-    rsync --delete-before --force -r ~/.empty/ $argv
+
+function rsync_to
+    set src (pwd | sed "s|$HOME|~|")
+    rsync -vaurP $src $argv:$src
+end
+
+function rsync_from
+    set src (pwd | sed "s|$HOME|~|")
+    rsync -vaurP $argv:$src $src
 end
 
 function play
