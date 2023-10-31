@@ -166,7 +166,6 @@ class RsyncDownloadManager:
                 break
 
     @classmethod
-    @classmethod
     def download_and_rsync(cls, url_template, include, dest):
         dest = cls.get_abspath(dest)
         cls.initial_rsync(dest)
