@@ -1,95 +1,17 @@
 import numpy as np
-import torch
 import os.path as osp
 import subprocess
 import os
 import glob
 from ..basic import map_async
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from kn_util.data.collate import collect_features_from_sample_list, merge_list_to_tensor
-from PIL import Image
-from functools import partial
 import numpy as np
-from functools import partial
 import io
-import warnings
 from contextlib import redirect_stdout
-from pathlib import Path
-from einops import rearrange
 import ffmpeg
+import cv2
 
 
-class HFImageModelWrapper(nn.Module):
-    """enable huggingface image transformer to be used for video inference"""
-
-    def __init__(self, model, extractor, batch_size=16, use_cuda=True) -> None:
-        super().__init__()
-        self.model = model
-        self.extractor = extractor
-        self.batch_size = batch_size
-        self.use_cuda = use_cuda
-
-    @torch.no_grad()
-    def forward(self, raw_data):
-
-        images = [Image.open(path).convert("RGB") for path in raw_data]
-        dataloader = DataLoader(images,
-                                batch_size=self.batch_size,
-                                collate_fn=partial(self.extractor, return_tensors="pt"),
-                                num_workers=8,
-                                prefetch_factor=6,
-                                pin_memory=True)
-        outputs_list = []
-        for inputs in dataloader:
-            if self.use_cuda:
-                inputs = {k: v.cuda(non_blocking=True) for k, v in inputs.items()}
-            outputs = self.model(**inputs)
-            outputs = self.post_forward(outputs)
-            outputs = {k: v.cpu().detach().numpy() for k, v in outputs.items()}
-            outputs_list += [outputs]
-
-        outputs = merge_list_to_tensor(collect_features_from_sample_list(outputs_list), mode="concat")
-        return outputs
-
-    def post_forward(self, outputs):
-        return outputs
-
-
-class VisionCLIPWrapper(HFImageModelWrapper):
-
-    def __init__(self,
-                 model,
-                 extractor,
-                 batch_size=16,
-                 spatial_reduce=4,
-                 temporal_reduce=2,
-                 pooling="avg",
-                 use_cuda=True) -> None:
-        super().__init__(model, extractor, batch_size, use_cuda)
-        self.spatial_reduce = spatial_reduce
-        self.temporal_reduce = temporal_reduce
-        self.pooling = pooling
-
-    def post_forward(self, outputs):
-        last_hidden_state = outputs["last_hidden_state"]
-        patch_size = int(np.sqrt(last_hidden_state.shape[1]))
-        last_hidden_state = rearrange(last_hidden_state[:, 1:, :], "t (h w) d -> d t h w", h=patch_size,
-                                      w=patch_size)[None, :]
-        pooling = F.avg_pool3d if self.pooling == "avg" else F.max_pool3d
-        spatial_reduce = self.spatial_reduce
-        temporal_reduce = np.minimum(last_hidden_state.shape[2], self.temporal_reduce)
-        last_hidden_state = pooling(last_hidden_state,
-                                    kernel_size=(temporal_reduce, spatial_reduce, spatial_reduce),
-                                    stride=(temporal_reduce, spatial_reduce, spatial_reduce))
-        last_hidden_state = rearrange(last_hidden_state[0], "d t h w -> t h w d")
-
-        outputs["last_hidden_state"] = last_hidden_state
-        return outputs
-
-
-class VideoProcessor:
+class __FFMPEG:
 
     @classmethod
     def single_video_process(cls, video_path, output_video_path, frame_scale=None, fps=None, quiet=True):
@@ -113,14 +35,7 @@ class VideoProcessor:
         subprocess.run(cmd, shell=True)
 
     @classmethod
-    def single_video_to_image(cls,
-                              video_path,
-                              cur_image_dir,
-                              max_frame=None,
-                              frame_scale=None,
-                              fps=None,
-                              quiet=True,
-                              overwrite=False):
+    def single_video_to_image(cls, video_path, cur_image_dir, max_frame=None, frame_scale=None, fps=None, quiet=True, overwrite=False):
         # if not overwrite and osp.exists(osp.join(cur_image_dir, ".finish")):
         #     return
         os.makedirs(cur_image_dir, exist_ok=True)
@@ -167,34 +82,52 @@ class VideoProcessor:
 
         map_async(args, func_single, num_process=64)
 
-    @staticmethod
-    def get_hw(video_path):
-        import cv2
-        cap = cv2.VideoCapture(video_path)
+
+class OpenCVVideoLoader:
+
+    def __init__(self, video_path):
+        self.video_path = video_path
+        self.cap = cv2.VideoCapture(video_path)
+
+    @property
+    def hw(self):
+        cap = self.cap
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         return height, width
-    
-    @staticmethod
-    def get_fps(video_path):
-        import cv2
-        cap = cv2.VideoCapture(video_path)
+
+    @property
+    def fps(self):
+        cap = self.cap
         fps = cap.get(cv2.CAP_PROP_FPS)
         return fps
-    
-    @staticmethod
-    def get_length(video_path):
-        import cv2
-        cap = cv2.VideoCapture(video_path)
+
+    @property
+    def length(self):
+        cap = self.cap
         length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         return length
 
-    @classmethod
-    def load_frames(cls, video_path):
+    @property
+    def frames(self):
+        ret, frame = self.cap.read()
+        if ret:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return rgb_frame
+        else:
+            print("read frame failed")
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.cap.release()
+
+
+class FFMPEGVideoLoader(OpenCVVideoLoader):
+
+    @property
+    def frames(self):
         # using ffmpeg to load video
-        h, w = cls.get_hw(video_path)
-        buffer, _ = (ffmpeg.input(video_path).output('pipe:', format='rawvideo', pix_fmt='rgb24').run(capture_stdout=True,
-                                                                                                   quiet=True))
+        h, w = self.hw
+        buffer, _ = (ffmpeg.input(self.video_path).output('pipe:', format='rawvideo', pix_fmt='rgb24').run(capture_stdout=True, quiet=True))
         frames = np.frombuffer(buffer, np.uint8).reshape([-1, h, w, 3])
         return frames
 
@@ -207,13 +140,7 @@ class YTDLPDownloader:
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # scale should be conditon like "<=224" or ">=224"
-        ydl_opts = {
-            'ignoreerrors': True,
-            'format': video_format,
-            'outtmpl': video_path,
-            'quiet': quiet,
-            'noprogress': quiet
-        }
+        ydl_opts = {'ignoreerrors': True, 'format': video_format, 'outtmpl': video_path, 'quiet': quiet, 'noprogress': quiet}
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -267,14 +194,7 @@ class YTDLPDownloader:
 
     @staticmethod
     def _download_ydl(youtube_id, buffer, video_format, quiet=True):
-        ydl_opts = {
-            'ignoreerrors': True,
-            'format': video_format,
-            'outtmpl': "-",
-            'logtostderr': True,
-            'quiet': quiet,
-            'noprogress': quiet
-        }
+        ydl_opts = {'ignoreerrors': True, 'format': video_format, 'outtmpl': "-", 'logtostderr': True, 'quiet': quiet, 'noprogress': quiet}
         with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([youtube_id])
         return error_code
@@ -298,29 +218,28 @@ class YTDLPDownloader:
         return buffer, error_code == 0
 
 
-try:
-    from decord import VideoReader
-except:
-    warnings.warn("decord is not installed, video loading is not available")
+# try:
+#     from decord import VideoReader
+# except:
+#     warnings.warn("decord is not installed, video loading is not available")
 
+# class __DecordFrameLoader:
 
-class DecordFrameLoader:
+#     @classmethod
+#     def get_fps(cls, buffer):
+#         return VideoReader(buffer).get_avg_fps()
 
-    @classmethod
-    def get_fps(cls, buffer):
-        return VideoReader(buffer).get_avg_fps()
+#     @classmethod
+#     def load_frames(cls, buffer, stride=1, width=-1, height=-1):
+#         raise Warning("deprecated, decord seems buggy, use ffmpeg instead")
+#         vr = VideoReader(buffer, width=width, height=height, num_threads=16)
 
-    @classmethod
-    def load_frames(cls, buffer, stride=1, width=-1, height=-1):
-        raise Warning("deprecated, decord seems buggy, use ffmpeg instead")
-        vr = VideoReader(buffer, width=width, height=height, num_threads=16)
+#         indices = list(range(0, len(vr), stride))
+#         arr = vr.get_batch(indices).asnumpy()
 
-        indices = list(range(0, len(vr), stride))
-        arr = vr.get_batch(indices).asnumpy()
+#         return arr
 
-        return arr
-
-    @classmethod
-    def get_frame_count(cls, buffer):
-        vr = VideoReader(buffer, num_threads=16)
-        return len(vr)
+#     @classmethod
+#     def get_frame_count(cls, buffer):
+#         vr = VideoReader(buffer, num_threads=16)
+#         return len(vr)
