@@ -121,6 +121,56 @@ class OpenCVVideoLoader:
         self.cap.release()
 
 
+def sample_video_cv2(output_path, input_path, fps=None, wh=None):
+    video_loader = OpenCVVideoLoader(input_path)
+
+    if fps is None:
+        fps = video_loader.fps
+
+    if wh is None:
+        hw = video_loader.hw
+        wh = (hw[1], hw[0])
+
+    fourcc = cv2.VideoWriter_fourcc(*'VP90')
+    out = cv2.VideoWriter(output_path, fourcc, fps, wh)
+    assert video_loader.fps % fps == 0
+
+    step = video_loader.fps // fps
+    cnt = 0
+    while True:
+        ret, frame = video_loader.cap.read()
+        if not ret:
+            break
+
+        if cnt % step == 0:
+            out.write(frame)
+
+        cnt += 1
+
+
+def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx265"):
+    # 获取原视频的帧率和分辨率
+    probe = ffmpeg.probe(input_path)
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    original_fps = float(video_stream['avg_frame_rate'].split('/')[0])
+    original_wh = (int(video_stream['width']), int(video_stream['height']))
+
+    # 如果没有指定帧率和分辨率，使用原始值
+    if fps is None:
+        fps = original_fps
+    if wh is None:
+        wh = original_wh
+
+    # 计算跳帧步长
+    assert original_fps % fps == 0
+    step = original_fps // fps
+
+    (ffmpeg.input(input_path).filter('fps', fps=fps, round='up')\
+        .filter('scale', wh[0],wh[1])\
+            .output(output_path, vcodec=codec, video_bitrate="5000k")\
+                .run(quiet=True))
+
+
 class FFMPEGVideoLoader(OpenCVVideoLoader):
 
     @property

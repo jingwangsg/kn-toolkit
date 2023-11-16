@@ -19,7 +19,7 @@ class TarTool:
             file_size = osp.getsize(file)
             if chunk_bytes + file_size >= chunk_size:
                 tar.close()
-                tar = tarfile.open(f"{dst}.{index:08d}", "w")
+                tar = tarfile.open(f"{dst}.{index.value:08d}", "w")
                 chunk_bytes = 0
             else:
                 tar.add(file)
@@ -45,3 +45,4 @@ class TarTool:
 
         with mp.Pool(num_processes) as p:
             p.apply_async(cls._compress_worker, args=(q, dst, index, chunk_size))
+        
