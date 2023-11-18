@@ -11,6 +11,14 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 
+def _run_sequential(iterable, func, desc=""):
+    pbar = tqdm(total=len(iterable), desc=desc)
+    ret = []
+    for it in iterable:
+        ret.append(func(it))
+        pbar.update(1)
+    pbar.close()
+    return ret
 
 def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
     pbar = tqdm(total=len(iterable), desc=desc)
@@ -36,8 +44,7 @@ def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False, verbose=True):
     """while test_flag=True, run sequentially"""
     if test_flag:
-        ret = [func(x) for x in tqdm(iterable, desc=desc)]
-        return ret
+        return _run_sequential(iterable, func, desc=desc)
     else:
         p = Pool(num_process)
         # ret = []
@@ -59,19 +66,31 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
         return ret.get()
 
 
-def map_async_with_thread(iterable, func, num_thread=30, desc="", verbose=True):
+def map_async_with_thread(iterable, func, num_thread=30, desc="", verbose=True, test_flag=False):
+    if test_flag:
+        return _run_sequential(iterable, func, desc=desc)
+        
     with ThreadPoolExecutor(num_thread) as executor:
         pbar = tqdm(total=len(iterable), desc=desc) if verbose else None
         context = pbar if pbar else nullcontext()
 
+        results = []
+
         with context:
-            futures = [executor.submit(func, x) for x in iterable]
+            futures = {executor.submit(func, x): x for x in iterable}
 
             for future in as_completed(futures):
                 if pbar:
                     pbar.update(1)
-                future.result()  # 如果 func 抛出异常，这里会重新抛出
+                try:
+                    result = future.result()  # Get the result from the future
+                    results.append(result)    # Append the result to the results list
+                except Exception as e:
+                    # If there is an exception, you can handle it here
+                    # For now, we'll just print it
+                    print(f"Exception in thread: {e}")
 
+        return results
 
 def map_async_with_tolerance(iterable, func, num_workers=32, level="thread", is_ready=lambda x: x):
 

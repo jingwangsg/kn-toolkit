@@ -110,12 +110,14 @@ class OpenCVVideoLoader:
 
     @property
     def frames(self):
-        ret, frame = self.cap.read()
-        if ret:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            return rgb_frame
-        else:
-            print("read frame failed")
+        while True:
+            ret, frame = self.cap.read()
+            if ret:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                return rgb_frame
+            else:
+                print("read frame failed")
+    
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.cap.release()
@@ -148,11 +150,11 @@ def sample_video_cv2(output_path, input_path, fps=None, wh=None):
         cnt += 1
 
 
-def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx265"):
+def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx265", verbose=False):
     # 获取原视频的帧率和分辨率
     probe = ffmpeg.probe(input_path)
     video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-    original_fps = float(video_stream['avg_frame_rate'].split('/')[0])
+    original_fps = np.round(eval(video_stream['avg_frame_rate']))
     original_wh = (int(video_stream['width']), int(video_stream['height']))
 
     # 如果没有指定帧率和分辨率，使用原始值
@@ -161,14 +163,11 @@ def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx2
     if wh is None:
         wh = original_wh
 
-    # 计算跳帧步长
-    assert original_fps % fps == 0
-    step = original_fps // fps
 
     (ffmpeg.input(input_path).filter('fps', fps=fps, round='up')\
         .filter('scale', wh[0],wh[1])\
-            .output(output_path, vcodec=codec, video_bitrate="5000k")\
-                .run(quiet=True))
+            .output(output_path, vcodec=codec)\
+                .run(quiet=not verbose))
 
 
 class FFMPEGVideoLoader(OpenCVVideoLoader):
@@ -186,10 +185,17 @@ import yt_dlp
 
 
 class YTDLPDownloader:
+    @staticmethod
+    def _maybe_youtube_id(url):
+        if url.startswith("http"):
+            return osp.basename(url)
+        else:
+            return url
 
     @classmethod
     def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # scale should be conditon like "<=224" or ">=224"
+        youtube_id = cls._maybe_youtube_id(youtube_id)
         ydl_opts = {'ignoreerrors': True, 'format': video_format, 'outtmpl': video_path, 'quiet': quiet, 'noprogress': quiet}
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
@@ -256,6 +262,7 @@ class YTDLPDownloader:
     @classmethod
     def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
         # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+        youtube_id = cls._maybe_youtube_id(youtube_id)
 
         buffer = io.BytesIO()
         error_code = cls._download_ydl(youtube_id=youtube_id, buffer=buffer, video_format=video_format, quiet=quiet)
