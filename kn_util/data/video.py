@@ -167,7 +167,7 @@ def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx2
     (ffmpeg.input(input_path).filter('fps', fps=fps, round='up')\
         .filter('scale', wh[0],wh[1])\
             .output(output_path, vcodec=codec)\
-                .run(quiet=not verbose))
+                .run(quiet=not verbose, overwrite_output=True))
 
 
 class FFMPEGVideoLoader(OpenCVVideoLoader):

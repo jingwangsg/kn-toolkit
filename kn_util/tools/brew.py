@@ -117,7 +117,10 @@ def patch(app=None, path=None, need_check=True):
 
         all_executable = [_which(app) for app in app.split() if _which(app) is not None]
     elif path is not None:
-        all_executable = [path]
+        if "*" in path:
+            all_executable = glob.glob(path)
+        else:
+            all_executable = [path]
     else:
         all_executable = glob.glob(f"{homebrew_root}/bin/*")
 

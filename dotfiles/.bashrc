@@ -105,7 +105,7 @@ if [ -f ~/.bash_aliases ]; then
 fi
 
 source /etc/profile.d/modules.sh
-module load slurm cuda11.2/toolkit/11.2.0
+module load slurm cuda11.7/toolkit/11.7.1
 
 alias sv="conda activate torch && ~/server_utils/server.sh"
 alias lsq="python ~/server_utils/list_task.py"
@@ -130,7 +130,7 @@ alias kps="ps --no-header -eo ppid,user,stime,cmd | sort -u -k1,1 | cut -c 1-$((
 knkill() {
     # conda activate torch
     # python $HOME/server_utils/kill.py ${1:-python}
-    ps -u $(whoami) -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
+    ps -u kningtg -o pid,command | awk '{print $1,$2}' | grep ${1:-python} | awk '{print $1}' | xargs kill -9
 }
 
 upl() {
@@ -161,11 +161,10 @@ export WANDB_DIR="$HOME/.wandb"
 if [ ! -d "$HOME/.tmp/$(hostname)" ]; then
     mkdir -p "$HOME/.tmp/$(hostname)"
 fi
-export SLURM_TMPDIR="$HOME/.tmp/$(hostname)"
-export TMUX_TMPDIR="$HOME/.tmp/$(hostname)"
-# export TMPDIR="$HOME/.tmp/$(hostname)"
+export SLURM_TMPDIR="$HOME/.tmp"
+export TMUX_TMPDIR="$HOME/.tmp"
 export TMPDIR="/tmp/"
-export HOMEBREW_TEMP="$HOME/.tmp/$(hostname)"
+export HOMEBREW_TEMP="$HOME/.tmp"
 
 show_gpu() {
     echo $CUDA_VISIBLE_DEVICES
@@ -229,6 +228,12 @@ PATH="$HOMEBREW/bin:$PATH"
 # PATH="$CUDA_TOOLKIT_ROOT/:$PATH"
 # PATH="$CUDA_HOME/bin/:$CUDA_TOOLKIT_ROOT/bin/:$PATH"
 export PATH
+
+fusermount -u ~/mnt/gc 2>/dev/null
+fusermount -u ~/mnt/dmal 2>/dev/null
+rclone mount scsegc:/export/home/kningtg/ ~/mnt/gc --daemon
+rclone mount dmal:/media/wangjing/Drive/ ~/mnt/dmal --daemon
+
 if [ -z $NO_FISH ]; then
     if [ -z $SLURM_JOB_ID ]; then
         exec fish
@@ -237,19 +242,18 @@ if [ -z $NO_FISH ]; then
     fi
 fi
 
+
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/export/home/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2>/dev/null)"
+__conda_setup="$('/export/home2/kningtg/miniconda3/bin/conda' 'shell.bash' 'hook' 2>/dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/export/home/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/export/home/kningtg/miniconda3/etc/profile.d/conda.sh"
+    if [ -f "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/export/home2/kningtg/miniconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/export/home/kningtg/miniconda3/bin:$PATH"
+        export PATH="/export/home2/kningtg/miniconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup
 # <<< conda initialize <<<
-PATH=/homebrew/bin:/export/home/kningtg/homebrew/bin:/export/home/kningtg/miniconda3/envs/torch/bin:/export/home/kningtg/homebrew/opt/glibc/sbin:/export/home/kningtg/homebrew/opt/glibc/bin:/export/home/kningtg/bin:/export/home/kningtg/.local/bin:/export/home/kningtg/homebrew/bin:/export/home/kningtg/miniconda3/bin:/cm/shared/apps/torque/6.1.1/bin:/cm/shared/apps/torque/6.1.1/sbin:/export/home/kningtg/miniconda3/bin:/export/home/kningtg/miniconda3/condabin:/export/home/kningtg/homebrew/bin:/export/home/kningtg/miniconda3/bin:/cm/local/apps/cuda/libs/current/bin:/cm/shared/apps/cuda11.2/sdk/11.2.0/bin/x86_64/linux/release:/cm/shared/apps/cuda11.2/toolkit/11.2.0/bin:/cm/shared/apps/slurm/17.11.5/sbin:/cm/shared/apps/slurm/17.11.5/bin:/export/home/kningtg/.vscode-server/bin/e7e037083ff4455cf320e344325dacb480062c3c/bin/remote-cli:/export/home/kningtg/homebrew/opt/glibc/sbin:/export/home/kningtg/homebrew/opt/glibc/bin:/export/home/kningtg/.cargo/bin:/export/home/kningtg/bin:/export/home/kningtg/.local/bin:/cm/shared/apps/torque/6.1.1/bin:/cm/shared/apps/torque/6.1.1/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/sbin:/usr/sbin:/cm/local/apps/environment-modules/4.0.0/bin:/opt/dell/srvadmin/bin:/snap/bin
-LD_LIBRARY_PATH=/homebrew/lib:/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:/export/home/kningtg/homebrew/lib:/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:/export/home/kningtg/homebrew/lib:/lib/x86_64-linux-gnu/:/usr/lib/x86_64-linux-gnu/:/export/home/kningtg/homebrew/lib:/cm/local/apps/cuda/libs/current/lib64:/cm/shared/apps/cuda11.2/toolkit/11.2.0/targets/x86_64-linux/lib:/cm/shared/apps/slurm/17.11.5/lib64/slurm:/cm/shared/apps/slurm/17.11.5/lib64:::

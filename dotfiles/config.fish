@@ -63,6 +63,14 @@ function play
     cd $HOME/WORKSPACE/playground
     mkdir -p $argv[1]
     cd $argv[1]
+    readlink -f .
+end
+
+function task
+    cd $HOME/TASKS
+    mkdir -p $argv[1]
+    cd $argv[1]
+    readlink -f .
 end
 
 function new
@@ -89,7 +97,6 @@ end
 function fg 
     python ~/server_utils/query_cluster.py --task available $argv
 end
-
 
 function fu 
     python ~/server_utils/query_cluster.py --task usage $argv

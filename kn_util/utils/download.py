@@ -209,8 +209,8 @@ class AsyncDownloader(Downloader):
         return ranges
 
     @classmethod
-    def download(cls, **kwargs):
-        return asyncio.run(cls._async_sharded_download(**kwargs))
+    def download(cls, url, **kwargs):
+        return asyncio.run(cls._async_sharded_download(url, **kwargs))
 
     @classmethod
     async def _async_sharded_download(cls,
@@ -374,14 +374,16 @@ class CommandDownloader(Downloader):
             for k, v in headers.items():
                 wget_args += f" --header \"{k}:{v}\""
 
-        cmd = f"wget {wget_args} '{url}' -O '{out}'"
 
         if out is not None:
+            cmd = f"wget {wget_args} '{url}' -O '{out}'"
             run_cmd(cmd, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as f, io.BytesIO() as buffer:
-                run_cmd(cmd, verbose=verbose, out=f.name)
+                cmd = f"wget {wget_args} '{url}' -O '{f.name}'"
+                run_cmd(cmd, verbose=verbose)
                 buffer.write(f.read())
+            buffer.seek(0)
             return buffer
 
 
@@ -413,17 +415,26 @@ class SimpleDownloader(Downloader):
         if to_buffer:
             buffer = io.BytesIO()
         else:
-            buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
+            # buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
+            if osp.exists(out) and osp.getsize(out) == filesize:
+                return
+            buffer = open(out, "wb")
+            # buffer.seek(0, 2)  # seek to end
+            # skip_bytes = buffer.tell()
 
         with context:
             proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
             client = httpx.Client(timeout=None, proxies=proxy)
-            with client.stream('GET', url=url, headers=headers) as r:
-                for chunk in r.iter_bytes(chunk_size=chunk_size):
-                    if chunk:
-                        buffer.write(chunk)
-                        if pbar:
-                            pbar.update(len(chunk))
+            if chunk_size is None:
+                with client.stream('GET', url=url, headers=headers) as r:
+                        for chunk in r.iter_bytes(chunk_size=chunk_size):
+                            if chunk:
+                                buffer.write(chunk)
+                                if pbar:
+                                    pbar.update(len(chunk))
+            else:
+                with client.get(url=url, headers=headers) as r:
+                    buffer.write(r.content)
 
         if not to_buffer:
             buffer.close()
