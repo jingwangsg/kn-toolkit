@@ -85,9 +85,8 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
     # patching
     run_cmd(f"LD_LIBRARY_PATH={rpath} patchelf --remove-rpath {new_fn}")
     interpreter_path = f"{homebrew_root}/opt/glibc/lib/ld-linux-x86-64.so.2"
-    run_cmd(
-        f"LD_LIBRARY_PATH={rpath} patchelf --set-interpreter {interpreter_path} --force-rpath --set-rpath {rpath} {new_fn}",
-        verbose=True)
+    run_cmd(f"LD_LIBRARY_PATH={rpath} patchelf --set-interpreter {interpreter_path} --force-rpath --set-rpath {rpath} {new_fn}",
+            verbose=True)
 
     # check readelf
     run_cmd(f"readelf -d {new_fn}", verbose=True)
@@ -126,18 +125,13 @@ def patch(app=None, path=None, need_check=True):
 
     all_executable = list(set([run_cmd(f"readlink -f {executable}").stdout.strip() for executable in all_executable]))
 
-    library_by_app = map_async(iterable=all_executable,
-                               func=get_link_library_single_app,
-                               desc="Getting link librarys for each Apps")
+    library_by_app = map_async(iterable=all_executable, func=get_link_library_single_app, desc="Getting link librarys for each Apps")
     library_by_app_mapping = dict(zip(all_executable, library_by_app))
-    link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app,
-                                                               homebrew_root=homebrew_root)
+    link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app, homebrew_root=homebrew_root)
     print(f"Link librarys found: {list(link_library_homebrew_paths.keys())}")
 
     # filter
-    all_executable = [
-        _ for _ in all_executable if check_patchable(_, library_by_app_mapping[_], link_library_homebrew_paths)
-    ]
+    all_executable = [_ for _ in all_executable if check_patchable(_, library_by_app_mapping[_], link_library_homebrew_paths)]
     print("=> Patchable Apps: ", all_executable)
 
     if need_check:
@@ -240,11 +234,9 @@ def install(app, post_patch=False):
 def self_install(root_dir):
     if os.geteuid() != 0:
         print("=> not root user! running alternative installation")
-        run_cmd(f"cd {root_dir} && git clone --progress https://github.com/Homebrew/brew {root_dir}/homebrew",
-                verbose=True)
+        run_cmd(f"cd {root_dir} && git clone --progress https://github.com/Homebrew/brew {root_dir}/homebrew", verbose=True)
     else:
-        run_cmd('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-                verbose=True)
+        run_cmd('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"', verbose=True)
 
     run_cmd("brew update --force --quiet", verbose=True)
 
@@ -270,10 +262,11 @@ if __name__ == "__main__":
         args = parser.parse_args()
         patch(app=args.app, path=args.path)
     elif command == "install":
-        parser.add_argument("app", type=str, default="")
+        parser.add_argument("apps", nargs="+", type=str)
         parser.add_argument("--post_patch", action="store_true", default=False, help="patch after install")
         args = parser.parse_args()
-        install(args.app, post_patch=args.post_patch)
+        for app in args.apps:
+            install(app, post_patch=args.post_patch)
     elif command == "self_install":
         if check_brew_available():
             print("=> brew already installed!")

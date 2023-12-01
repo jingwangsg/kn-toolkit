@@ -1,6 +1,6 @@
 from ..utils.download import Downloader, AsyncDownloader, CommandDownloader
 import argparse
-from kn_util.utils.download import get_headers
+from ..utils.download import get_headers
 
 
 def get_args():
@@ -24,13 +24,15 @@ if __name__ == "__main__":
     if args.mode == "direct":
         Downloader.download(url=args.url, out=args.output, proxy=args.proxy, headers=headers)
     elif args.mode == "async":
-        AsyncDownloader.download(url=args.url,
-                                          out=args.output,
-                                          num_shards=args.num_shards,
-                                          chunk_size=args.chunk_size,
-                                          headers=headers,
-                                          proxy=args.proxy,
-                                          low_memory=args.low_memory)
+        AsyncDownloader.download(
+            url=args.url,
+            out=args.output,
+            num_shards=args.num_shards,
+            chunk_size=args.chunk_size,
+            headers=headers,
+            proxy=args.proxy,
+            low_memory=args.low_memory,
+        )
     elif args.mode in ["axel", "wget"]:
         if args.mode == "axel":
             CommandDownloader.download_axel(url=args.url, out=args.output, proxy=args.proxy, headers=headers)

@@ -1,4 +1,3 @@
-from kn_util.data import DecordFrameLoader
 from PIL import Image
 from dataclasses import dataclass
 import cv2
@@ -22,7 +21,7 @@ def merge_by_fid(bboxs_list, texts=None):
         fid = bbox["fid"]
         fid_dict = ret.get(fid, dict())
         if texts is not None:
-            cur_text = texts[idx]["text"]
+            cur_text = texts[idx]
             if xyxy in fid_dict:
                 fid_dict[xyxy] = f"{fid_dict[xyxy]}\n{cur_text}"
             else:

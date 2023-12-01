@@ -247,10 +247,6 @@ class AsyncDownloader(Downloader):
         proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
         client = httpx.AsyncClient(transport=transport, timeout=None, proxies=proxy)
 
-        if not to_buffer:
-            # create file
-            with open(out, "wb") as f:
-                pass
 
         pbar = tqdm_asyncio(total=filesize,
                             dynamic_ncols=True,
@@ -291,6 +287,8 @@ class AsyncDownloader(Downloader):
             shard_paths = [
                 cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)
             ]
+            with open(out, "wb") as f:
+                pass
             from time import time
             st = time()
             if low_memory:
