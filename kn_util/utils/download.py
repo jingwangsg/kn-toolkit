@@ -15,9 +15,9 @@ import subprocess
 import tempfile
 from ..utils.system import run_cmd
 
+
 import nest_asyncio
 
-nest_asyncio.apply()
 
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [

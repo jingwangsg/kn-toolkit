@@ -71,10 +71,8 @@ class VideoVisualizer:
     def output_array_to_video_ffmpeg(cls, array, video_path, fps=2, vcodec="libx264", quiet=True):
         n, height, width, channels = array.shape
         process = (ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgb24',
-                                s='{}x{}'.format(width,
-                                                 height)).output(video_path, pix_fmt='yuv420p', vcodec=vcodec,
-                                                                 r=fps).overwrite_output().run_async(pipe_stdin=True,
-                                                                                                     quiet=quiet))
+                                s='{}x{}'.format(width, height)).output(video_path, pix_fmt='yuv420p', vcodec=vcodec,
+                                                                        r=fps).overwrite_output().run_async(pipe_stdin=True, quiet=quiet))
         for frame in array:
             process.stdin.write(frame.astype(np.uint8).tobytes())
         process.stdin.close()
@@ -86,29 +84,30 @@ class VideoVisualizer:
         #     img = Image.fromarray(img)
         #     img.save(osp.join(image_dir, f"{idx}.jpg"))
         from kn_util.basic import map_async
-        map_async(iterable=enumerate(array),
-                  func=lambda x: Image.fromarray(x[1]).save(osp.join(image_dir, f"{x[0]}.jpg")))
+        map_async(iterable=enumerate(array), func=lambda x: Image.fromarray(x[1]).save(osp.join(image_dir, f"{x[0]}.jpg")))
 
 
 class Visualizer:
 
     @classmethod
-    def draw_bboxs_on_image(cls,
-                            image,
-                            bboxes,
-                            texts=None,
-                            thickness: int = 1,
-                            bbox_color: int = "green",
-                            text_color: int = "green",
-                            font_scale: float = 0.5,
-                            bg_color: str = "opaque"):
+    def draw_bboxs_on_image(
+        cls,
+        image,
+        bboxes,
+        texts=None,
+        thickness: int = 1,
+        bbox_color: int = "blue",
+        text_color: int = "blue",
+        font_scale: float = 0.5,
+        bg_color: str = "opaque",
+    ):
         """from mmcv.visualization.image"""
         image = copy.deepcopy(image)
 
         bbox_color = color_val(bbox_color)
         text_color = color_val(text_color)
 
-        def draw_single(image, bbox, text=None):
+        def draw_single_bbox(image, bbox, text=None):
             image = copy.deepcopy(image)
             if not isinstance(bbox, np.ndarray):
                 bbox = np.array(bbox)
@@ -122,18 +121,51 @@ class Visualizer:
             cv2.rectangle(image, left_top, right_bottom, bbox_color, thickness=thickness)
             # annotate
             if text is not None:
-                image = draw_text_line(img=image,
-                                       point=(bbox_int[0], bbox_int[1] - 2),
-                                       text_line=text,
-                                       font_scale=font_scale,
-                                       bg_color=bg_color,
-                                       text_color=text_color)
+                image = draw_text_line(
+                    img=image,
+                    point=(bbox_int[0], bbox_int[1] - 2),
+                    text_line=text,
+                    font_scale=font_scale,
+                    bg_color=bg_color,
+                    text_color=text_color,
+                )
             return image
 
         if texts is None:
             texts = [None] * len(bboxes)
 
         for bbox, text in zip(bboxes, texts):
-            image = draw_single(image, bbox, text)
+            image = draw_single_bbox(image, bbox, text)
 
+        return image
+
+    def draw_arrow_on_image(
+        self,
+        image,
+        points,
+        arrow_color: str = "green",
+        thickness: int = 1,
+        arrow_length: int = 10,
+        arrow_thickness: int = 1,
+        texts=None,
+    ):
+        image = copy.deepcopy(image)
+        arrow_color = color_val(arrow_color)
+
+        def draw_arrow_on_image_single(start_point, end_point):
+            start_point = tuple(start_point)
+            end_point = tuple(end_point)
+            cv2.arrowedLine(
+                image,
+                start_point,
+                end_point,
+                arrow_color,
+                thickness=thickness,
+                tipLength=arrow_length,
+                line_type=cv2.LINE_AA,
+                shift=0,
+            )
+
+        for start_point, end_point in points:
+            draw_arrow_on_image_single(start_point, end_point)
         return image

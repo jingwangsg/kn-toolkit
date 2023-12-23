@@ -9,6 +9,7 @@ import io
 from contextlib import redirect_stdout
 import ffmpeg
 import cv2
+import av
 
 
 class __FFMPEG:
@@ -108,16 +109,16 @@ class OpenCVVideoLoader:
         length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         return length
 
-    @property
-    def frames(self):
+    def get_frames(self):
+        imgs = []
         while True:
             ret, frame = self.cap.read()
             if ret:
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                return rgb_frame
+                imgs += [rgb_frame]
             else:
-                print("read frame failed")
-    
+                break
+        return np.stack(imgs)
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.cap.release()
@@ -170,21 +171,72 @@ def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx2
                 .run(quiet=not verbose, overwrite_output=True))
 
 
+class PyAVVideoLoader(OpenCVVideoLoader):
+
+    def __init__(self, video_path, multi_thread=True):
+        super().__init__(video_path)
+        file_obj = open(video_path, "rb")
+        self.container = av.open(file_obj)
+
+        if multi_thread:
+            self.container.streams.video[0].thread_type = 'AUTO'
+
+    def get_frames(self):
+        container = self.container
+
+        total_frames = self.length
+
+        i = 0
+        imgs = []
+        for frame in container.decode(video=0):
+            if i >= total_frames:
+                break
+            imgs.append(frame.to_rgb().to_ndarray())
+            i += 1
+        imgs = np.stack(imgs)
+        return imgs
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        self.container.close()
+
+
 class FFMPEGVideoLoader(OpenCVVideoLoader):
 
-    @property
-    def frames(self):
-        # using ffmpeg to load video
+    def get_frames(self):
         h, w = self.hw
-        buffer, _ = (ffmpeg.input(self.video_path).output('pipe:', format='rawvideo', pix_fmt='rgb24').run(capture_stdout=True, quiet=True))
+
+        # filter_kwargs = {}
+        # if frame_ids is not None:
+        #     select_filter = '+'.join([f'eq(n\,{frame_id+1})' for frame_id in frame_ids])
+        #     filter_string = f'select={select_filter}'
+        #     filter_kwargs = {"vf": filter_string}
+
+        buffer, _ = (
+            ffmpeg.input(self.video_path).output(
+                'pipe:',
+                format='rawvideo',
+                pix_fmt='rgb24',
+                # **filter_kwargs,
+            ).run(
+                capture_stdout=True,
+                quiet=True,
+            ))
         frames = np.frombuffer(buffer, np.uint8).reshape([-1, h, w, 3])
         return frames
+
+
+class AVVideoLoader(OpenCVVideoLoader):
+
+    def decode_frames(self):
+        pass
 
 
 import yt_dlp
 
 
 class YTDLPDownloader:
+
     @staticmethod
     def _maybe_youtube_id(url):
         if url.startswith("http"):
