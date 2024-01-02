@@ -1,4 +1,4 @@
-from .checkpoint import CheckPointer
+# from .checkpoint import CheckPointer
 from .ops import clones, detach_collections
 from .logger import log_every_n, log_every_n_seconds, log_first_n
 from .git_utils import commit, get_origin_url

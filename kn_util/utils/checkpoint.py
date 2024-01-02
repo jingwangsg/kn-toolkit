@@ -8,65 +8,88 @@ import numpy as np
 import glob
 
 
-class CheckPointer:
+class Checkpointer(object):
 
-    def __init__(self, monitor, work_dir, mode="min") -> None:
-        self.monitor = monitor
-        self.best_metric = None
-        self.work_dir = work_dir
-        self.mode = mode
+    def __init__(self, cfg, model, model_ema=None, optimizer=None, save_dir="", save_to_disk=None, logger=None, is_train=True):
+        self.cfg = cfg
+        self.model = model
+        self.model_ema = model_ema
+        self.optimizer = optimizer
+        self.save_dir = save_dir
+        self.save_to_disk = save_to_disk
+        self.logger = logger
+        self.is_train = is_train
 
-        self.ckpt_latest = osp.join(self.work_dir, "ckpt-latest.pth")
-        self.ckpt_best = osp.join(self.work_dir, "ckpt-best-ep{}-{}.pth")
+    def save(self, name, **kwargs):
+        if not self.save_dir:
+            return
 
-    def better(self, new, orig):
-        if orig is None:
-            return True
-        if self.mode == "min":
-            return new < orig
-        elif self.mode == "max":
-            return new > orig
-        else:
-            raise NotImplementedError()
+        if not self.save_to_disk:
+            return
 
-    def save_if_exists(self, obj, name, save_dict):
-        if obj is not None:
-            save_dict[name] = obj.state_dict()
+        data = {}
+        data["model"] = self.model.state_dict()
+        if self.model_ema is not None:
+            data["model_ema"] = self.model_ema.state_dict()
+        if self.optimizer is not None:
+            data["optimizer"] = self.optimizer.state_dict()
+        data.update(kwargs)
 
-    def save_checkpoint(self, model, optimizer, num_epochs, metric_vals=None, lr_scheduler=None):
-        """save latest checkpoint only for metric_vals=None to resume latest epoch
-        For metric_vals not None, update best checkpoint
-        """
-        save_dict = dict(model=model.state_dict(),
-                         optimizer=optimizer.state_dict(),
-                         num_epochs=num_epochs,
-                         metrics=metric_vals)
-        self.save_if_exists(lr_scheduler, "lr_scheduler", save_dict)
-        torch.save(save_dict, self.ckpt_latest)
+        save_file = os.path.join(self.save_dir, "{}.pth".format(name))
+        self.logger.info("Saving checkpoint to {}".format(save_file))
+        torch.save(data, save_file)
 
-        if metric_vals:
-            if self.better(metric_vals[self.monitor], self.best_metric):
-                self.best_metric = metric_vals[self.monitor]
-                subprocess.run(f"rm -rf {self.ckpt_best}".format('*', osp.basename(self.monitor), '*'), shell=True)
-                torch.save(save_dict, self.ckpt_best.format(num_epochs, np.round(self.best_metric, decimals=6)))
-                return True
-        return False
+        self.tag_last_checkpoint(save_file)
 
-    def load_checkpoint(self, model, optimizer, lr_scheduler=None, mode="latest"):
-        if mode == "latest":
-            fn = self.ckpt_latest
-        elif mode == "best":
-            ckpt_best = glob.glob(osp.join(self.work_dir, self.ckpt_best.format("*", "*")))[0]
-            fn = ckpt_best
-        else:
-            raise NotImplementedError()
-        load_dict = torch.load(fn)
+    def load(self, f=None, with_optim=True, load_mapping={}):
+        if self.has_checkpoint() and self.is_train:
+            # override argument with existing checkpoint
+            f = self.get_checkpoint_file()
+        if not f:
+            # no checkpoint could be found
+            self.logger.info("No checkpoint found. Initializing model from ImageNet")
+            return {}
 
-        model.load_state_dict(load_dict["model"])
-        optimizer.load_state_dict(load_dict["optimizer"])
-        if lr_scheduler:
-            if "lr_scheduler" not in load_dict:
-                raise Exception("lr_scheduler not found")
-            lr_scheduler.load_state_dict(load_dict["lr_scheduler"])
+        self.logger.info("Loading checkpoint from {}".format(f))
+        checkpoint = self.load_file(f)
 
-        return load_dict
+        self.load_model(checkpoint)
+
+        if with_optim:
+            if "optimizer" in checkpoint and self.optimizer:
+                self.logger.info("Loading optimizer from {}".format(f))
+                self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
+
+        # return any further checkpoint data
+        return checkpoint
+
+    def has_checkpoint(self):
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
+        return os.path.exists(save_file)
+
+    def get_checkpoint_file(self):
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
+        try:
+            with open(save_file, "r") as f:
+                last_saved = f.read()
+                last_saved = last_saved.strip()
+        except IOError:
+            # if file doesn't exist, maybe because it has just been
+            # deleted by a separate process
+            last_saved = ""
+        return last_saved
+
+    def tag_last_checkpoint(self, last_filename):
+        save_file = os.path.join(self.save_dir, "last_checkpoint")
+        with open(save_file, "w") as f:
+            f.write(last_filename)
+
+    def load_file(self, f):
+        # load native pytorch checkpoint
+        loaded = torch.load(f, map_location=torch.device("cpu"))
+
+        return loaded
+
+    def _load_model(self, checkpoint):
+        if self.is_train and self.has_checkpoint():  # resume training
+            self.model.load_state_dict(checkpoint["model"])
