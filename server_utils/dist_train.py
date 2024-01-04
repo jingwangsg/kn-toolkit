@@ -53,13 +53,24 @@ def main():
     else:
         gpus = eval(f"[{args.gpus}]")
 
+    launch_task(
+        mode=args.mode,
+        gpus=gpus,
+        time=args.time,
+        mem=args.mem,
+        email=args.email,
+        threshold=args.threshold,
+    )
+
+
+def launch_task(mode, gpus, time, mem, email=False, threshold=0.95):
     fake_datasets = ["coco2017", "coco_seg2017", "Charades-STA", "ActivityNetCaption"]
     fake_models = ["GroundingFormer", "PSGFormer", "GDBFormer", "QueryMoment", "GTR"]
 
     mode_dict = dict(occupy=0, attack=1, peace=2)
 
     def launch(id):
-        if args.mode != "attack":
+        if mode != "attack":
             rand_left = random.uniform(2.5, 3.5)
         else:
             rand_left = 1.0
@@ -68,15 +79,15 @@ def main():
         # CUDA_VERSION = subprocess.check_output("cat $HOME/WORKSPACE/kn-toolkit/dotfiles/variable.sh | grep CUDA_VERSION", shell=True).decode("utf-8").strip().split("=")[1]
         CUDA_VERSION = "10"
         cmd = f"$HOME/miniconda3/envs/cuda{CUDA_VERSION}/bin/python main.py --model {model[0]} --dataset {dataset[0]} --use_bbox_refine --num_epoch 100 --host 127.0.0.1 --ddp --local-rank {id}"
-        cmd = cmd + f" {mode_dict[args.mode]} {args.time} {args.mem} {rand_left}"
+        cmd = cmd + f" {mode_dict[mode]} {time} {mem} {rand_left}"
         subprocess.Popen(cmd, shell=True)
 
     launched = [False for _ in range(len(gpus))]
-    if args.mode == "peace":
+    if mode == "peace":
         while (not all(launched)):
             memories = get_vailable_memory()
             for slot_idx, id in enumerate(gpus):
-                if not launched[slot_idx] and memories[id][1] / memories[id][0] > args.threshold:
+                if not launched[slot_idx] and memories[id][1] / memories[id][0] > threshold:
                     launch(id)
                     launched[slot_idx] = True
             from time import sleep
@@ -85,7 +96,7 @@ def main():
         for id in gpus:
             launch(id)
 
-    if args.email:
+    if email:
         hostname = subprocess.run("hostname", shell=True, capture_output=True).stdout.strip()
         subject = f"#Node{hostname} {len(gpus)} GPUs finished"
 

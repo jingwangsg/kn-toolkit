@@ -124,53 +124,6 @@ class OpenCVVideoLoader:
         self.cap.release()
 
 
-def sample_video_cv2(output_path, input_path, fps=None, wh=None):
-    video_loader = OpenCVVideoLoader(input_path)
-
-    if fps is None:
-        fps = video_loader.fps
-
-    if wh is None:
-        hw = video_loader.hw
-        wh = (hw[1], hw[0])
-
-    fourcc = cv2.VideoWriter_fourcc(*'VP90')
-    out = cv2.VideoWriter(output_path, fourcc, fps, wh)
-    assert video_loader.fps % fps == 0
-
-    step = video_loader.fps // fps
-    cnt = 0
-    while True:
-        ret, frame = video_loader.cap.read()
-        if not ret:
-            break
-
-        if cnt % step == 0:
-            out.write(frame)
-
-        cnt += 1
-
-
-def sample_video_ffmpeg(output_path, input_path, fps=None, wh=None, codec="libx265", verbose=False):
-    # 获取原视频的帧率和分辨率
-    probe = ffmpeg.probe(input_path)
-    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-    original_fps = np.round(eval(video_stream['avg_frame_rate']))
-    original_wh = (int(video_stream['width']), int(video_stream['height']))
-
-    # 如果没有指定帧率和分辨率，使用原始值
-    if fps is None:
-        fps = original_fps
-    if wh is None:
-        wh = original_wh
-
-
-    (ffmpeg.input(input_path).filter('fps', fps=fps, round='up')\
-        .filter('scale', wh[0],wh[1])\
-            .output(output_path, vcodec=codec)\
-                .run(quiet=not verbose, overwrite_output=True))
-
-
 class PyAVVideoLoader(OpenCVVideoLoader):
 
     def __init__(self, video_path, multi_thread=True):
@@ -327,28 +280,23 @@ class YTDLPDownloader:
         return buffer, error_code == 0
 
 
-# try:
-#     from decord import VideoReader
-# except:
-#     warnings.warn("decord is not installed, video loading is not available")
+import decord
+from decord import VideoReader
+# decord.bridge.set_bridge('numpy')
 
-# class __DecordFrameLoader:
 
-#     @classmethod
-#     def get_fps(cls, buffer):
-#         return VideoReader(buffer).get_avg_fps()
+class DecordVideoLoader(OpenCVVideoLoader):
 
-#     @classmethod
-#     def load_frames(cls, buffer, stride=1, width=-1, height=-1):
-#         raise Warning("deprecated, decord seems buggy, use ffmpeg instead")
-#         vr = VideoReader(buffer, width=width, height=height, num_threads=16)
+    def __init__(self, video_path):
+        super().__init__(video_path)
+        self.vr = VideoReader(video_path)
 
-#         indices = list(range(0, len(vr), stride))
-#         arr = vr.get_batch(indices).asnumpy()
+    @property
+    def length(self):
+        return len(self.vr)
 
-#         return arr
-
-#     @classmethod
-#     def get_frame_count(cls, buffer):
-#         vr = VideoReader(buffer, num_threads=16)
-#         return len(vr)
+    def get_frames(self, frame_ids=None):
+        if frame_ids is None:
+            frame_ids = range(self.length)
+        frames = self.vr.get_batch(frame_ids)
+        return frames.asnumpy()
