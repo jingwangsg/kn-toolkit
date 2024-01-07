@@ -38,21 +38,6 @@ def save_pickle(obj, fn):
         dill.dump(obj, f, protocol=dill.HIGHEST_PROTOCOL)
 
 
-def run_or_load(func, file_path, cache=True, overwrite=False, args=dict()):
-    # def run_or_loader_wrapper(**kwargs):
-    #     if os.path.exists()
-    #     return fn(**kwargs)
-    # if os.path.exists(file_path)
-    if overwrite or not os.path.exists(file_path):
-        obj = func(**args)
-        if cache:
-            save_pickle(obj, file_path)
-    else:
-        obj = load_pickle(obj)
-
-    return obj
-
-
 def load_csv(fn, delimiter=",", has_header=True):
     fr = open(fn, "r")
     read_csv = csv.reader(fr, delimiter=delimiter)
@@ -150,11 +135,7 @@ class LargeHDF5Cache:
     def final_save(self):
         tmp_files = glob.glob(osp.join(self.tmp_dir, "*.hdf5"))
         result_handle = h5py.File(self.hdf5_path, "a")
-        loader = DataLoader(tmp_files,
-                            batch_size=1,
-                            collate_fn=lambda x: load_hdf5(x[0]),
-                            num_workers=8,
-                            prefetch_factor=6)
+        loader = DataLoader(tmp_files, batch_size=1, collate_fn=lambda x: load_hdf5(x[0]), num_workers=8, prefetch_factor=6)
         for ret_dict in tqdm(loader, desc=f"merging to {self.hdf5_path}"):
             save_hdf5(ret_dict, result_handle)
         result_handle.close()
