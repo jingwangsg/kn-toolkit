@@ -83,7 +83,7 @@ class VideoVisualizer:
         # for idx, img in enumerate(array):
         #     img = Image.fromarray(img)
         #     img.save(osp.join(image_dir, f"{idx}.jpg"))
-        from kn_util.basic import map_async
+        from kn_util.utils.multiproc import map_async
         map_async(iterable=enumerate(array), func=lambda x: Image.fromarray(x[1]).save(osp.join(image_dir, f"{x[0]}.jpg")))
 
 

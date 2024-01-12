@@ -8,7 +8,7 @@ import os.path as osp
 from ..utils.download import get_headers, CommandDownloader, AsyncDownloader, SimpleDownloader
 from ..utils.git_utils import get_origin_url
 from ..utils.rsync import RsyncTool
-from ..basic import map_async
+from ..utils.multiproc import map_async
 from functools import partial
 import re
 import multiprocessing as mp

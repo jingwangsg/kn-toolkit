@@ -1,6 +1,6 @@
 import subprocess
 import os
-from ..basic import map_async
+from ..utils.multiproc import map_async
 import os.path as osp
 from .system import run_cmd
 

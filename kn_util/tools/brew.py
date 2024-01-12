@@ -4,7 +4,7 @@ import os.path as osp
 import subprocess
 import glob
 import sys
-from kn_util.basic import map_async
+from kn_util.utils.multiproc import map_async
 from functools import partial
 from ..utils.system import run_cmd
 
