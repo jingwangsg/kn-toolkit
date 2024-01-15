@@ -3,7 +3,7 @@ import os.path as osp
 import subprocess
 import os
 import glob
-from ..basic import map_async
+from ..utils.multiproc import map_async
 import numpy as np
 import io
 from contextlib import redirect_stdout
