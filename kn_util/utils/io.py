@@ -24,6 +24,20 @@ def save_json(obj: dict, fn):
     with open(fn, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=4)
 
+def load_jsonl(fn, as_generator=False):
+    with open(fn, "r", encoding="utf-8") as f:
+        if as_generator:
+            for line in f:
+                yield json.loads(line)
+        else:
+            return [json.loads(line) for line in f]
+
+def save_jsonl(obj: Sequence[dict], fn):
+    with open(fn, "w", encoding="utf-8") as f:
+        for line in obj:
+            json.dump(line, f)
+            f.write("\n")
+
 
 def load_pickle(fn):
     # return joblib.load(fn)
