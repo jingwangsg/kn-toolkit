@@ -285,15 +285,23 @@ from decord import VideoReader
 # decord.bridge.set_bridge('numpy')
 
 
-class DecordVideoLoader(OpenCVVideoLoader):
+class DecordVideoLoader:
 
     def __init__(self, video_path):
-        super().__init__(video_path)
+        # super().__init__(video_path)
         self.vr = VideoReader(video_path)
+    
+    @property
+    def hw(self):
+        return self.vr[0].shape[:2]
 
     @property
     def length(self):
         return len(self.vr)
+    
+    @property
+    def fps(self):
+        return self.vr.get_avg_fps()
 
     def get_frames(self, frame_ids=None):
         if frame_ids is None:
