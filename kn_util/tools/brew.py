@@ -4,7 +4,7 @@ import os.path as osp
 import subprocess
 import glob
 import sys
-from kn_util.utils.multiproc import map_async
+from kn_util.utils.multiproc import map_async_with_thread, map_async
 from functools import partial
 from ..utils.system import run_cmd
 
@@ -125,7 +125,11 @@ def patch(app=None, path=None, need_check=True):
 
     all_executable = list(set([run_cmd(f"readlink -f {executable}").stdout.strip() for executable in all_executable]))
 
-    library_by_app = map_async(iterable=all_executable, func=get_link_library_single_app, desc="Getting link librarys for each Apps")
+    library_by_app = map_async(
+        iterable=all_executable,
+        func=get_link_library_single_app,
+        desc="Getting link librarys for each Apps",
+    )
     library_by_app_mapping = dict(zip(all_executable, library_by_app))
     link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app, homebrew_root=homebrew_root)
     print(f"Link librarys found: {list(link_library_homebrew_paths.keys())}")
@@ -199,9 +203,12 @@ def prepare_link_library_mapping(library_by_app, homebrew_root="~/homebrew"):
         all_library += libs
     all_library = list(set(all_library))
 
-    library_homebrew = map_async(iterable=all_library,
-                                 func=partial(get_link_library_homebrew, homebrew_root=homebrew_root),
-                                 desc="Getting library homebrew paths for each Apps")
+    library_homebrew = map_async_with_thread(
+        iterable=all_library,
+        func=partial(get_link_library_homebrew, homebrew_root=homebrew_root),
+        desc="Getting library homebrew paths for each Apps",
+        num_thread=64,
+    )
 
     for lib_hb, lib_name in zip(library_homebrew, all_library):
         if lib_hb == "":
