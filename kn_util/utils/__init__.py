@@ -7,6 +7,6 @@ from .download import *
 from .system import run_cmd
 from .cache import cached_func
 from .misc import seed_everything
-from .io import (load_json, save_json, load_yaml, save_yaml, load_pickle, save_pickle, load_csv, save_csv, load_hdf5, save_hdf5, load_jsonl,
+from .io import (load_json, save_json, load_pickle, save_pickle, load_csv, load_hdf5, save_hdf5, load_jsonl,
                  save_jsonl)
 from .logger import setup_logger_loguru, SmoothedValue, MetricLogger

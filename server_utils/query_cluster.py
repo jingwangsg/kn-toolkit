@@ -11,6 +11,39 @@ import os
 import os.path as osp
 
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
+
+
+def map_async_with_thread(
+    iterable,
+    func,
+    num_thread=30,
+    desc="",
+    verbose=True,
+):
+
+    with ThreadPoolExecutor(num_thread) as executor:
+        pbar = tqdm(total=len(iterable), desc=desc) if verbose else None
+        context = pbar if pbar else nullcontext()
+
+        results = []
+
+        with context:
+            futures = {executor.submit(func, x): x for x in iterable}
+
+            for future in as_completed(futures):
+                if pbar:
+                    pbar.update(1)
+                try:
+                    result = future.result()  # Get the result from the future
+                    results.append(result)  # Append the result to the results list
+                except Exception as e:
+                    # If there is an exception, you can handle it here
+                    # For now, we'll just print it
+                    print(f"Exception in thread: {e}")
+
+        return results
 
 
 def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False):
@@ -78,7 +111,7 @@ class GPUCluster:
         inputs_list = [(row["node_idx"], row["partition"], cmd, self.timeout) for _, row in self.server_info.iterrows()]
 
         st = time.time()
-        node_stdout = map_async(iterable=inputs_list, func=self._query_single_node)
+        node_stdout = map_async_with_thread(iterable=inputs_list, func=self._query_single_node)
         print(f"query costs {time.time()-st}(s)")
         return node_stdout
 
@@ -258,8 +291,8 @@ if __name__ == "__main__":
             print(df.iloc[:args.n_gpu, :].to_markdown(index=False))
     elif args.task == "stat":
         df = gpu_cluster.get_usage_dataframe()
-        df["gpu.occupied.value"] = (df["gpu.occupied"] if "int" in str(df["gpu.occupied"].dtype) else
-                                    df["gpu.occupied"].str.replace("MiB", "").astype(int))
+        df["gpu.occupied.value"] = (df["gpu.occupied"] if "int" in str(df["gpu.occupied"].dtype) else df["gpu.occupied"].str.replace(
+            "MiB", "").astype(int))
         result = df.groupby("user").agg({"gpu.id": ["nunique", "count"], "gpu.occupied.value": "sum"})
         result.columns = ["ngpu", "nproc", "mem"]
         result.sort_values(by=["ngpu", "nproc"], ascending=False, inplace=True)

@@ -13,14 +13,7 @@ import torch
 import torch.distributed as dist
 import timm.models.hub as timm_hub
 from loguru import logger
-import socket
 import pickle
-
-
-def get_available_port():
-    sock = socket.socket()
-    sock.bind(('', 0))
-    return sock.getsockname()[1]
 
 
 def setup_print_for_distributed(is_master):

@@ -43,7 +43,15 @@ def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
     return asyncio.run(_map_async_with_coroutine(iterable))
 
 
-def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False, verbose=True):
+def map_async(
+    iterable,
+    func,
+    num_process=30,
+    chunksize=1,
+    desc: object = "",
+    test_flag=False,
+    verbose=True,
+):
     """while test_flag=True, run sequentially"""
     if test_flag:
         return _run_sequential(iterable, func, desc=desc)
@@ -52,7 +60,11 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
         # ret = []
         # for it in tqdm(iterable, desc=desc):
         #     ret.append(p.apply_async(func, args=(it,)))
-        ret = p.map_async(func=func, iterable=iterable)
+        ret = p.map_async(
+            func=func,
+            iterable=iterable,
+            chunksize=chunksize,
+        )
         total = ret._number_left
 
         pbar = tqdm(total=total, desc=desc) if verbose else None
@@ -68,7 +80,14 @@ def map_async(iterable, func, num_process=30, desc: object = "", test_flag=False
         return ret.get()
 
 
-def map_async_with_thread(iterable, func, num_thread=30, desc="", verbose=True, test_flag=False):
+def map_async_with_thread(
+    iterable,
+    func,
+    num_thread=30,
+    desc="",
+    verbose=True,
+    test_flag=False,
+):
     if test_flag:
         return _run_sequential(iterable, func, desc=desc)
 

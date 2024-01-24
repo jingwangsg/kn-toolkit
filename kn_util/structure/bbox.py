@@ -31,6 +31,8 @@ class BoxList(object):
         self.size = image_size  # (image_width, image_height)
         self.mode = mode
         self.extra_fields = {}
+    
+    
 
     def add_field(self, field, field_data):
         self.extra_fields[field] = field_data
@@ -324,4 +326,39 @@ class BoxList(object):
         s += "image_width={}, ".format(self.size[0])
         s += "image_height={}, ".format(self.size[1])
         s += "mode={})".format(self.mode)
+        return s
+
+class BoxList1D:
+    def __init__(self, bbox, duration):
+        """
+        Hacking BoxList to support 1D Time Span
+        """
+        self.bbox = torch.as_tensor(bbox, dtype=torch.float32)
+        self.duration = duration
+        self.extra_fields = {}
+    
+    def add_field(self, field, field_data):
+        self.extra_fields[field] = field_data
+    
+    def get_field(self, field):
+        return self.extra_fields[field]
+    
+    def resize(self, duration, *args, **kwargs):
+        bbox = self.bbox
+        bbox[:, 1] = bbox[:, 1] * duration / self.duration
+        bbox[:, 2] = bbox[:, 2] * duration / self.duration
+        self.duration = duration
+        return self
+    
+    def top_k(self, k):
+        scores = self.extra_fields["scores"]
+        torch.argsort(scores)
+    
+    def area(self):
+        return self.bbox[:, 1] - self.bbox[:, 0]
+    
+    def __repr__(self):
+        s = self.__class__.__name__ + "("
+        s += "num_boxes={}, ".format(len(self))
+        s += "duration={}, ".format(self.size[1])
         return s

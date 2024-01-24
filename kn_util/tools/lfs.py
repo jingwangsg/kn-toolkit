@@ -12,6 +12,7 @@ from ..utils.multiproc import map_async
 from functools import partial
 import re
 import multiprocessing as mp
+from hget import hget
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -97,7 +98,15 @@ def _download_fn(url_path_pair, verbose=True, **kwargs):
     return True
 
 
-def download(url_template, include=None, queue=None, proxy=None, verbose=True, **kwargs):
+def download(
+    url_template,
+    include=None,
+    threads=16,
+    queue=None,
+    proxy=None,
+    verbose=True,
+    **kwargs,
+):
     # clone the repo
     paths = lfs_list_files(include=include)
     print(f"=> Found {len(paths)} files to download")
@@ -106,85 +115,17 @@ def download(url_template, include=None, queue=None, proxy=None, verbose=True, *
     org, repo = _parse_repo_url(url)
     headers = get_headers(from_hf=True)
 
-    url_path_pairs = []
-
     for path in paths:
         url = url_template.format(org=org, repo=repo, path=path)
-        url_path_pairs += [(url, path)]
-
-    # map_async(func=lambda pair: _download_fn(pair, headers=headers, proxy=proxy, queue=queue, verbose=False, **kwargs),
-    #           iterable=url_path_pairs,
-    #           num_process=16)
-
-    for pair in url_path_pairs:
-        print(pair)
-        ret = _download_fn(pair, headers=headers, proxy=proxy, verbose=verbose, **kwargs)
-        if queue and ret:
-            queue.put(pair)
-
-    if queue:
-        queue.put(None)  # ending signal for download process
+        print(f"{url} \n=> {path}")
+        hget(
+            url=url,
+            threads=threads,
+            headers=headers,
+        )
 
 
-class RsyncDownloadManager:
-
-    @staticmethod
-    def get_abspath(dest):
-        if len(dest.split(":")) < 2:
-            # local
-            cmd = f"readlink -f {dest}"
-            abspath = run_cmd(cmd, return_output=True).stdout.strip()
-            return abspath
-        else:
-            # remote
-            host, path = dest.split(":")
-            cmd = f"ssh {host} 'readlink -f {path}'"
-            abspath = run_cmd(cmd, return_output=True).stdout.strip()
-            return f"{host}:{abspath}"
-
-    @staticmethod
-    def rsync_finished(dest):
-        src_dir = os.getcwd()
-        print(f"=> rsync finished to {dest}")
-        RsyncTool.launch_rsync(src_dir,
-                               to_addr=dest,
-                               async_dir=True,
-                               exclude="**/.*.finish,*.git",
-                               remove_source_files=True)
-
-    @staticmethod
-    def rsync_listen(queue, dest):
-        while True:
-            pair = queue.get()
-
-            print(f"=> Incremental rsync {pair[1]} => {dest}")
-
-            subprocess.run(f"rsync -vaurP --remove-source-files --relative {pair[1]} {dest}", shell=True)
-            # prevent rsync .finish file
-
-            if pair is None:
-                break
-
-    @classmethod
-    def download_and_rsync(cls, url_template, include, dest):
-        dest = cls.get_abspath(dest)
-        cls.initial_rsync(dest)
-
-        queue = mp.Queue()
-
-        dl = partial(download, url_template=url_template, include=include, queue=queue, verbose=True)
-        rsync = partial(cls.rsync_listen, queue=queue, dest=dest)
-
-        dl_proc = mp.Process(target=dl)
-        dl_proc.start()
-        rsync_proc = mp.Process(target=rsync)
-        rsync_proc.start()
-
-        dl_proc.join()
-        rsync_proc.join()
-
-
-def download_recursive():
+def download_recursive(threads=16):
     cwd = os.getcwd()
     repos = run_cmd("find ./ -name '.git' -type d", return_output=True).splitlines()
     repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
@@ -192,7 +133,7 @@ def download_recursive():
     for repo in repos:
         print(f"=> Downloading {repo}")
         os.chdir(repo)
-        download(url_template=HF_DOWNLOAD_TEMPLATE, verbose=True)
+        download(url_template=HF_DOWNLOAD_TEMPLATE, threads=16, verbose=True)
 
 
 if __name__ == "__main__":
@@ -213,14 +154,18 @@ if __name__ == "__main__":
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
         parser.add_argument("--num-shards", type=int, help="The number of shards to use", default=1)
+        parser.add_argument("-n", "--num-threads", type=int, help="The number of threads to use", default=16)
         args = parser.parse_args()
 
         if not args.recursive:
-            download(url_template=args.template,
-                     include=args.include,
-                     proxy=args.proxy,
-                     verbose=True,
-                     num_shards=args.num_shards)
+            download(
+                url_template=args.template,
+                include=args.include,
+                threads=args.num_threads,
+                proxy=args.proxy,
+                verbose=True,
+                num_shards=args.num_shards,
+            )
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive()

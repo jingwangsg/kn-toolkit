@@ -154,7 +154,28 @@ class PyAVVideoLoader(OpenCVVideoLoader):
         self.container.close()
 
 
-class FFMPEGVideoLoader(OpenCVVideoLoader):
+class FFMPEGVideoLoader:
+    def __init__(self, video_path):
+        metadata = ffmpeg.probe(video_path)
+        video_stream = next((stream for stream in metadata['streams'] if stream['codec_type'] == 'video'), None)
+
+        self._fps = metadata['streams'][0]['r_frame_rate']
+        self._duration = metadata['streams'][0]['duration']
+        self._width = metadata['streams'][0]['width']
+        self._height = metadata['streams'][0]['height']
+    
+    @property
+    def hw(self):
+        return self._height, self._width
+    
+    @property
+    def length(self):
+        return int(float(self._duration) * float(self._fps))
+
+    @property
+    def fps(self):
+        # get fps from ffmpeg
+        return self.fps
 
     def get_frames(self):
         h, w = self.hw
