@@ -203,11 +203,11 @@ def prepare_link_library_mapping(library_by_app, homebrew_root="~/homebrew"):
         all_library += libs
     all_library = list(set(all_library))
 
-    library_homebrew = map_async_with_thread(
+    library_homebrew = map_async(
         iterable=all_library,
         func=partial(get_link_library_homebrew, homebrew_root=homebrew_root),
         desc="Getting library homebrew paths for each Apps",
-        num_thread=64,
+        num_process=30,
     )
 
     for lib_hb, lib_name in zip(library_homebrew, all_library):
