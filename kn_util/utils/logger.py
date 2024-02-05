@@ -185,7 +185,13 @@ def setup_logger_logging():
     )
 
 
-def setup_logger_loguru(name=None, filename=None, stdout=True, include_function=True):
+def setup_logger_loguru(
+    name=None,
+    filename=None,
+    stdout=True,
+    include_function=False,
+    include_filepath=True,
+):
     # when filename = None and stdout=False, loguru will not log anything
     # this is espeically useful for distributed training
     from loguru import logger
@@ -194,13 +200,15 @@ def setup_logger_loguru(name=None, filename=None, stdout=True, include_function=
     if name is not None:
         template += "{name}|"
 
-    template += "{time:YYYY-MM-DD HH:mm:ss}|{level}"
+    template += "<green>{time:YY-MM-DD HH:mm:ss}</green>|<blue>{level}</blue>"
+    if include_filepath:
+        template += "<cyan>> {file.path}({line})</cyan>\n\033[1m=>\033[0m"
     if include_function:
-        template += ":{function}:{line}:"
-    template += "{message}"
+        template += "<cyan>{function}</cyan>"
+    template += " \033[1m{message}\033[0m"
 
     logger.remove(0)
     if filename is not None:
-        logger.add(filename, level="INFO")
+        logger.add(filename, level="INFO", format=template, enqueue=True)
     if stdout:
-        logger.add(sys.stdout)
+        logger.add(sys.stdout, format=template, enqueue=True)

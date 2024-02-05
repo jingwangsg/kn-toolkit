@@ -1,7 +1,7 @@
 # from .checkpoint import CheckPointer
 from .ops import clones, detach_collections
 from .git_utils import commit, get_origin_url
-from .output import explore_content, dict2str, max_memory_allocated, module2tree, lazyconf2str
+from .output import explore_content, dict2str, max_memory_allocated, lazyconf2str
 from .mail import send_email
 from .download import *
 from .system import run_cmd

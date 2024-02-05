@@ -78,36 +78,6 @@ def lazyconf2str(cfg):
     return yaml_data
 
 
-def module2tree(rt_module: nn.Module, print_limit_list=1):
-    # we treat the extra repr like the sub-module, one item per line
-    extra_lines = []
-    extra_repr = rt_module.extra_repr()
-    # empty string will be split into list ['']
-    if extra_repr:
-        extra_lines = extra_repr.split('\n')
-    child_lines = []
-    for key, module in rt_module._modules.items():
-        mod_str = module2tree(module, print_limit_list=print_limit_list)
-        mod_str = _addindent(mod_str, 4)
-        if rt_module._get_name() in ("Sequential", "ModuleList") and int(key) == print_limit_list and mod_str:
-            child_lines.append(
-                colored("|- ... ({} children)".format(len(rt_module._modules) - print_limit_list), "grey"))
-            break
-        child_lines.append(colored("|-" + '(' + key + '): ', "blue", attrs=["blink", "bold"]) + mod_str)
-    lines = extra_lines + child_lines
-
-    main_str = colored(rt_module._get_name(), "green", attrs=["blink", "bold"]) + '('
-    if lines:
-        # simple one-liner info, which most builtin modules will use
-        if len(extra_lines) == 1 and not child_lines:
-            main_str += extra_lines[0]
-        else:
-            main_str += '\n  ' + '\n  '.join(lines) + '\n'
-
-    main_str += '  )'
-    return main_str
-
-
 def explore_content(
     x,
     name="default",

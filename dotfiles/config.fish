@@ -4,15 +4,12 @@ end
 
 set tide_context_always_display true
 
-if test -f $HOME/miniconda3/bin/conda
-    status is-interactive && eval $HOME/miniconda3/bin/conda "shell.fish" "hook" $argv | source
-end
-
 abbr sv "~/server_utils/server.sh"
 abbr lsq "python ~/server_utils/list_task.py"
 abbr nv 'nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv'
 abbr nvp "gpustat -f"
 # pip install py3nvml
+abbr base "conda activate base"
 abbr tc 'conda activate torch'
 abbr zh 'conda activate zh'
 abbr pyipdb "python -m ipdb -c continue "
@@ -33,6 +30,23 @@ abbr knuntar 'cat ./INPUT.tgz.* | tar --use-compress-program=unpigz -xvpf -'
 
 abbr "knrsync" 'python $HOME/server_utils/rsync_tool.py'
 abbr "skip_clone" "GIT_LFS_SKIP_SMUDGE=1 git clone"
+
+function kill_nfs
+    # 递归搜索当前文件夹内所有 .nfs 文件
+    set nfs_files (find . -type f -name '*.nfs')
+    # 遍历所有 .nfs 文件
+    for nfs_file in $nfs_files
+        # 使用 lsof 命令找到正在使用这个文件的进程
+        set processes (lsof "$nfs_file" | awk 'NR>1 {print $2}' | sort -u)
+
+        # 终止这些进程
+        for process in $processes
+            echo "Killing process: $process"
+            kill -9 $process
+        end
+    end
+end
+
 
 
 function rsync_to
@@ -88,6 +102,10 @@ end
 
 function gpu
     export CUDA_VISIBLE_DEVICES=$argv
+end
+
+function whichgpu
+    echo $CUDA_VISIBLE_DEVICES
 end
 
 function rl
@@ -160,3 +178,20 @@ end
 function pcmd
   ps -p $argv[1] -o pid,ppid,cmd
 end
+
+
+
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+if test -f /export/home2/kningtg/miniconda3/bin/conda
+    status is-interactive && eval /export/home2/kningtg/miniconda3/bin/conda "shell.fish" "hook" $argv | source
+else
+    if test -f "/export/home2/kningtg/miniconda3/etc/fish/conf.d/conda.fish"
+        . "/export/home2/kningtg/miniconda3/etc/fish/conf.d/conda.fish"
+    else
+        set -x PATH "/export/home2/kningtg/miniconda3/bin" $PATH
+    end
+end
+# <<< conda initialize <<<
+

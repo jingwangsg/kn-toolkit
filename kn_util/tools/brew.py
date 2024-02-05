@@ -80,13 +80,20 @@ def patch_single(executable, library_names, link_library_homebrew_paths):
     # construct new rpath
     runpath = _get_readelf(new_fn, domain="RUNPATH")
     rpath = _get_readelf(new_fn, domain="RPATH")
+    rpath_orig = unique_path(rpath)
     rpath = unique_path(f"{runpath}:{rpath}:{appended_rpath}")
+    if rpath == rpath_orig:
+        run_cmd(f"rm -f {new_fn}")
+        print(f"=> No need to patch {executable}")
+        return
 
     # patching
     run_cmd(f"LD_LIBRARY_PATH={rpath} patchelf --remove-rpath {new_fn}")
     interpreter_path = f"{homebrew_root}/opt/glibc/lib/ld-linux-x86-64.so.2"
-    run_cmd(f"LD_LIBRARY_PATH={rpath} patchelf --set-interpreter {interpreter_path} --force-rpath --set-rpath {rpath} {new_fn}",
-            verbose=True)
+    run_cmd(
+        f"LD_LIBRARY_PATH={rpath} patchelf --set-interpreter {interpreter_path} --force-rpath --set-rpath {rpath} {new_fn}",
+        verbose=True,
+    )
 
     # check readelf
     run_cmd(f"readelf -d {new_fn}", verbose=True)
@@ -266,8 +273,13 @@ if __name__ == "__main__":
     if command == "patch":
         parser.add_argument("--app", type=str, default=None)
         parser.add_argument("--path", type=str, default=None)
+        parser.add_argument("-y", "--disable_check", action="store_true", default=False, help="prompt before patch")
         args = parser.parse_args()
-        patch(app=args.app, path=args.path)
+        patch(
+            app=args.app,
+            path=args.path,
+            need_check=not args.disable_check,
+        )
     elif command == "install":
         parser.add_argument("apps", nargs="+", type=str)
         parser.add_argument("--post_patch", action="store_true", default=False, help="patch after install")
