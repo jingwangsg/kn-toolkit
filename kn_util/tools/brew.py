@@ -236,7 +236,7 @@ def install(app, post_patch=False):
             status = install(dep)
 
     if post_patch:
-        patch(app=" ".join(deps), need_check=False)
+        patch(need_check=False)
 
     print(f"=> Installing {app}")
     code = run_cmd(f"brew install {app}", verbose=True)
