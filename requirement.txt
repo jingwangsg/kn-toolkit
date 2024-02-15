@@ -12,3 +12,4 @@ dill
 pudb
 pyfzf
 hget @git+https://github.com/K-Nick/hget
+einops
