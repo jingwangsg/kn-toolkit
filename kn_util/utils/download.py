@@ -19,7 +19,6 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36",
@@ -189,8 +188,7 @@ class AsyncDownloader(Downloader):
             except httpx.NetworkError:
                 retries += 1
                 if retries < max_retries:
-                    print(
-                        f"=> Network error at {written_bytes}/{e_pos-s_pos + 1}, retrying ({retries}/{max_retries})...")
+                    print(f"=> Network error at {written_bytes}/{e_pos-s_pos + 1}, retrying ({retries}/{max_retries})...")
                 else:
                     print("=> Max retries reached. Download failed.")
                     if not to_buffer:
@@ -230,9 +228,6 @@ class AsyncDownloader(Downloader):
         if out == "auto":
             out = cls.get_output_path(url)
 
-        if proxy == "auto":
-            proxy = "127.0.0.1:8091"
-
         res = get_response_with_redirects(url, headers=headers)
 
         if res.headers.get("Accept-Ranges", None) != "bytes":
@@ -248,15 +243,16 @@ class AsyncDownloader(Downloader):
         proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
         client = httpx.AsyncClient(transport=transport, timeout=None, proxies=proxy)
 
-
-        pbar = tqdm_asyncio(total=filesize,
-                            dynamic_ncols=True,
-                            desc=f"Downloading",
-                            unit="B",
-                            unit_scale=True,
-                            smoothing=0.1,
-                            miniters=1,
-                            ascii=True) if verbose else None
+        pbar = tqdm_asyncio(
+            total=filesize,
+            dynamic_ncols=True,
+            desc=f"Downloading",
+            unit="B",
+            unit_scale=True,
+            smoothing=0.1,
+            miniters=1,
+            ascii=True,
+        ) if verbose else None
         context = pbar if verbose else nullcontext()
 
         loop = asyncio.get_event_loop()
@@ -273,8 +269,7 @@ class AsyncDownloader(Downloader):
 
         with context:
             # https://zhuanlan.zhihu.com/p/575243634
-            tasks = asyncio.gather(
-                *[download_shard(s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
+            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
             result = loop.run_until_complete(tasks)
 
         # loop.close()
@@ -285,9 +280,7 @@ class AsyncDownloader(Downloader):
                 ret_buffer.write(buffer.getvalue())
             return ret_buffer
         else:
-            shard_paths = [
-                cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)
-            ]
+            shard_paths = [cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)]
             with open(out, "wb") as f:
                 pass
             from time import time
@@ -295,14 +288,9 @@ class AsyncDownloader(Downloader):
             if low_memory:
                 # merge shard files to out
 
-                pbar = tqdm_asyncio(total=filesize,
-                                    dynamic_ncols=True,
-                                    desc=f"Merging",
-                                    unit="B",
-                                    unit_scale=True,
-                                    smoothing=0.1,
-                                    miniters=1,
-                                    ascii=True) if verbose else None
+                pbar = tqdm_asyncio(
+                    total=filesize, dynamic_ncols=True, desc=f"Merging", unit="B", unit_scale=True, smoothing=0.1, miniters=1,
+                    ascii=True) if verbose else None
                 context = pbar if verbose else nullcontext()
                 with context:
                     await cls.merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
@@ -318,15 +306,7 @@ class AsyncDownloader(Downloader):
 class CommandDownloader(Downloader):
 
     @classmethod
-    def download_axel(cls,
-                      url,
-                      out=None,
-                      headers=None,
-                      proxy=None,
-                      num_shards=None,
-                      timeout=5,
-                      retries=3,
-                      verbose=True):
+    def download_axel(cls, url, out=None, headers=None, proxy=None, num_shards=None, timeout=5, retries=3, verbose=True):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -373,7 +353,6 @@ class CommandDownloader(Downloader):
             for k, v in headers.items():
                 wget_args += f" --header \"{k}:{v}\""
 
-
         if out is not None:
             cmd = f"wget {wget_args} '{url}' -O '{out}'"
             run_cmd(cmd, verbose=verbose)
@@ -400,14 +379,9 @@ class SimpleDownloader(Downloader):
         url = res.url
         filesize = int(res.headers["Content-Length"])
 
-        pbar = tqdm(total=filesize,
-                    dynamic_ncols=True,
-                    desc=f"Downloading",
-                    unit="B",
-                    unit_scale=True,
-                    smoothing=0.1,
-                    miniters=1,
-                    ascii=True) if verbose else None
+        pbar = tqdm(
+            total=filesize, dynamic_ncols=True, desc=f"Downloading", unit="B", unit_scale=True, smoothing=0.1, miniters=1,
+            ascii=True) if verbose else None
 
         context = pbar if verbose else nullcontext()
 
@@ -426,11 +400,11 @@ class SimpleDownloader(Downloader):
             client = httpx.Client(timeout=None, proxies=proxy)
             if chunk_size is None:
                 with client.stream('GET', url=url, headers=headers) as r:
-                        for chunk in r.iter_bytes(chunk_size=chunk_size):
-                            if chunk:
-                                buffer.write(chunk)
-                                if pbar:
-                                    pbar.update(len(chunk))
+                    for chunk in r.iter_bytes(chunk_size=chunk_size):
+                        if chunk:
+                            buffer.write(chunk)
+                            if pbar:
+                                pbar.update(len(chunk))
             else:
                 with client.get(url=url, headers=headers) as r:
                     buffer.write(r.content)

@@ -11,13 +11,14 @@ import sys
 import tempfile
 from copy import deepcopy
 from importlib import import_module
+import copy
+import inspect
 
 import yaml
 
 from .easydict import EasyDict
 
 __all__ = ["Config"]
-
 
 BASE_KEY = "_base_"
 # BASE_CONFIG = {"OUTPUT_DIR": "./workspace", "SESSION": "base", "LOG_FILE": "log.txt"}
@@ -67,43 +68,50 @@ class Config(object):
         json.dump(cfg, open(savepath, "w"), indent=2)
 
     @classmethod
-    def get_config(cls, default_config: dict = None):
-        """get a `Config` instance.
+    # def get_config(cls, default_config: dict = None):
+    def get_config(cls, config_file, opts=None):
+        #     """get a `Config` instance.
 
-        Args:
-            default_config (dict): The default config. `default_config` will be overrided
-                by config file `--cfg`, `--cfg` will be overrided by commandline args.
+        #     Args:
+        #         default_config (dict): The default config. `default_config` will be overrided
+        #             by config file `--cfg`, `--cfg` will be overrided by commandline args.
 
-        Returns: an EasyDict.
-        """
-        global cfg
-        if cfg is not None:
-            return cfg
+        #     Returns: an EasyDict.
+        #     """
+        #     global cfg
+        #     if cfg is not None:
+        #         return cfg
 
-        # define arg parser.
-        parser = argparse.ArgumentParser()
-        # parser.add_argument("--cfg", help="load configs from yaml file", default="", type=str)
-        parser.add_argument(
-            "config_file", help="the configuration file to load. support: .yaml, .json, .py"
-        )
-        parser.add_argument(
-            "opts",
-            default=None,
-            nargs="*",
-            help="overrided configs. List. Format: 'key1 name1 key2 name2'",
-        )
-        args = parser.parse_args()
+        #     # define arg parser.
+        #     parser = argparse.ArgumentParser()
+        #     # parser.add_argument("--cfg", help="load configs from yaml file", default="", type=str)
+        #     parser.add_argument("config_file", help="the configuration file to load. support: .yaml, .json, .py")
+        #     parser.add_argument(
+        #         "opts",
+        #         default=None,
+        #         nargs="*",
+        #         help="overrided configs. List. Format: 'key1 name1 key2 name2'",
+        #     )
+        #     args = parser.parse_args()
 
         cfg = EasyDict(BASE_CONFIG)
-        if osp.isfile(args.config_file):
-            cfg_from_file = cls.from_file(args.config_file)
+        if osp.isfile(config_file):
+            cfg_from_file = cls.from_file(config_file)
             cfg = merge_a_into_b(cfg_from_file, cfg)
-        cfg = cls.merge_list(cfg, args.opts)
+        if opts is not None:
+            cfg = cls.merge_list(cfg, opts)
+            cfg.overwrite = opts
+
         cfg = eval_dict_leaf(cfg)
+        # _variable only used for eval
+        cfg = {name: value for name, value in cfg.items() \
+            if not name.startswith("_") and not inspect.isclass(value) and not inspect.isfunction(value)}
+        cfg = EasyDict(cfg)
 
         # update some keys to make them show at the last
         for k in BASE_CONFIG:
             cfg[k] = cfg.pop(k)
+
         return cfg
 
     @classmethod
@@ -127,11 +135,7 @@ class Config(object):
                 mod = import_module("tmp_config." + osp.splitext(osp.basename(filepath))[0])
                 # mod = import_module(temp_module_name)
                 sys.path.pop(0)
-                cfg_dict = {
-                    name: value
-                    for name, value in mod.__dict__.items()
-                    if not name.startswith("__")
-                }
+                cfg_dict = {name: value for name, value in mod.__dict__.items() if not name.startswith("__")}
                 for k in list(sys.modules.keys()):
                     if "tmp_config" in k:
                         del sys.modules[k]
@@ -150,9 +154,7 @@ class Config(object):
         if BASE_KEY in cfg_dict:  # load configs in `BASE_KEY`
             cfg_dir = osp.dirname(filepath)
             base_filename = cfg_dict.pop(BASE_KEY)
-            base_filename = (
-                base_filename if isinstance(base_filename, list) else [base_filename]
-            )
+            base_filename = (base_filename if isinstance(base_filename, list) else [base_filename])
 
             cfg_dict_list = list()
             for f in base_filename:
@@ -278,3 +280,31 @@ def eval_string(string, d):
     except:
         v = string
     return v
+
+
+class LazyCall:
+
+    def __init__(self, target):
+        self._target = target
+
+    def __call__(self, **kwargs):
+        return {"_target_": self._target, **kwargs}
+
+
+def instantiate(cfg, **kwargs):
+
+    def _instantiate(_cfg, **_kwargs):
+        _cfg = copy.deepcopy(_cfg)
+        if "_target_" in _cfg:
+            target = _cfg.pop("_target_")
+            for k, v in _cfg.items():
+                if isinstance(v, dict):
+                    _kwargs[k] = _instantiate(v)
+                else:
+                    _kwargs[k] = v
+
+            return target(**_kwargs)
+        else:
+            return _cfg
+
+    return _instantiate(cfg, **kwargs)

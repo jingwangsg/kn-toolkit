@@ -1,5 +1,6 @@
 import torch
 
+
 def calc_iou_matrix(pred_bds, targets, type="iou"):
     """
     pred_bds:   (N, 2)
@@ -27,6 +28,7 @@ def calc_iou_matrix(pred_bds, targets, type="iou"):
         return 0.5 * (iou + U / Ac)
     else:
         raise NotImplementedError()
+
 
 @torch.no_grad()
 def calc_iou_1d(pred_bds, gt, type="iou"):
@@ -57,3 +59,28 @@ def calc_iou_1d(pred_bds, gt, type="iou"):
     else:
         raise NotImplementedError()
 
+def broadcast_all(tensors):
+    shape_tensor = torch.concat([t.shape for t in tensors], dim=0)
+    to_shape = shape_tensor.max(dim=0).values.tolist()
+
+    for t in tensors:
+        new_tensors.append(t.expand(*to_shape))
+    
+    return new_tensors
+    
+
+def broadcast_concat(tensors, dim):
+    """
+    Concatenate tensors with broadcasting
+    """
+    new_tensors = broadcast_all(tensors)
+
+    return torch.cat(new_tensors, dim=dim)
+
+def broadcast_stack(tensors, dim):
+    """
+    Stack tensors with broadcasting
+    """
+    new_tensors = broadcast_all(tensors)
+
+    return torch.stack(new_tensors, dim=dim)

@@ -1,34 +1,9 @@
 from loguru import logger
 from termcolor import colored
 from .mixin_util import _find_module_by_keys, module2tree
-
+import torch
 
 class ModelMixin:
-
-    def get_peft_model(
-        self,
-        keys=[],
-        r=64,
-        lora_alpha=16,
-        lora_dropout=0.05,
-        lora_bias="none",
-    ):
-        if len(keys) == 0:
-            logger.info("No keys provided, LoRA disabled.")
-            return self
-        else:
-            logger.info(f"Injecting LoRA into modules: {keys}")
-
-        lora_modules = _find_module_by_keys(self, keys)
-
-        cfg = LoraConfig(
-            r=r,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            bias=lora_bias,
-            target_modules=lora_modules,
-        )
-        return get_peft_model(model=self, peft_config=cfg)
 
     def set_requires_grad(self, keys=None, requires_grad=True):
         if keys is None:
@@ -72,7 +47,7 @@ class ModelMixin:
         for p in self.parameters():
             p.data = p.data.half()
         return self
-    
+
     def to(self, *args, **kwargs):
         for p in self.parameters():
             if p.dtype == torch.float32:

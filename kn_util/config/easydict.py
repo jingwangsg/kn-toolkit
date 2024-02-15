@@ -1,3 +1,9 @@
+import copy
+import inspect
+import json
+import yapf
+
+
 class EasyDict(dict):
     """
     Get attributes
@@ -142,6 +148,28 @@ class EasyDict(dict):
         if hasattr(self, k):
             delattr(self, k)
         return super(EasyDict, self).pop(k, d)
+
+    def __str__(self):
+        cfg = copy.deepcopy(self)
+        import ipdb
+        ipdb.set_trace()
+
+        def replace_unserializable(_cfg):
+            for k, v in _cfg.items():
+                if inspect.isclass(v) or inspect.isfunction(v):
+                    _cfg[k] = str(v)
+                elif isinstance(v, EasyDict):
+                    replace_unserializable(v)
+
+        replace_unserializable(cfg)
+
+        return yapf.yapf_api.FormatCode(json.dumps(cfg, indent=4))[0]
+    
+    def pformat(self, ignored=["overwrite"]):
+        cfg = copy.deepcopy(self)
+        for k in ignored:
+            cfg.pop(k, None)
+        return self.__str__()
 
 
 if __name__ == "__main__":

@@ -10,6 +10,10 @@ import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
+from threading import Semaphore
+from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
+from queue import Queue
+import threading
 
 
 def _run_sequential(iterable, func, desc=""):
@@ -114,40 +118,84 @@ def map_async_with_thread(
         return results
 
 
-def map_async_with_tolerance(iterable, func, num_workers=32, level="thread", is_ready=lambda x: x):
+def map_async_with_shard(
+    iterable,
+    func=lambda x: x,
+    loader=lambda x: x,
+    num_process=32,
+    num_thread=32,
+    max_semaphore=32,
+    max_retries=5,
+    shard_size=1000,
+    verbose=True,
+    is_ready=lambda x: True,
+):
+    """
+    producer-consumer model, split iterable to shards.
+    For each shard, use thread to load data and process data iteratively
+    (Here, func should be compute-bound, and loader should be io-bound)
 
-    if level == "thread":
-        p = ThreadPool(num_workers)
-    elif level == "process":
-        p = ProcessPool(num_workers)
-    p.restart()
+    Q1: Why only split iterable to shards when using process pool?
+    A1: Frequently switching between processes is much more expensive than switching between threads.
+    """
+    iterable = list(iterable)  # make sure it is shardable
 
-    data_queue = mp.Queue()
-    for x in iterable:
-        data_queue.put(x)
+    def _process_shard(shard):
+        semaphore = Semaphore(max_semaphore)
+        task_queue = Queue()
+        failed_queue = Queue()
 
-    running = []
+        for item in shard:
+            task_queue.put((0, item))
 
-    total = data_queue.qsize()
-    pbar = tqdm(total=total)
+        def locked_iterable():
+            while not task_queue.empty():
+                semaphore.acquire()
+                yield task_queue.get()
 
-    while not (data_queue.empty() and len(running) == 0):
-        if not data_queue.empty():
-            cur_item = data_queue.get()
-            cur_thread = p.apipe(func, cur_item)
-            running.append(cur_thread)
+        def wrapped_loader(*args, **kwargs):
+            try:
+                return True, item, loader(*args, **kwargs)
+            except Exception as e:
+                return False, item, None
+        
+        def deal_with_error(retry_cnt):
+            if retry_cnt >= max_retries:
+                failed_queue.put(item)
+            else:
+                task_queue.put((retry_cnt + 1, item))
+            semaphore.release()
+        
+        with ThreadPoolVanilla(num_thread) as thread_pool:
+            for retry_cnt, success, item, output in thread_pool.imap_unordered(
+                    lambda x: (x[0], *wrapped_loader(x[1])),
+                    locked_iterable(),
+            ):
+                if not success:
+                    deal_with_error(retry_cnt)
+                    continue
 
-        # update running processes whose state in unready
-        new_running = []
-        for item in running:
-            if not item.ready():
-                new_running.append(item)
-            elif is_ready(item.get()):
-                pbar.n = pbar.n + 1
-                pbar.refresh()
-                time.sleep(0.1)
-        running.clear()
-        del running
-        running = new_running
+                try:
+                    ret = func(output)
+                except:
+                    deal_with_error(retry_cnt)
+                    continue
 
-    p.close()
+                if not is_ready(ret):
+                    deal_with_error(retry_cnt)
+                    continue
+                    
+                semaphore.release()
+        
+        return failed_queue.qsize()
+
+    iterable_shards = [iterable[i:i + shard_size] for shard_idx, i in enumerate(range(0, len(iterable), shard_size))]
+    if verbose:
+        print(f"Total {len(iterable_shards)} shards")
+
+    map_async(
+        iterable=iterable_shards,
+        func=_process_shard,
+        num_process=num_process,
+        verbose=verbose,
+    )
