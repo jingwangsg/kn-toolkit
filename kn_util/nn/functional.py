@@ -62,6 +62,7 @@ def calc_iou_1d(pred_bds, gt, type="iou"):
 def broadcast_all(tensors):
     shape_tensor = torch.concat([t.shape for t in tensors], dim=0)
     to_shape = shape_tensor.max(dim=0).values.tolist()
+    new_tensors = []
 
     for t in tensors:
         new_tensors.append(t.expand(*to_shape))

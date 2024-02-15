@@ -11,5 +11,9 @@ rich
 dill
 pudb
 pyfzf
+loguru
+cloudpickle
+aiofiles
+GitPython
 hget @git+https://github.com/K-Nick/hget
 einops

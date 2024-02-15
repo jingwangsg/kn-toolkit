@@ -142,6 +142,7 @@ def download(
         # )
 
         meta_handler.write(path + "\n")
+        meta_handler.flush()
 
 
 def download_recursive(threads=16):
