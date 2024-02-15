@@ -4,3 +4,11 @@ py3nvml
 ipdb
 ipython
 yapf
+hydra-core
+omegaconf
+termcolor
+rich
+dill
+pudb
+pyfzf
+hget @git+https://github.com/K-Nick/hget

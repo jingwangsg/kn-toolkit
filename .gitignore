@@ -2,3 +2,4 @@
 **/.vscode
 **/.nfs*
 server_utils/server_list.csv
+**/*.egg-info

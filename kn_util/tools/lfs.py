@@ -12,8 +12,7 @@ from ..utils.multiproc import map_async
 from functools import partial
 import re
 import multiprocessing as mp
-# from hget import hget
-from kn_util.utils.download import AsyncDownloader
+from hget import hget
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -118,7 +117,7 @@ def download(
     if not osp.exists(".downloaded"):
         run_cmd("touch .downloaded")
 
-    meta_handler = open(".downloaded", "rb+")
+    meta_handler = open(".downloaded", "r+")
     downloaded = set(meta_handler.readlines())
     print(f"=> Found {len(downloaded)} files already downloaded")
 
@@ -130,16 +129,17 @@ def download(
         url = url_template.format(org=org, repo=repo, path=path)
 
         print(f"{url} \n=> {path}")
-        # hget(
-        #     url=url,
-        #     threads=threads,
-        #     headers=headers,
-        # )
-        AsyncDownloader.download(
+        hget(
             url=url,
+            threads=threads,
             headers=headers,
-            num_shards=threads,
         )
+        # AsyncDownloader.download(
+        #     url=url,
+        #     headers=headers,
+        #     num_shards=threads,
+        #     low_memory=True,
+        # )
 
         meta_handler.write(path + "\n")
 
