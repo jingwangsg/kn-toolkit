@@ -20,3 +20,6 @@ einops
 pandas
 gpustat
 fire
+iopath
+httpx
+nest_asyncio
