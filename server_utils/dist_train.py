@@ -5,13 +5,16 @@ import numpy as np
 import time
 import random
 from kn_util.utils import send_email
+from gpustat import GPUStatCollection
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--gpus", type=str)
-    parser.add_argument("-m", "--mode", choices=["occupy", "attack", "peace"], default="peace")
+    parser.add_argument(
+        "-m", "--mode", choices=["occupy", "attack", "peace"], default="peace"
+    )
     parser.add_argument("-t", "--time", type=int, default=-1)
     parser.add_argument("--mem", type=int, default=-1)
     parser.add_argument("--delay", type=float, default=0.0)
@@ -26,12 +29,20 @@ def parse_args():
 
 
 def query_nvidia():
-    cmd = "nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv,noheader"
+    cmd = (
+        "nvidia-smi --query-gpu=gpu_name,memory.total,memory.free --format=csv,noheader"
+    )
     outs = subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout
     return outs
 
 
-def get_vailable_memory():
+def get_memory_list():
+    stat = GPUStatCollection.new_query()
+    json_dict = stat.jsonify()
+    return [_["memory.used"] for _ in json_dict["gpus"]]
+
+
+def __get_vailable_memory():
     outs = query_nvidia().strip().split("\n")
     memories = [outs[i].split(",")[-2:] for i in range(len(outs))]
 
@@ -48,7 +59,7 @@ def main():
     time.sleep((args.delay * 3600))
     gpus = []
     if args.gpus == "-1":
-        num_devices = len(get_vailable_memory())
+        num_devices = len(get_memory_list())
         gpus = [_ for _ in range(num_devices)]
     else:
         gpus = eval(f"[{args.gpus}]")
@@ -84,23 +95,33 @@ def launch_task(mode, gpus, time, mem, email=False, threshold=0.95):
 
     launched = [False for _ in range(len(gpus))]
     if mode == "peace":
-        while (not all(launched)):
-            memories = get_vailable_memory()
+        while not all(launched):
+            memories = get_memory_list()
             for slot_idx, id in enumerate(gpus):
-                if not launched[slot_idx] and memories[id][1] / memories[id][0] > threshold:
+                if (
+                    not launched[slot_idx]
+                    and memories[id][1] / memories[id][0] > threshold
+                ):
                     launch(id)
                     launched[slot_idx] = True
             from time import sleep
+
             sleep(1)
     else:
         for id in gpus:
             launch(id)
 
     if email:
-        hostname = subprocess.run("hostname", shell=True, capture_output=True).stdout.strip()
+        hostname = subprocess.run(
+            "hostname", shell=True, capture_output=True
+        ).stdout.strip()
         subject = f"#Node{hostname} {len(gpus)} GPUs finished"
 
-        send_email(subject=subject, text=query_nvidia(), to_addr="kningtg@gmail.com")
+        send_email(
+            subject=subject,
+            text=query_nvidia(),
+            to_addr="kningtg@gmail.com",
+        )
 
 
 if __name__ == "__main__":

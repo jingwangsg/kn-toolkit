@@ -1,3 +1,6 @@
+scipy
+scikit-learn
+numpy
 pathos
 tabulate
 py3nvml
@@ -23,3 +26,4 @@ fire
 iopath
 httpx
 nest_asyncio
+Pyarrow
