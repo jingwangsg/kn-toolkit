@@ -39,7 +39,6 @@ if [ $STAGE == "install" ]; then
 
     python -m kn_util.tools.brew patch -y
 
-    brew install htop
     brew install btop
     brew install ncdu
     brew install -f gdu

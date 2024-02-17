@@ -17,3 +17,6 @@ aiofiles
 GitPython
 hget @git+https://github.com/K-Nick/hget
 einops
+pandas
+gpustat
+fire
