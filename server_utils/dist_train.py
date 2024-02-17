@@ -7,6 +7,8 @@ import random
 from kn_util.utils import send_email
 from gpustat import GPUStatCollection
 
+mode_dict = dict(occupy=0, attack=1, peace=2)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -36,10 +38,11 @@ def query_nvidia():
     return outs
 
 
-def get_memory_list():
+def get_memory_info():
     stat = GPUStatCollection.new_query()
     json_dict = stat.jsonify()
-    return [_["memory.used"] for _ in json_dict["gpus"]]
+    memorys = [(_["memory.total"], _["memory.used"]) for _ in json_dict["gpus"]]
+    return memorys
 
 
 def __get_vailable_memory():
@@ -59,57 +62,83 @@ def main():
     time.sleep((args.delay * 3600))
     gpus = []
     if args.gpus == "-1":
-        num_devices = len(get_memory_list())
+        num_devices = len(get_memory_info())
         gpus = [_ for _ in range(num_devices)]
     else:
         gpus = eval(f"[{args.gpus}]")
 
-    launch_task(
+    launch_task_all(
         mode=args.mode,
         gpus=gpus,
-        time=args.time,
+        runtime=args.time,
         mem=args.mem,
         email=args.email,
         threshold=args.threshold,
     )
 
 
-def launch_task(mode, gpus, time, mem, email=False, threshold=0.95):
+def launch_task(
+    id, mode, runtime, mem, dataset="coco2017", model="detr", threshold=0.95
+):
+    if mode != "attack":
+        rand_left = random.uniform(2.5, 3.5)
+    else:
+        rand_left = 1.0
+    # CUDA_VERSION = subprocess.check_output("cat $HOME/WORKSPACE/kn-toolkit/dotfiles/variable.sh | grep CUDA_VERSION", shell=True).decode("utf-8").strip().split("=")[1]
+    CUDA_VERSION = "10"
+    cmd = (
+        f"$HOME/miniconda3/envs/cuda{CUDA_VERSION}/bin/python main.py --model {model[0]} --dataset {dataset[0]}"
+        f" --use_bbox_refine --num_epoch 100 --host 127.0.0.1 --ddp --local-rank {id}"
+        f" {mode_dict[mode]} {runtime} {mem} {rand_left}"
+    )
+    subprocess.Popen(cmd, shell=True)
+
+
+def generate_model_dataset():
     fake_datasets = ["coco2017", "coco_seg2017", "Charades-STA", "ActivityNetCaption"]
     fake_models = ["GroundingFormer", "PSGFormer", "GDBFormer", "QueryMoment", "GTR"]
+    dataset = np.random.choice(fake_datasets, size=1)
+    model = np.random.choice(fake_models, size=1)
+    return dataset, model
 
-    mode_dict = dict(occupy=0, attack=1, peace=2)
 
-    def launch(id):
-        if mode != "attack":
-            rand_left = random.uniform(2.5, 3.5)
-        else:
-            rand_left = 1.0
-        dataset = np.random.choice(fake_datasets, size=1)
-        model = np.random.choice(fake_models, size=1)
-        # CUDA_VERSION = subprocess.check_output("cat $HOME/WORKSPACE/kn-toolkit/dotfiles/variable.sh | grep CUDA_VERSION", shell=True).decode("utf-8").strip().split("=")[1]
-        CUDA_VERSION = "10"
-        cmd = f"$HOME/miniconda3/envs/cuda{CUDA_VERSION}/bin/python main.py --model {model[0]} --dataset {dataset[0]} --use_bbox_refine --num_epoch 100 --host 127.0.0.1 --ddp --local-rank {id}"
-        cmd = cmd + f" {mode_dict[mode]} {time} {mem} {rand_left}"
-        subprocess.Popen(cmd, shell=True)
+def launch_task_all(mode, gpus, runtime, mem, email=False, threshold=0.95):
 
     launched = [False for _ in range(len(gpus))]
     if mode == "peace":
+        cnt = time.time()
         while not all(launched):
-            memories = get_memory_list()
+            info = get_memory_info()
+            dataset, model = generate_model_dataset()
+
             for slot_idx, id in enumerate(gpus):
-                if (
-                    not launched[slot_idx]
-                    and memories[id][1] / memories[id][0] > threshold
-                ):
-                    launch(id)
+                if not launched[slot_idx] and info[id][1] / info[id][0] < 1 - threshold:
+                    launch_task(
+                        id=id,
+                        mode=mode,
+                        runtime=runtime,
+                        mem=mem,
+                        threshold=threshold,
+                        dataset=dataset,
+                        model=model,
+                    )
                     launched[slot_idx] = True
             from time import sleep
 
-            sleep(1)
+            if time.time() - cnt > 10:
+                print("=> Waiting for all GPUs to be occupied...")
+                cnt = time.time()
+
     else:
         for id in gpus:
-            launch(id)
+            dataset, model = generate_model_dataset()
+            launch_task(
+                id=id,
+                mode=mode,
+                runtime=runtime,
+                mem=mem,
+                threshold=threshold,
+            )
 
     if email:
         hostname = subprocess.run(
