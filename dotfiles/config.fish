@@ -27,7 +27,7 @@ abbr zh 'conda activate zh'
 abbr pyipdb "python -m ipdb -c continue "
 abbr pypdb "python -m pdb -c continue "
 # abbr aner "conda activate decouplener"
-abbr fgA "python ~/server_utils/query_cluster.py --task available -n -1 | sort -n"
+abbr fgA "python ~/server_utils/query_cluster.py --task available --all -f"
 abbr fst "python ~/server_utils/query_cluster.py --task stat"
 abbr bash_only "export NO_FISH=1; bash"
 abbr tool "python -m kn_util.tools."
