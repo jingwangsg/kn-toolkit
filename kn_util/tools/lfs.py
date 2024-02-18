@@ -201,6 +201,7 @@ def main():
                 include=args.include,
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
+                proxy=args.proxy,
                 verbose=args.verbose,
             )
         else:

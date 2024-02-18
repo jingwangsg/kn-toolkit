@@ -9,7 +9,7 @@ import os
 import os.path as osp
 import tempfile
 import random
-from ..utils.system import run_cmd
+from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
 
 
@@ -89,9 +89,10 @@ class MultiThreadDownloader(Downloader):
     def __init__(
         self,
         headers=None,
-        verbose=1,
         num_threads=4,
         max_retries=10,
+        proxy=None,
+        verbose=1,
         chunk_size_download=1024 * 100,
         chunk_size_merge=1024**3,
         # proxy=None,
@@ -106,6 +107,7 @@ class MultiThreadDownloader(Downloader):
         self.client = httpx.Client(
             headers=headers,
             follow_redirects=True,
+            proxy=proxy,
             timeout=None,
         )
         self.chunk_size_merge = chunk_size_merge
@@ -144,6 +146,8 @@ class MultiThreadDownloader(Downloader):
         s_pos += skip_bytes
         pbar.update(skip_bytes)
         thread_pbar.update(skip_bytes)
+        if s_pos == e_pos + 1:
+            return
 
         with self.client.stream(
             "GET",
@@ -158,11 +162,23 @@ class MultiThreadDownloader(Downloader):
                 if pbar:
                     pbar.update(len(chunk))
                     thread_pbar.update(len(chunk))
+            assert buffer.tell() == e_pos + 1
 
-    def clear_cache(self, path):
+    def get_cache_files(self, path):
         dirname, filename = osp.dirname(path), osp.basename(path)
         cache_pattern = osp.join(dirname, f".{filename}.*")
-        run_cmd(f"rm -rf {cache_pattern}")
+        filenames = [
+            _.strip()
+            for _ in run_cmd(f"ls {cache_pattern}").stdout.split("\n")
+            if _.strip() != ""
+        ]
+        return filenames
+
+    def clear_cache(self, path):
+        filenames = self.get_cache_files(path)
+        filename = osp.basename(path)
+
+        assert all(force_delete(filename) for filename in filenames)
         print(f"=> Cache of {filename} cleared")
 
     def resolve_download_meta(self, url, path, filesize):
@@ -179,8 +195,13 @@ class MultiThreadDownloader(Downloader):
             if download_meta_load != download_meta:
                 print("=> Download meta file exists but not match, re-download")
                 self.clear_cache(path)
-        else:
-            save_json(download_meta, download_meta_path)
+            else:
+                # make sure other process is not using same cache files
+                cache_files = self.get_cache_files(path)
+                for cache_file in cache_files:
+                    clear_process(cache_file)
+
+        save_json(download_meta, download_meta_path)
 
     def download(self, url, path):
         file_dir, filename = osp.dirname(path), osp.basename(path)
