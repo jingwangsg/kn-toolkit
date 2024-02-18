@@ -59,6 +59,13 @@ function kill_nfs
     end
 end
 
+function kill_jobs
+    for job in (jobs -p)
+        kill $job
+        and echo "Killed job $job"
+        or echo "Failed to kill job $job"
+    end
+end
 
 
 function rsync_to

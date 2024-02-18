@@ -1,43 +1,70 @@
-from ..utils.download import Downloader, AsyncDownloader, CommandDownloader
+from ..utils.download import CommandDownloader
 import argparse
-from ..utils.download import get_headers
+from ..utils.download import get_hf_headers, get_random_headers, MultiThreadDownloader
+from fire import Fire
+import os.path as osp
 
 
-def get_args():
-    parser = argparse.ArgumentParser(description='tools for lfs')
-
-    parser.add_argument("url", type=str, help="The url to parse")
-    parser.add_argument("--output", type=str, default="auto", help="The output path")
-    parser.add_argument("--num-shards", type=int, default=10, help="The number of shards to download")
-    parser.add_argument("--chunk-size", type=int, default=1024, help="The chunk size to download")
-    parser.add_argument("--proxy", type=str, default=None, help="The proxy to use")
-    parser.add_argument("--mode", type=str, default="async", help="The mode to use")
-    parser.add_argument("--hf", action="store_true", default=False, help="Download from huggingface")
-    parser.add_argument("--low-memory", action="store_true", default=False, help="Low memory usage")
-
-    return parser.parse_args()
+def add_basic_parser(parser):
+    parser.add_argument("url", type=str, help="The url to download")
+    parser.add_argument(
+        "-o", "--output", type=str, help="The output path", default=None
+    )
+    parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
+    parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
 
 
-if __name__ == "__main__":
-    args = get_args()
-    headers = get_headers(from_hf=args.hf) if args.hf else None
-    if args.mode == "direct":
-        Downloader.download(url=args.url, out=args.output, proxy=args.proxy, headers=headers)
-    elif args.mode == "async":
-        AsyncDownloader.download(
-            url=args.url,
-            out=args.output,
-            num_shards=args.num_shards,
-            chunk_size=args.chunk_size,
+def add_thread_parser(parser):
+    parser.add_argument(
+        "-n", "--num-threads", type=int, help="The number of threads", default=8
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, help="The chunk size", default=1024 * 100
+    )
+    parser.add_argument("-v", "--verbose", type=int, help="The verbosity level", default=1)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    add_basic_parser(parser)
+    args = parser.parse_known_args()[0]
+    url = args.url
+    output = osp.basename(url) if args.output is None else args.output
+
+    headers = get_random_headers()
+    if "huggingface" in url:
+        print("=> Detected huggingface url, using huggingface headers")
+        headers = get_hf_headers()
+
+
+    if args.mode == "thread":
+        add_thread_parser(parser)
+        args = parser.parse_args()
+
+        downloader = MultiThreadDownloader(
             headers=headers,
-            proxy=args.proxy,
-            low_memory=args.low_memory,
+            num_threads=args.num_threads,
+            chunk_size_download=args.chunk_size,
+            verbose=args.verbose,
         )
+        downloader.download(url=url, path=output)
+
     elif args.mode in ["axel", "wget"]:
+
         if args.mode == "axel":
-            CommandDownloader.download_axel(url=args.url, out=args.output, proxy=args.proxy, headers=headers)
+            CommandDownloader.download_axel(
+                url=args.url,
+                out=args.output,
+                proxy=args.proxy,
+                headers=headers,
+            )
         elif args.mode == "wget":
-            CommandDownloader.download_wget(url=args.url, out=args.output, proxy=args.proxy, headers=headers)
+            CommandDownloader.download_wget(
+                url=args.url,
+                out=args.output,
+                proxy=args.proxy,
+                headers=headers,
+            )
 
     else:
         raise ValueError(f"Unknown mode: {args.mode}")

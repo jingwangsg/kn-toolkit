@@ -20,7 +20,9 @@ def unique_path(path):
 
 
 def _get_readelf(executable, domain="RPATH"):
-    return run_cmd(f"readelf -d {executable} | grep {domain} | grep -oP '\[\K[^]]*'").stdout.strip()
+    return run_cmd(
+        f"readelf -d {executable} | grep {domain} | grep -oP '\[\K[^]]*'"
+    ).stdout.strip()
 
 
 def get_appended_rpath(library_names, link_library_homebrew_paths):
@@ -130,7 +132,14 @@ def patch(app=None, path=None, need_check=True):
     else:
         all_executable = glob.glob(f"{homebrew_root}/bin/*")
 
-    all_executable = list(set([run_cmd(f"readlink -f {executable}").stdout.strip() for executable in all_executable]))
+    all_executable = list(
+        set(
+            [
+                run_cmd(f"readlink -f {executable}").stdout.strip()
+                for executable in all_executable
+            ]
+        )
+    )
 
     library_by_app = map_async(
         iterable=all_executable,
@@ -138,11 +147,17 @@ def patch(app=None, path=None, need_check=True):
         desc="Getting link librarys for each Apps",
     )
     library_by_app_mapping = dict(zip(all_executable, library_by_app))
-    link_library_homebrew_paths = prepare_link_library_mapping(library_by_app=library_by_app, homebrew_root=homebrew_root)
+    link_library_homebrew_paths = prepare_link_library_mapping(
+        library_by_app=library_by_app, homebrew_root=homebrew_root
+    )
     print(f"Link librarys found: {list(link_library_homebrew_paths.keys())}")
 
     # filter
-    all_executable = [_ for _ in all_executable if check_patchable(_, library_by_app_mapping[_], link_library_homebrew_paths)]
+    all_executable = [
+        _
+        for _ in all_executable
+        if check_patchable(_, library_by_app_mapping[_], link_library_homebrew_paths)
+    ]
     print("=> Patchable Apps: ", all_executable)
 
     if need_check:
@@ -153,7 +168,11 @@ def patch(app=None, path=None, need_check=True):
     def _unwrap_patch(executable):
 
         library_names = library_by_app_mapping[executable]
-        patch_single(executable, library_names=library_names, link_library_homebrew_paths=link_library_homebrew_paths)
+        patch_single(
+            executable,
+            library_names=library_names,
+            link_library_homebrew_paths=link_library_homebrew_paths,
+        )
 
     map_async(iterable=all_executable, func=_unwrap_patch, desc="Patching Apps")
 
@@ -183,7 +202,7 @@ def get_dependencies(app):
 
 
 def get_link_library_homebrew(library, homebrew_root="~/homebrew"):
-    ret = run_cmd(f"find {homebrew_root} -name \"{library}\"").stdout
+    ret = run_cmd(f'find {homebrew_root} -name "{library}"').stdout
     first_line = ret.split("\n")[0]
     homebrew_lib = first_line.rsplit("/", 1)[0]
 
@@ -248,9 +267,15 @@ def install(app, post_patch=False):
 def self_install(root_dir):
     if os.geteuid() != 0:
         print("=> not root user! running alternative installation")
-        run_cmd(f"cd {root_dir} && git clone --progress https://github.com/Homebrew/brew {root_dir}/homebrew", verbose=True)
+        run_cmd(
+            f"cd {root_dir} && git clone --progress https://github.com/Homebrew/brew {root_dir}/homebrew",
+            verbose=True,
+        )
     else:
-        run_cmd('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"', verbose=True)
+        run_cmd(
+            '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+            verbose=True,
+        )
 
     run_cmd("brew update --force --quiet", verbose=True)
 
@@ -258,7 +283,9 @@ def self_install(root_dir):
         reply = input("add ~/homebrew/bin and lib/ to ~/.bashrc? [y/n]")
         if reply == "y":
             run_cmd('echo "PATH=/homebrew/bin:$PATH" >> ~/.bashrc')
-            run_cmd('echo "LD_LIBRARY_PATH=/homebrew/lib:$LD_LIBRARY_PATH" >> ~/.bashrc')
+            run_cmd(
+                'echo "LD_LIBRARY_PATH=/homebrew/lib:$LD_LIBRARY_PATH" >> ~/.bashrc'
+            )
         else:
             print("=> Please add ~/homebrew/bin and lib/ to ~/.bashrc manually!")
 
@@ -266,14 +293,22 @@ def self_install(root_dir):
         run_cmd('echo "LD_LIBRARY_PATH=/homebrew/lib:$LD_LIBRARY_PATH" >> ~/.bashrc')
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", type=str, choices=["patch", "install", "self_install"])
+    parser.add_argument(
+        "command", type=str, choices=["patch", "install", "self_install"]
+    )
     command = parser.parse_known_args()[0].command
     if command == "patch":
         parser.add_argument("--app", type=str, default=None)
         parser.add_argument("--path", type=str, default=None)
-        parser.add_argument("-y", "--disable_check", action="store_true", default=False, help="prompt before patch")
+        parser.add_argument(
+            "-y",
+            "--disable_check",
+            action="store_true",
+            default=False,
+            help="prompt before patch",
+        )
         args = parser.parse_args()
         patch(
             app=args.app,
@@ -282,7 +317,12 @@ if __name__ == "__main__":
         )
     elif command == "install":
         parser.add_argument("apps", nargs="+", type=str)
-        parser.add_argument("--post_patch", action="store_true", default=False, help="patch after install")
+        parser.add_argument(
+            "--post_patch",
+            action="store_true",
+            default=False,
+            help="patch after install",
+        )
         args = parser.parse_args()
         for app in args.apps:
             install(app, post_patch=args.post_patch)

@@ -18,7 +18,7 @@ loguru
 cloudpickle
 aiofiles
 GitPython
-hget @git+https://github.com/K-Nick/hget
+# hget @git+https://github.com/K-Nick/hget
 gpustat @git+https://github.com/K-Nick/gpustat
 einops
 pandas

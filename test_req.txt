@@ -1,2 +1,0 @@
-# https://stackoverflow.com/questions/76092115/how-to-add-a-released-whl-to-requirement-txt
-https://github.com/vllm-project/vllm/releases/download/v0.3.1/vllm-0.3.1+cu118-cp310-cp310-manylinux1_x86_64.whl

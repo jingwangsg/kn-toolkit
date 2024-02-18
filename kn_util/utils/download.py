@@ -1,23 +1,17 @@
-import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import httpx
-import requests
-from tqdm.asyncio import tqdm_asyncio
 from tqdm import tqdm
 from huggingface_hub.utils._headers import build_hf_headers
 from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
 import io
+import os
 import os.path as osp
-from functools import partial
-import aiofiles
-import json
-import subprocess
 import tempfile
+import random
 from ..utils.system import run_cmd
+from ..utils.io import save_json, load_json
 
-import nest_asyncio
-
-nest_asyncio.apply()
 
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [
@@ -27,286 +21,233 @@ USER_AGENT_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36",
 ]
 
 
-def is_vailable(url):
-    ret = get_response_with_redirects(url)
-    if ret.status_code == 200:
-        return True
+def get_pbar(total, desc=None, disable=False, **kwargs):
+    return tqdm(
+        total=total,
+        desc=desc,
+        unit="B",
+        unit_scale=True,
+        dynamic_ncols=True,
+        smoothing=0.1,
+        miniters=1,
+        ascii=True,
+        disable=disable,
+        **kwargs,
+    )
 
 
-def get_response_with_redirects(url, verbose=False, headers=None):
-    with httpx.Client(follow_redirects=False, timeout=None) as client:
-        response = client.head(url, headers=headers)
-        while response.status_code in (301, 302):
-            if verbose:
-                print("Redirected to:", response.headers['Location'])
-            response = client.head(response.headers['Location'])
-
-        if response.status_code == 200:
-            return response
-        else:
-            with client.stream('GET', url=url, headers=headers) as r:
-                return r
-
-
-# async download
-def get_headers(from_hf=False):
-    # only for huggingface
+def get_hf_headers():
     user_agent_header = http_user_agent()
-    if from_hf:
-        headers = build_hf_headers(user_agent=user_agent_header, token="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")
-    else:
-        headers = {"User-Agent": user_agent_header}
+    headers = build_hf_headers(
+        user_agent=user_agent_header, token="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"
+    )
     return headers
 
 
-def _get_byte_length(obj):
-    return (obj.bit_length() + 7) // 8
+def get_random_headers():
+    # only for huggingface
+    user_agent_header = USER_AGENT_LIST[random.randint(0, len(USER_AGENT_LIST) - 1)]
+    headers = {"User-Agent": user_agent_header}
+    return headers
 
 
 class Downloader:
-
-    @staticmethod
-    def get_output_path(url):
-        out = url.split("/")[-1]
-        return out
-
-
-class AsyncDownloader(Downloader):
-
-    @classmethod
-    async def merge_shard_files(cls, shard_paths, chunk_size=1024**3, out=None, pbar=None):
-
-        async with aiofiles.open(out, 'wb') as f:
-            for shard_path in shard_paths:
-                async with aiofiles.open(shard_path, 'rb') as f_shard:
-                    while True:
-                        chunk = await f_shard.read(chunk_size)
-                        if not chunk:
-                            break
-
-                        await f.write(chunk)
-                        if pbar:
-                            pbar.update(len(chunk))
-
-                # Replace with asyncio-compatible command execution or delegate to a thread
-                await cls._async_run_cmd(f"> {shard_path} && rm {shard_path}")
-
-    @classmethod
-    def _read_chunk_progress(cls, out):
-        progress_file = osp.join(osp.dirname(out), "." + osp.basename(out) + ".progress")
-        numbers = []
-        if osp.exists(progress_file):
-            with open(progress_file, 'rb') as f:
-                for _ in range(cls.num_shards):
-                    chunk = f.read(cls.record_size)
-                    numbers.append(int.from_bytes(chunk, 'big'))
-        else:
-            with open(progress_file, 'wb') as f:
-                for _ in range(cls.num_shards):
-                    f.write((0).to_bytes(cls.record_size, 'big'))
-            return [0] * cls.num_shards
-        return numbers
-
-    @classmethod
-    async def _write_chunk_progress(cls, out, written_bytes, shard_id):
-        progress_file = osp.join(osp.dirname(out), "." + osp.basename(out) + ".progress")
-        async with aiofiles.open(progress_file, 'rb+') as f:
-            await f.seek(shard_id * cls.record_size)
-            binary_data = written_bytes.to_bytes(_get_byte_length(written_bytes), 'big')
-            await f.write(binary_data)
-
-    @staticmethod
-    def get_shard_path(out, s_pos, e_pos):
-        return osp.join(osp.dirname(out), "." + osp.basename(out) + f".tmp{s_pos}-{e_pos}")
-
-    @staticmethod
-    async def write_shard_async(out, s_pos, shard_path, chunk_size=1024 * 100):
-        async with aiofiles.open(out, "rb+") as f:
-            await f.seek(s_pos)
-            async with aiofiles.open(shard_path, "rb") as buffer:
-                while chunk := await buffer.read(chunk_size):
-                    await f.write(chunk)
-
-    @staticmethod
-    async def _async_run_cmd(cmd):
-        process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, shell=True)
-
-    @classmethod
-    async def _async_range_download(
-        cls,
-        url,
-        s_pos,
-        e_pos,
-        client,
-        chunk_size,
-        out=None,
+    def __init__(
+        self,
+        chunk_size_download=1024,
         headers=None,
-        pbar=None,
-        max_retries=5,
+        verbose=True,
     ):
-        #! should initiate separate file handler for each coroutine, or speed will be slow
-        to_buffer = (out is None)
+        self.chunk_size_download = chunk_size_download
+        self.headers = headers
+        self.verbose = verbose
 
-        headers = headers or {}
-        retries = 0
-        written_bytes = 0
+    def download(url):
+        pass
 
-        if to_buffer:
-            # byteio
-            buffer = io.BytesIO()
-            buffer.seek(0)
+
+def retry_wrapper(max_retries=10):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for i in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    print(f"=> Retry {i+1}/{max_retries} failed: {e}")
+            raise Exception(f"Retry {max_retries} times, still failed")
+
+        return wrapper
+
+    return decorator
+
+
+class MultiThreadDownloader(Downloader):
+    def __init__(
+        self,
+        headers=None,
+        verbose=1,
+        num_threads=4,
+        max_retries=10,
+        chunk_size_download=1024 * 100,
+        chunk_size_merge=1024**3,
+        # proxy=None,
+    ):
+        super().__init__(
+            chunk_size_download=chunk_size_download,
+            headers=headers,
+            verbose=verbose,
+        )
+        self.num_threads = num_threads
+        self.max_retries = max_retries
+        self.client = httpx.Client(
+            headers=headers,
+            follow_redirects=True,
+            timeout=None,
+        )
+        self.chunk_size_merge = chunk_size_merge
+
+    def is_support_range(self, url):
+        headers = self.client.head(url).headers
+        return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
+
+    def get_filesize(self, url):
+        return int(self.client.head(url).headers["Content-Length"])
+
+    def range_merge(self, shard_path, output_file, s_pos, e_pos):
+        with open(shard_path, "rb") as f:
+            f.seek(s_pos)
+            output_file.seek(s_pos)
+            for chunk in iter(lambda: f.read(self.chunk_size_merge), b""):
+                output_file.write(chunk)
+            assert f.tell() == e_pos + 1
+
+    def range_download(self, url, s_pos, e_pos, shard_path, thread_idx, pbar):
+
+        thread_pbar = get_pbar(
+            e_pos - s_pos + 1,
+            desc=f"Thread {thread_idx}",
+            position=thread_idx + 1,
+            disable=self.verbose < 2,
+        )
+
+        if osp.exists(shard_path):
+            buffer = open(shard_path, "rb+")
         else:
-            # file path
-            out = cls.get_shard_path(out, s_pos, e_pos)
-            buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
-            buffer.seek(0, 2)  # seek to end
-            skip_bytes = buffer.tell()
-            written_bytes += skip_bytes
-            if pbar:
-                pbar.update(skip_bytes)  # update progress bar
+            buffer = open(shard_path, "wb+")
 
-            if written_bytes == e_pos - s_pos + 1:
-                return
+        buffer.seek(0, os.SEEK_END)
+        skip_bytes = buffer.tell()
+        s_pos += skip_bytes
+        pbar.update(skip_bytes)
+        thread_pbar.update(skip_bytes)
 
-        while retries < max_retries:
-            try:
-                headers["Range"] = f"bytes={s_pos + written_bytes}-{e_pos}"
-                async with client.stream('GET', url=url, headers=headers) as r:
-                    async for chunk in r.aiter_bytes():
-                        if chunk:  # prevent keep-alive chunks
-                            chunk_size = len(chunk)
-                            buffer.write(chunk)
-                            written_bytes += chunk_size
+        with self.client.stream(
+            "GET",
+            url,
+            headers={
+                **self.headers,
+                "Range": f"bytes={s_pos}-{e_pos}",
+            },
+        ) as r:
+            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                buffer.write(chunk)
+                if pbar:
+                    pbar.update(len(chunk))
+                    thread_pbar.update(len(chunk))
 
-                            if pbar:
-                                pbar.update(chunk_size)
-                break  # Break the retry loop if download is successful
-            except httpx.NetworkError:
-                retries += 1
-                if retries < max_retries:
-                    print(f"=> Network error at {written_bytes}/{e_pos-s_pos + 1}, retrying ({retries}/{max_retries})...")
-                else:
-                    print("=> Max retries reached. Download failed.")
-                    if not to_buffer:
-                        buffer.close()
-                    raise
+    def clear_cache(self, path):
+        dirname, filename = osp.dirname(path), osp.basename(path)
+        cache_pattern = osp.join(dirname, f".{filename}.*")
+        run_cmd(f"rm -rf {cache_pattern}")
+        print(f"=> Cache of {filename} cleared")
 
-        if not to_buffer:
-            buffer.close()
+    def resolve_download_meta(self, url, path, filesize):
+        file_dir, filename = osp.dirname(path), osp.basename(path)
+        download_meta_path = osp.join(file_dir, f".{filename}.meta.json")
+
+        download_meta = {
+            "url": url,
+            "filesize": filesize,
+            "num_threads": self.num_threads,
+        }
+        if osp.exists(download_meta_path):
+            download_meta_load = load_json(download_meta_path)
+            if download_meta_load != download_meta:
+                print("=> Download meta file exists but not match, re-download")
+                self.clear_cache(path)
         else:
-            return buffer
+            save_json(download_meta, download_meta_path)
 
-    @staticmethod
-    def _calc_divisional_range(filesize, chuck=10):
-        step = filesize // chuck
-        ranges = [[i, i + step - 1] for i in range(0, filesize, step)]
-        ranges[-1][-1] = filesize - 1
-        return ranges
+    def download(self, url, path):
+        file_dir, filename = osp.dirname(path), osp.basename(path)
 
-    @classmethod
-    def download(cls, url, **kwargs):
-        return asyncio.run(cls._async_sharded_download(url, **kwargs))
+        filesize = self.get_filesize(url)
+        file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
+        ranges = [
+            (i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1))
+            for i in range(self.num_threads)
+        ]
+        self.resolve_download_meta(url, path, filesize)
 
-    @classmethod
-    async def _async_sharded_download(cls,
-                                      url,
-                                      out=None,
-                                      chunk_size=1024 * 100,
-                                      num_shards=10,
-                                      headers=None,
-                                      proxy=None,
-                                      low_memory=False,
-                                      verbose=True):
-        to_buffer = (out is None)
-        if isinstance(out, io.BufferedRandom):
-            out = out.name
-
-        if out == "auto":
-            out = cls.get_output_path(url)
-
-        res = get_response_with_redirects(url, headers=headers)
-
-        if res.headers.get("Accept-Ranges", None) != "bytes":
-            print("File does not support range download, use direct download")
+        if not self.is_support_range(url):
+            print(f"{url} does not support range download")
             return
 
-        # get filesize
-        url = res.url
-        filesize = int(res.headers["Content-Length"])
-        divisional_ranges = cls._calc_divisional_range(filesize, num_shards)
+        # self.range_download(url, 0, filesize, path, 0)
+        pbar = None
+        pbar = get_pbar(
+            filesize,
+            desc=f"Downloading {filename}",
+            disable=not self.verbose,
+            position=0,
+        )
 
-        transport = httpx.AsyncHTTPTransport(retries=5)
-        proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
-        client = httpx.AsyncClient(transport=transport, timeout=None, proxies=proxy)
+        thread_pool = ThreadPoolExecutor(max_workers=self.num_threads)
+        for i, (s_pos, e_pos) in enumerate(ranges):
+            shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
+            thread_pool.submit(
+                self.range_download,
+                url=url,
+                s_pos=s_pos,
+                e_pos=e_pos,
+                shard_path=shard_path,
+                thread_idx=i,
+                pbar=pbar,
+            )
 
-        pbar = tqdm_asyncio(
-            total=filesize,
-            dynamic_ncols=True,
-            desc=f"Downloading",
-            unit="B",
-            unit_scale=True,
-            smoothing=0.1,
-            miniters=1,
-            ascii=True,
-        ) if verbose else None
-        context = pbar if verbose else nullcontext()
+        output_file = open(path, "wb+")
+        for i, (s_pos, e_pos) in enumerate(ranges):
+            shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
+            thread_pool.submit(
+                self.range_merge,
+                shard_path=shard_path,
+                output_file=output_file,
+                s_pos=s_pos,
+                e_pos=e_pos,
+            )
 
-        loop = asyncio.get_event_loop()
-
-        async def download_shard(s_pos, e_pos):
-            return await cls._async_range_download(url=url,
-                                                   s_pos=s_pos,
-                                                   e_pos=e_pos,
-                                                   client=client,
-                                                   chunk_size=chunk_size,
-                                                   out=out,
-                                                   headers=headers,
-                                                   pbar=pbar)
-
-        with context:
-            # https://zhuanlan.zhihu.com/p/575243634
-            tasks = asyncio.gather(*[download_shard(s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)])
-            result = loop.run_until_complete(tasks)
-
-        # loop.close()
-
-        if to_buffer:
-            ret_buffer = io.BytesIO()
-            for buffer in result:
-                ret_buffer.write(buffer.getvalue())
-            return ret_buffer
-        else:
-            shard_paths = [cls.get_shard_path(out, s_pos, e_pos) for idx, (s_pos, e_pos) in enumerate(divisional_ranges)]
-            with open(out, "wb") as f:
-                pass
-            from time import time
-            st = time()
-            if low_memory:
-                # merge shard files to out
-
-                pbar = tqdm_asyncio(
-                    total=filesize, dynamic_ncols=True, desc=f"Merging", unit="B", unit_scale=True, smoothing=0.1, miniters=1,
-                    ascii=True) if verbose else None
-                context = pbar if verbose else nullcontext()
-                with context:
-                    await cls.merge_shard_files(shard_paths, chunk_size=1024**3, out=out, pbar=pbar)
-            else:
-                cmd = f"cat {' '.join(shard_paths)} > {out} && rm {' '.join(shard_paths)}"
-                # print(cmd)
-                await cls._async_run_cmd(cmd)
-
-            if verbose:
-                print("=> Merging time:", time() - st)
+        thread_pool.shutdown(wait=True)
+        self.clear_cache(path)
 
 
 class CommandDownloader(Downloader):
 
     @classmethod
-    def download_axel(cls, url, out=None, headers=None, proxy=None, num_shards=None, timeout=5, retries=3, verbose=True):
+    def download_axel(
+        cls,
+        url,
+        out=None,
+        headers=None,
+        proxy=None,
+        num_shards=None,
+        timeout=5,
+        retries=3,
+        verbose=True,
+    ):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -319,7 +260,7 @@ class CommandDownloader(Downloader):
 
         if headers:
             for k, v in headers.items():
-                axel_args += f" --header \"{k}:{v}\""
+                axel_args += f' --header "{k}:{v}"'
 
         if num_shards:
             axel_args += f" --num-connections {num_shards}"
@@ -336,7 +277,9 @@ class CommandDownloader(Downloader):
             return buffer
 
     @classmethod
-    def download_wget(cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True):
+    def download_wget(
+        cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True
+    ):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -347,11 +290,13 @@ class CommandDownloader(Downloader):
         if proxy:
             wget_args += f" --proxy=on --proxy http://{proxy}"
 
-        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
+        wget_args += (
+            f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
+        )
 
         if headers:
             for k, v in headers.items():
-                wget_args += f" --header \"{k}:{v}\""
+                wget_args += f' --header "{k}:{v}"'
 
         if out is not None:
             cmd = f"wget {wget_args} '{url}' -O '{out}'"
@@ -362,54 +307,4 @@ class CommandDownloader(Downloader):
                 run_cmd(cmd, verbose=verbose)
                 buffer.write(f.read())
             buffer.seek(0)
-            return buffer
-
-
-class SimpleDownloader(Downloader):
-
-    @classmethod
-    def download(cls, url, out=None, chunk_size=1024 * 100, headers=None, proxy=None, verbose=True):
-        if out == "auto":
-            out = cls.get_output_path(url)
-
-        to_buffer = (out is None)
-
-        # resolve redirect
-        res = get_response_with_redirects(url, headers=headers)
-        url = res.url
-        filesize = int(res.headers["Content-Length"])
-
-        pbar = tqdm(
-            total=filesize, dynamic_ncols=True, desc=f"Downloading", unit="B", unit_scale=True, smoothing=0.1, miniters=1,
-            ascii=True) if verbose else None
-
-        context = pbar if verbose else nullcontext()
-
-        if to_buffer:
-            buffer = io.BytesIO()
-        else:
-            # buffer = open(out, "rb+") if osp.exists(out) else open(out, "wb+")
-            if osp.exists(out) and osp.getsize(out) == filesize:
-                return
-            buffer = open(out, "wb")
-            # buffer.seek(0, 2)  # seek to end
-            # skip_bytes = buffer.tell()
-
-        with context:
-            proxy = httpx.Proxy(url=f"http://{proxy}") if proxy else None
-            client = httpx.Client(timeout=None, proxies=proxy)
-            if chunk_size is None:
-                with client.stream('GET', url=url, headers=headers) as r:
-                    for chunk in r.iter_bytes(chunk_size=chunk_size):
-                        if chunk:
-                            buffer.write(chunk)
-                            if pbar:
-                                pbar.update(len(chunk))
-            else:
-                with client.get(url=url, headers=headers) as r:
-                    buffer.write(r.content)
-
-        if not to_buffer:
-            buffer.close()
-        else:
             return buffer
