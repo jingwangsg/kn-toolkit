@@ -153,7 +153,7 @@ end
 function gpukill
     set variable $argv[1]
     for i in (string split "," $variable)
-        nvidia-smi pmon -c 1 -d 1 -i $i | tail -n +3 | awk '{print $2}' | xargs kill -9
+        gpustat --id $i --json | grep pid | awk '{print $2}' | tr -d ',' | xargs kill -9
     end
 end
 
