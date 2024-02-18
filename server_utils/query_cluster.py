@@ -162,9 +162,9 @@ class GPUCluster:
                 item = {
                     "gpu.id": f"node{node_idx:02d}_gpu#{gpu['index']}",
                     "name": gpu["name"],
-                    "gpu\.util": gpu["utilization.gpu"],
-                    "memory\n.free [Mb]": gpu["memory.total"] - gpu["memory.used"],
-                    "memory\n.total [Mb]": gpu["memory.total"],
+                    "gpu\n.util": gpu["utilization.gpu"],
+                    "memory\n.free": gpu["memory.total"] - gpu["memory.used"],
+                    "memory\n.total": gpu["memory.total"],
                     "proc\n.num": len(gpu["processes"]),
                     "proc\n.users": users,
                     # "processes.cpu_usage": ", ".join([f'{p["cpu_percent"]:.1f}%' for p in gpu["processes"]]),
@@ -182,15 +182,15 @@ class GPUCluster:
             columns = [
                 "gpu.id",
                 "name",
-                "util.gpu",
-                "memory\n.free [Mb]",
-                "memory\n.total [Mb]",
+                "gpu\n.util",
+                "memory\n.free",
+                "memory\n.total",
                 "proc\n.cpuusage",
             ]
             df = df[columns]
 
         if sorted:
-            df["weight"] = df["memory\n.free [Mb]"] * (1 - df["util.gpu"] / 100)
+            df["weight"] = df["memory\n.free"] * (1 - df["gpu\n.util"] / 100)
             df = df.sort_values(by=["weight"], ascending=False)
             df = df.drop(columns=["weight"])
         else:
