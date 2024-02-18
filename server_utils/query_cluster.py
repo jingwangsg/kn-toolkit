@@ -185,9 +185,7 @@ class GPUCluster:
                     "gpu\n.util": gpu["utilization.gpu"],
                     "memory\n.free": gpu["memory.total"] - gpu["memory.used"],
                     "memory\n.total": gpu["memory.total"],
-                    "proc\n.num": len(gpu["processes"]),
                     "proc\n.users": users,
-                    # "processes.cpu_usage": ", ".join([f'{p["cpu_percent"]:.1f}%' for p in gpu["processes"]]),
                     "node\n.cpu": cpu_usage_str,
                     "node\n.mem": mem_str,
                 }
