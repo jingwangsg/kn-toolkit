@@ -126,7 +126,10 @@ def launch_task_all(mode, gpus, runtime, mem, email=False, threshold=0.95):
             from time import sleep
 
             if time.time() - cnt > 10:
-                print("=> Waiting for all GPUs to be occupied...")
+                unlaunched_ids = ",".join(
+                    [str(gpus[i]) for i in range(len(gpus)) if not launched[i]]
+                )
+                print(f"=> Waiting for GPU {unlaunched_ids}")
                 cnt = time.time()
 
     else:
