@@ -246,7 +246,7 @@ def add_args_usage(parser):
 def add_args_avail(parser):
     parser.add_argument("-f", "--full", action="store_true")
     parser.add_argument("--all", action="store_true")
-    parser.add_argument("-n", "--n_gpu", default=20, type=int)
+    parser.add_argument("-n", "--n_gpu", default=30, type=int)
     parser.add_argument("--update", action="store_true")
 
 
