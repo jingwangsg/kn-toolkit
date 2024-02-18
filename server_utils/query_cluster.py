@@ -162,14 +162,14 @@ class GPUCluster:
                 item = {
                     "gpu.id": f"node{node_idx:02d}_gpu#{gpu['index']}",
                     "name": gpu["name"],
-                    "util.gpu": gpu["utilization.gpu"],
+                    "gpu\.util": gpu["utilization.gpu"],
                     "memory\n.free [Mb]": gpu["memory.total"] - gpu["memory.used"],
                     "memory\n.total [Mb]": gpu["memory.total"],
                     "proc\n.num": len(gpu["processes"]),
                     "proc\n.users": users,
                     # "processes.cpu_usage": ", ".join([f'{p["cpu_percent"]:.1f}%' for p in gpu["processes"]]),
-                    "proc\n.cpuusage": cpu_usage_str,
-                    "proc\n.mem_usage": mem_usage_gb_str,
+                    "proc\n.cpu": cpu_usage_str,
+                    "proc\n.mem": mem_usage_gb_str,
                 }
                 df_list += [item]
         df = pd.DataFrame(df_list)
