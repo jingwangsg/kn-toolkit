@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import httpx
 from tqdm import tqdm
 from huggingface_hub.utils._headers import build_hf_headers
-from transformers.utils.hub import http_user_agent
+from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
 from contextlib import nullcontext
 import io
 import os
