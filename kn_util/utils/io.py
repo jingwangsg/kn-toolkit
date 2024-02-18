@@ -11,7 +11,6 @@ from typing import Sequence, Mapping
 import os.path as osp
 import glob
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 import warnings
 
 
@@ -161,6 +160,7 @@ class LargeHDF5Cache:
         subprocess.run(f"touch {tmp_file}.finish", shell=True)
 
     def final_save(self):
+        from torch.utils.data import DataLoader
         tmp_files = glob.glob(osp.join(self.tmp_dir, "*.hdf5"))
         result_handle = h5py.File(self.hdf5_path, "a")
         loader = DataLoader(tmp_files, batch_size=1, collate_fn=lambda x: load_hdf5(x[0]), num_workers=8, prefetch_factor=6)
