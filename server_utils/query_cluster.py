@@ -145,7 +145,7 @@ class GPUCluster:
     def get_memory_dataframe(self):
         gpu_query_cmd = "gpustat --json"
         node_stdouts = self.query_all_node(gpu_query_cmd)
-        node_stdouts = [x for x in node_stdouts if x[1] and len(x[1]) > 0]
+        node_stdouts = [x for x in node_stdouts if x[1]]
 
         df_list = []
 
@@ -203,7 +203,7 @@ class GPUCluster:
         cmd = "gpustat -f --json"
 
         node_stdouts = self.query_all_node(cmd)
-        node_stdouts = [x for x in node_stdouts if x[1] and len(x[1]) > 0]
+        node_stdouts = [x for x in node_stdouts if x[1]]
         item_list = []
 
         for node_idx, node_stdout in node_stdouts:
@@ -214,14 +214,14 @@ class GPUCluster:
             for gpu in node_stdout["gpus"]:
                 for process in gpu["processes"]:
                     item = {
-                        "partition": self.server_info[
+                        "gpu\n.name": self.server_info[
                             self.server_info["node_idx"] == node_idx
                         ]["partition"].item(),
-                        "gpu.id": f"{node_stdout['hostname']}_#{gpu['index']}",
-                        "gpu.occupied": process["gpu_memory_usage"],
+                        "gpu\n.id": f"{node_stdout['hostname']}_#{gpu['index']}",
+                        "gpu\n.used": process["gpu_memory_usage"],
                         "PID": process["pid"],
                         "user": process["username"],
-                        "cmd": " ".join(process["full_command"]),
+                        "cmd": " ".join(process["full_command"])[:30],
                     }
                     item_list += [item]
 
@@ -311,8 +311,8 @@ if __name__ == "__main__":
             cmd_include=args.command,
         )
         pd.set_option("display.max_colwidth", 50)
-        print(df)
-        # print(df.to_markdown(index=False))
+        # print(df)
+        print(df.to_markdown(index=False))
     elif args.task == "available":
         add_args_avail(parser)
         args = parser.parse_args()
@@ -326,13 +326,8 @@ if __name__ == "__main__":
             print(df.iloc[: args.n_gpu, :].to_markdown(index=False))
     elif args.task == "stat":
         df = gpu_cluster.get_usage_dataframe()
-        df["gpu.occupied.value"] = (
-            df["gpu.occupied"]
-            if "int" in str(df["gpu.occupied"].dtype)
-            else df["gpu.occupied"].str.replace("MiB", "").astype(int)
-        )
         result = df.groupby("user").agg(
-            {"gpu.id": ["nunique", "count"], "gpu.occupied.value": "sum"}
+            {"gpu\n.id": ["nunique", "count"], "gpu\n.used": ["sum"]}
         )
         result.columns = ["ngpu", "nproc", "mem"]
         result.sort_values(by=["ngpu", "nproc"], ascending=False, inplace=True)
