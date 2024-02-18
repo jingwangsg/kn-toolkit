@@ -185,7 +185,7 @@ class GPUCluster:
                 "gpu\n.util",
                 "memory\n.free",
                 "memory\n.total",
-                "proc\n.cpuusage",
+                "proc\n.cpu",
             ]
             df = df[columns]
 
