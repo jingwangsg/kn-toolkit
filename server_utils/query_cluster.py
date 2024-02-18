@@ -15,6 +15,12 @@ import numpy as np
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
+import psutil
+
+
+def zfill_space(x, n=3):
+    spaces = " " * max(0, n - len(str(x)))
+    return spaces + str(x)
 
 
 def map_async_with_thread(
@@ -150,22 +156,24 @@ class GPUCluster:
         df_list = []
 
         for node_idx, node_out in node_stdouts:
-            gpu_infos = json.loads(node_out)["gpus"]
-            mem_usage = np.sum(
-                [p["cpu_memory_usage"] for gpu in gpu_infos for p in gpu["processes"]]
-            )
-            mem_usage_gb = mem_usage / 1024 / 1024 / 1024
-            mem_usage_gb_str = f"{int(np.round(mem_usage_gb)):03d} Gb"
-            cpu_usage = (
-                np.sum(
-                    [
-                        np.sum([p["cpu_percent"] for p in gpu["processes"]])
-                        for gpu in gpu_infos
-                    ]
-                )
-                / 100
-            )
-            cpu_usage_str = f"{int(np.round(cpu_usage))}"
+            json_dict = json.loads(node_out)
+            gpu_infos = json_dict["gpus"]
+            system_infos = json_dict["system"]
+
+            # mem_usage = np.sum(
+            #     [p["cpu_memory_usage"] for gpu in gpu_infos for p in gpu["processes"]]
+            # )
+            def _rnd(x):
+                return int(np.round(x))
+
+            mem_usage_gb = system_infos["vmem_used"] / 1024 / 1024 / 1024
+            mem_total_gb = system_infos["vmem_total"] / 1024 / 1024 / 1024
+            mem_str = f"{_rnd(mem_usage_gb):03d} / {_rnd(mem_total_gb)}"
+
+            cpu_total = system_infos["cpu_count"]
+            cpu_usage = int(_rnd(system_infos["cpu_percent"] * cpu_total / 100))
+
+            cpu_usage_str = f"{cpu_usage:03d}/{cpu_total}"
 
             for gpu in gpu_infos:
                 users = ", ".join(
@@ -181,7 +189,7 @@ class GPUCluster:
                     "proc\n.users": users,
                     # "processes.cpu_usage": ", ".join([f'{p["cpu_percent"]:.1f}%' for p in gpu["processes"]]),
                     "node\n.cpu": cpu_usage_str,
-                    "node\n.mem": mem_usage_gb_str,
+                    "node\n.mem": mem_str,
                 }
                 df_list += [item]
         df = pd.DataFrame(df_list)
