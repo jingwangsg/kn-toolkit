@@ -151,11 +151,23 @@ class GPUCluster:
 
         for node_idx, node_out in node_stdouts:
             gpu_infos = json.loads(node_out)["gpus"]
+            mem_usage = np.sum(
+                [p["cpu_memory_usage"] for gpu in gpu_infos for p in gpu["processes"]]
+            )
+            mem_usage_gb = mem_usage / 1024 / 1024 / 1024
+            mem_usage_gb_str = f"{int(np.round(mem_usage_gb)):03d} Gb"
+            cpu_usage = (
+                np.sum(
+                    [
+                        np.sum([p["cpu_percent"] for p in gpu["processes"]])
+                        for gpu in gpu_infos
+                    ]
+                )
+                / 100
+            )
+            cpu_usage_str = f"{int(np.round(cpu_usage))}"
+
             for gpu in gpu_infos:
-                mem_usage = np.sum([p["cpu_memory_usage"] for p in gpu["processes"]])
-                mem_usage_gb_str = f"{mem_usage / 1024 / 1024 / 1024:.2f} GB"
-                cpu_usage = np.sum([p["cpu_percent"] for p in gpu["processes"]]) / 100
-                cpu_usage_str = f"{cpu_usage:.02f}"
                 users = ", ".join(
                     list(set(f'{p["username"]}' for p in gpu["processes"]))
                 )
@@ -168,8 +180,8 @@ class GPUCluster:
                     "proc\n.num": len(gpu["processes"]),
                     "proc\n.users": users,
                     # "processes.cpu_usage": ", ".join([f'{p["cpu_percent"]:.1f}%' for p in gpu["processes"]]),
-                    "proc\n.cpu": cpu_usage_str,
-                    "proc\n.mem": mem_usage_gb_str,
+                    "node\n.cpu": cpu_usage_str,
+                    "node\n.mem": mem_usage_gb_str,
                 }
                 df_list += [item]
         df = pd.DataFrame(df_list)
@@ -185,7 +197,7 @@ class GPUCluster:
                 "gpu\n.util",
                 "memory\n.free",
                 "memory\n.total",
-                "proc\n.cpu",
+                "node\n.cpu",
             ]
             df = df[columns]
 
@@ -219,6 +231,7 @@ class GPUCluster:
                         ]["partition"].item(),
                         "gpu\n.id": f"{node_stdout['hostname']}_#{gpu['index']}",
                         "gpu\n.used": process["gpu_memory_usage"],
+                        "gpu\n.util": gpu["utilization.gpu"],
                         "PID": process["pid"],
                         "user": process["username"],
                         "cmd": " ".join(process["full_command"])[:30],
@@ -310,7 +323,6 @@ if __name__ == "__main__":
             username=args.user,
             cmd_include=args.command,
         )
-        pd.set_option("display.max_colwidth", 50)
         # print(df)
         print(df.to_markdown(index=False))
     elif args.task == "available":
