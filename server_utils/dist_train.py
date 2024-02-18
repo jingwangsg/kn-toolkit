@@ -5,6 +5,7 @@ import numpy as np
 import time
 import random
 from kn_util.utils import send_email
+from kn_util.utils.system import run_cmd
 from gpustat import GPUStatCollection
 
 mode_dict = dict(occupy=0, attack=1, peace=2)
@@ -123,13 +124,14 @@ def launch_task_all(mode, gpus, runtime, mem, email=False, threshold=0.95):
                         model=model,
                     )
                     launched[slot_idx] = True
-            from time import sleep
 
             if time.time() - cnt > 10:
                 unlaunched_ids = ",".join(
                     [str(gpus[i]) for i in range(len(gpus)) if not launched[i]]
                 )
                 print(f"=> Waiting for GPU {unlaunched_ids}")
+                GPUStatCollection.new_query().print_formatted(force_color=True)
+
                 cnt = time.time()
 
     else:

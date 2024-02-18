@@ -84,19 +84,18 @@ class GPUCluster:
     def _check_node(self, node_idx):
         cmd = f"sinfo --nodes=node{node_idx:02d} -N --noheader"
         result = subprocess.run(cmd, text=True, capture_output=True, shell=True)
-        return result
+        status_str = "N/A" if not result.stdout else result.stdout.split()[-1]
+        return status_str
 
     def _query_single_node(self, inputs):
         node_idx, partition, cmd, timeout = inputs
 
-        result = self._check_node(node_idx)
+        status_str = self._check_node(node_idx)
 
-        invalid_state = ["drain", "fail", "drain", "drng"]
-        if any([state in result.stdout for state in invalid_state]):
-            if result.stdout:
-                print(f"node{node_idx:02d} {result.stdout.split()[-1]}")
-            else:
-                print(f"node{node_idx:02d} N/A")
+        invalid_status = ["drain", "fail", "drain", "drng", "down"]
+        if any([status in status_str for status in invalid_status]):
+
+            self.failed += [{"node": f"node{node_idx:02d}", "err": status_str}]
             return node_idx, None
 
         prefix = f"timeout {timeout} srun -p {partition} -w node{node_idx:02d} --export ALL --mem=0 "
@@ -113,8 +112,10 @@ class GPUCluster:
             result.stderr.strip() != ""
             and "has been allocated resources" not in result.stderr
         ):
-            print(f"[FAIL] node{node_idx:02d} | {result.stderr} | {result.stdout}")
-            output = ""
+            self.failed += [
+                {"node": f"node{node_idx:02d}", "err": result.stderr.split("\n")[0]}
+            ]
+            return node_idx, None
 
         return node_idx, output
 
@@ -123,12 +124,21 @@ class GPUCluster:
             (row["node_idx"], row["partition"], cmd, self.timeout)
             for _, row in self.server_info.iterrows()
         ]
+        self.failed = []
 
         st = time.time()
         node_stdout = map_async_with_thread(
             iterable=inputs_list, func=self._query_single_node
         )
+
         print(f"query costs {time.time()-st}(s)")
+
+        # failed_df = pd.DataFrame(self.failed)
+        # print(failed_df.to_markdown(index=False))
+        print("Failed nodes:")
+        print(", ".join([f"{x['node']}({x['err']})" for x in self.failed]))
+        print("\n")
+
         return node_stdout
 
     def get_memory_dataframe(self):
@@ -177,47 +187,13 @@ class GPUCluster:
                 "proc\n.cpuusage",
             ]
             df = df[columns]
+
         if sorted:
-            df = df.sort_values(by=["memory\n.free [Mb]"], ascending=False)
+            df["weight"] = df["memory\n.free [Mb]"] * (1 - df["util.gpu"] / 100)
+            df = df.sort_values(by=["weight"], ascending=False)
+            df = df.drop(columns=["weight"])
         else:
             df = df.sort_values(by=["gpu.id"])
-        return df
-
-    def get_usage_dataframe_by_py3smi(self):
-        gpu_query_cmd = f"py3smi -f --left -w $(($(tput cols)-30))"
-
-        node_stdouts = self.query_all_node(gpu_query_cmd)
-
-        item_list = []
-
-        for node_idx, node_out in node_stdouts:
-            if not node_out:
-                continue
-
-            lines = [_.strip() for _ in node_out.split("\n")]
-            lines = lines[lines.index("") + 5 : -2]  # include process info only
-
-            for line in lines:
-                line = line.replace(" days", "-days")
-                _id, usr, pid, time, _ = line.strip("|").strip().split(maxsplit=4)
-                cmd, size = _.rsplit(maxsplit=1)
-
-                item = {
-                    "partition": self.server_info[
-                        self.server_info["node_idx"] == node_idx
-                    ]["partition"].item(),
-                    "gpu.id": f"node{node_idx:02d}_#" + _id,
-                    "gpu.occupied": size,
-                    "PID": pid,
-                    "user": usr,
-                    "time": time,
-                    "cmd": cmd,
-                }
-
-                item_list += [item]
-
-        df = pd.DataFrame(item_list)
-
         return df
 
     def get_usage_dataframe(self):
@@ -231,6 +207,7 @@ class GPUCluster:
 
         for node_idx, node_stdout in node_stdouts:
             import datetime
+
             node_stdout = json.loads(node_stdout)
 
             for gpu in node_stdout["gpus"]:
