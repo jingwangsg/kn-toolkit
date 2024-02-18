@@ -1,9 +1,0 @@
-transformers
-accelerate
-peft
---index-url https://download.pytorch.org/whl/cu118 torch==2.1.2 # please assign cuda version here
---index-url https://download.pytorch.org/whl/cu118 torchvision==0.16.0
---index-url https://download.pytorch.org/whl/cu118 torchtext==0.16.0
-timm
-xformer=0.0.23.post1
-vllm==0.3.0
