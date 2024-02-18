@@ -135,8 +135,9 @@ class GPUCluster:
 
         # failed_df = pd.DataFrame(self.failed)
         # print(failed_df.to_markdown(index=False))
-        print("Failed nodes:")
-        print(", ".join([f"{x['node']}({x['err']})" for x in self.failed]))
+        if len(self.failed) > 0:
+            print("Failed nodes:")
+            print(", ".join([f"{x['node']}({x['err']})" for x in self.failed]))
         print("\n")
 
         return node_stdout
