@@ -4,7 +4,7 @@ import subprocess
 import numpy as np
 import time
 import random
-from kn_util.utils import send_email
+from kn_util.utils.mail import send_email
 from kn_util.utils.system import run_cmd
 from gpustat import GPUStatCollection
 

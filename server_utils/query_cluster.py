@@ -260,6 +260,8 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=int, default=10)
     args = parser.parse_known_args()[0]
     server_info_fn = osp.join(osp.dirname(__file__), "server_list.csv")
+    if not osp.exists(server_info_fn):
+        update_server_list(server_info_fn)
 
     gpu_cluster = GPUCluster(
         server_info_fn=server_info_fn,
