@@ -170,16 +170,10 @@ def main():
             default=False,
         )
         parser.add_argument(
-            "--num-shards",
-            type=int,
-            help="The number of shards to use",
-            default=1,
+            "--num-shards", type=int, help="The number of shards to use", default=1
         )
         parser.add_argument(
-            "--max-retries",
-            type=int,
-            help="The number of retries to use",
-            default=10,
+            "--max-retries", type=int, help="The number of retries to use", default=99
         )
         parser.add_argument(
             "-n",
@@ -188,6 +182,7 @@ def main():
             help="The number of threads to use",
             default=8,
         )
+        parser.add_argument("--timeout", type=int, help="The timeout", default=10)
         parser.add_argument(
             "--verbose",
             type=int,
@@ -202,6 +197,7 @@ def main():
                 include=args.include,
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
+                timeout=args.timeout,
                 proxy=args.proxy,
                 verbose=args.verbose,
             )
@@ -212,6 +208,7 @@ def main():
             download_recursive(
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
+                timeout=args.timeout,
                 proxy=args.proxy,
                 verbose=args.verbose,
             )

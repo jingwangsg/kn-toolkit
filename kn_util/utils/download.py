@@ -106,12 +106,13 @@ class Downloader:
 def retry_wrapper(max_retries=10):
     def decorator(func):
         def wrapper(*args, **kwargs):
+            thread_idx = kwargs["thread_idx"]
             for i in range(max_retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    print(f"=> Retry {i+1}/{max_retries} failed: {e}")
-            raise Exception(f"Retry {max_retries} times, still failed")
+                    print(f"=> Thread {thread_idx} retry {i+1}/{max_retries} failed: {e}")
+            raise Exception(f"=> Thread {thread_idx} retry {max_retries} times, still failed")
 
         return wrapper
 
