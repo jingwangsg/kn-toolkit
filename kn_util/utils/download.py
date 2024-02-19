@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, wait
 import httpx
 from tqdm import tqdm
+import json
 from huggingface_hub.utils._headers import build_hf_headers
 from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
 from contextlib import nullcontext
@@ -72,9 +73,17 @@ class Downloader:
             proxy=proxy,
             timeout=timeout,
         )
-
-        print("=> Using Proxy:", proxy)
-        print("=> Using Headers:", headers)
+        print("=> Client Configuration:")
+        print(
+            json.dumps(
+                {
+                    "headers": headers,
+                    "proxy": proxy,
+                    "timeout": timeout,
+                },
+                indent=4,
+            )
+        )
 
     @lru_cache()
     def get_file_headers(self, url):
@@ -111,8 +120,12 @@ def retry_wrapper(max_retries=10):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    print(f"=> Thread {thread_idx} retry {i+1}/{max_retries} failed: {e}")
-            raise Exception(f"=> Thread {thread_idx} retry {max_retries} times, still failed")
+                    print(
+                        f"=> Thread {thread_idx} retry {i+1}/{max_retries} failed: {e}"
+                    )
+            raise Exception(
+                f"=> Thread {thread_idx} retry {max_retries} times, still failed"
+            )
 
         return wrapper
 
