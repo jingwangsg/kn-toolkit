@@ -190,7 +190,7 @@ class RsyncTool:
             map_async_with_thread(
                 func=_apply,
                 iterable=path_chunks,
-                num_process=num_process,
+                num_thread=num_process,
                 desc=f"Rsync {from_addr} -> {to_addr}",
             )
 

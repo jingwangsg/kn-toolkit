@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 import httpx
 from tqdm import tqdm
 from huggingface_hub.utils._headers import build_hf_headers
@@ -11,7 +11,17 @@ import tempfile
 import random
 from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
+from ..utils.rich import get_rich_progress_download, add_tasks
 
+from rich.progress import (
+    Progress,
+    TextColumn,
+    BarColumn,
+    DownloadColumn,
+    TransferSpeedColumn,
+    TimeRemainingColumn,
+    Console,
+)
 
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [
@@ -23,21 +33,6 @@ USER_AGENT_LIST = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36",
 ]
-
-
-def get_pbar(total, desc=None, disable=False, **kwargs):
-    return tqdm(
-        total=total,
-        desc=desc,
-        unit="B",
-        unit_scale=True,
-        dynamic_ncols=True,
-        smoothing=0.1,
-        miniters=1,
-        ascii=True,
-        disable=disable,
-        **kwargs,
-    )
 
 
 def get_hf_headers():
@@ -127,14 +122,17 @@ class MultiThreadDownloader(Downloader):
                 output_file.write(chunk)
             assert f.tell() == e_pos + 1
 
-    def range_download(self, url, s_pos, e_pos, shard_path, thread_idx, pbar):
-
-        thread_pbar = get_pbar(
-            e_pos - s_pos + 1,
-            desc=f"Thread {thread_idx}",
-            position=thread_idx + 1,
-            disable=self.verbose < 2,
-        )
+    def range_download(
+        self,
+        url,
+        s_pos,
+        e_pos,
+        shard_path,
+        thread_idx,
+        total_task_id,
+        thread_task_id,
+        progress,
+    ):
 
         if osp.exists(shard_path):
             buffer = open(shard_path, "rb+")
@@ -144,8 +142,9 @@ class MultiThreadDownloader(Downloader):
         buffer.seek(0, os.SEEK_END)
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
-        pbar.update(skip_bytes)
-        thread_pbar.update(skip_bytes)
+        progress.update(thread_task_id, advance=skip_bytes)
+        progress.update(total_task_id, advance=skip_bytes)
+
         if s_pos == e_pos + 1:
             return
 
@@ -159,9 +158,9 @@ class MultiThreadDownloader(Downloader):
         ) as r:
             for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
                 buffer.write(chunk)
-                if pbar:
-                    pbar.update(len(chunk))
-                    thread_pbar.update(len(chunk))
+                if self.verbose == 2:
+                    progress.update(thread_task_id, advance=len(chunk))
+                progress.update(total_task_id, advance=len(chunk))
             assert buffer.tell() == e_pos + 1
 
     def get_cache_files(self, path):
@@ -203,6 +202,22 @@ class MultiThreadDownloader(Downloader):
 
         save_json(download_meta, download_meta_path)
 
+    def get_task_ids(self, progress, ranges, filesize):
+        if self.verbose == 2:
+            task_ids = add_tasks(
+                progress,
+                names=["Total"] + [f"Thread {i}" for i in range(self.num_threads)],
+                totals=[filesize]
+                + [ranges[i][1] - ranges[i][0] + 1 for i in range(self.num_threads)],
+            )
+        else:
+            task_ids = add_tasks(
+                progress,
+                names=["Total"],
+                totals=[filesize],
+            )
+        return task_ids
+
     def download(self, url, path):
         file_dir, filename = osp.dirname(path), osp.basename(path)
 
@@ -218,38 +233,46 @@ class MultiThreadDownloader(Downloader):
             print(f"{url} does not support range download")
             return
 
-        # self.range_download(url, 0, filesize, path, 0)
-        pbar = None
-        pbar = get_pbar(
-            filesize,
-            desc=f"Downloading {filename}",
-            disable=not self.verbose,
-            position=0,
-        )
+        progress: Progress = get_rich_progress_download(disable=(self.verbose == 0))
+        progress.start()
 
-        thread_pool = ThreadPoolExecutor(max_workers=self.num_threads)
+        task_ids = self.get_task_ids(progress, ranges, filesize)
+
+        executor = ThreadPoolExecutor(max_workers=self.num_threads)
+        futures = []
         for i, (s_pos, e_pos) in enumerate(ranges):
             shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
-            thread_pool.submit(
+            future = executor.submit(
                 self.range_download,
                 url=url,
                 s_pos=s_pos,
                 e_pos=e_pos,
                 shard_path=shard_path,
                 thread_idx=i,
-                pbar=pbar,
+                total_task_id=task_ids[0],
+                thread_task_id=task_ids[i + 1] if self.verbose == 2 else None,
+                progress=progress,
             )
+            futures.append(future)
+
+        wait(futures, return_when="ALL_COMPLETED")
+
+        progress.stop()
 
         output_file = open(path, "wb+")
+        futures = []
         for i, (s_pos, e_pos) in enumerate(ranges):
             shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
-            thread_pool.submit(
+            future = executor.submit(
                 self.range_merge,
                 shard_path=shard_path,
                 output_file=output_file,
                 s_pos=s_pos,
                 e_pos=e_pos,
             )
+            futures.append(future)
+
+        wait(futures)
 
         thread_pool.shutdown(wait=True)
         self.clear_cache(path)

@@ -8,12 +8,13 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 import time
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from contextlib import nullcontext
 from threading import Semaphore
 from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
 from queue import Queue
 import threading
+from .rich import get_rich_progress_mofn, add_tasks
 
 
 def _run_sequential(iterable, func, desc=""):
@@ -32,7 +33,9 @@ def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
     async def func_async(item):
         loop = asyncio.get_running_loop()
         if wrap_func:
-            result = await loop.run_in_executor(None, func, item)  # 在默认执行器中运行非异步函数
+            result = await loop.run_in_executor(
+                None, func, item
+            )  # 在默认执行器中运行非异步函数
         else:
             result = await func(item)
         pbar.update(1)
@@ -71,15 +74,17 @@ def map_async(
         )
         total = ret._number_left
 
-        pbar = tqdm(total=total, desc=desc) if verbose else None
+        progress = get_rich_progress_mofn(disable=not verbose)
+        progress.start()
+        task_id = progress.add_task(description=desc, total=total)
 
         while ret._number_left > 0:
-            if pbar:
-                pbar.n = total - ret._number_left
-                pbar.refresh()
+            if verbose:
+                progress.update(task_id, completed=total - ret._number_left)
+                progress.refresh()
             time.sleep(0.1)
-        if pbar:
-            p.close()
+
+        progress.stop()
 
         return ret.get()
 
@@ -96,24 +101,25 @@ def map_async_with_thread(
         return _run_sequential(iterable, func, desc=desc)
 
     with ThreadPoolExecutor(num_thread) as executor:
-        pbar = tqdm(total=len(iterable), desc=desc) if verbose else None
-        context = pbar if pbar else nullcontext()
+        progress = get_rich_progress_mofn(disable=not verbose)
+        progress.start()
+        task_id = progress.add_task(description=desc, total=len(iterable))
 
         results = []
 
-        with context:
-            futures = {executor.submit(func, x): x for x in iterable}
+        futures = {executor.submit(func, x): x for x in iterable}
 
-            for future in as_completed(futures):
-                if pbar:
-                    pbar.update(1)
-                try:
-                    result = future.result()  # Get the result from the future
-                    results.append(result)  # Append the result to the results list
-                except Exception as e:
-                    # If there is an exception, you can handle it here
-                    # For now, we'll just print it
-                    print(f"Exception in thread: {e}")
+        for future in as_completed(futures):
+            progress.update(task_id, advance=1)
+            try:
+                result = future.result()  # Get the result from the future
+                results.append(result)  # Append the result to the results list
+            except Exception as e:
+                # If there is an exception, you can handle it here
+                # For now, we'll just print it
+                print(f"Exception in thread: {e}")
+
+        progress.stop()
 
         return results
 
@@ -158,18 +164,18 @@ def map_async_with_shard(
                 return True, item, loader(*args, **kwargs)
             except Exception as e:
                 return False, item, None
-        
+
         def deal_with_error(retry_cnt):
             if retry_cnt >= max_retries:
                 failed_queue.put(item)
             else:
                 task_queue.put((retry_cnt + 1, item))
             semaphore.release()
-        
+
         with ThreadPoolVanilla(num_thread) as thread_pool:
             for retry_cnt, success, item, output in thread_pool.imap_unordered(
-                    lambda x: (x[0], *wrapped_loader(x[1])),
-                    locked_iterable(),
+                lambda x: (x[0], *wrapped_loader(x[1])),
+                locked_iterable(),
             ):
                 if not success:
                     deal_with_error(retry_cnt)
@@ -184,12 +190,15 @@ def map_async_with_shard(
                 if not is_ready(ret):
                     deal_with_error(retry_cnt)
                     continue
-                    
+
                 semaphore.release()
-        
+
         return failed_queue.qsize()
 
-    iterable_shards = [iterable[i:i + shard_size] for shard_idx, i in enumerate(range(0, len(iterable), shard_size))]
+    iterable_shards = [
+        iterable[i : i + shard_size]
+        for shard_idx, i in enumerate(range(0, len(iterable), shard_size))
+    ]
     if verbose:
         print(f"Total {len(iterable_shards)} shards")
 
