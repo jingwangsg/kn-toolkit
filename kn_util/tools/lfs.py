@@ -92,7 +92,7 @@ def download(
     if not osp.exists(".downloaded"):
         run_cmd("touch .downloaded")
 
-    meta_handler = open(".downloaded", "r+")
+    meta_handler = open(".downloaded", "r")
     downloaded = set([_.strip() for _ in meta_handler.readlines()])
     print(f"=> Found {len(downloaded)} files already downloaded")
 
