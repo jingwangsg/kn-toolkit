@@ -10,6 +10,7 @@ def add_basic_parser(parser):
     parser.add_argument(
         "-o", "--output", type=str, help="The output path", default=None
     )
+    parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
     parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
 
@@ -21,8 +22,7 @@ def add_thread_parser(parser):
     parser.add_argument(
         "--chunk-size", type=int, help="The chunk size", default=1024 * 100
     )
-    parser.add_argument(
-        "--timeout", type=int, help="The timeout", default=10)
+    parser.add_argument("--timeout", type=int, help="The timeout", default=10)
     parser.add_argument(
         "-v", "--verbose", type=int, help="The verbosity level", default=1
     )
@@ -48,6 +48,7 @@ def main():
             headers=headers,
             num_threads=args.num_threads,
             chunk_size_download=args.chunk_size,
+            max_retries=args.max_retries,
             timeout=args.timeout,
             verbose=args.verbose,
         )

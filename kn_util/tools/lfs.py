@@ -173,7 +173,7 @@ def main():
             "--num-shards", type=int, help="The number of shards to use", default=1
         )
         parser.add_argument(
-            "--max-retries", type=int, help="The number of retries to use", default=99
+            "--max-retries", type=int, help="The number of retries to use", default=None
         )
         parser.add_argument(
             "-n",
