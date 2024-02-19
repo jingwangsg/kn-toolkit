@@ -55,14 +55,45 @@ class Downloader:
         self,
         chunk_size_download=1024,
         headers=None,
+        proxy=None,
+        max_retries=10,
         verbose=True,
     ):
         self.chunk_size_download = chunk_size_download
         self.headers = headers
         self.verbose = verbose
+        self.max_retries = max_retries
 
-    def download(url):
-        pass
+        self.client = httpx.Client(
+            headers=headers,
+            follow_redirects=True,
+            proxy=proxy,
+            timeout=None,
+        )
+
+        print("=> Using Proxy:", proxy)
+        print("=> Using Headers:", headers)
+
+    def get_filesize(self, url):
+        return int(self.client.head(url).headers["Content-Length"])
+
+    def download(self, url, path):
+        filesize = self.get_filesize(url)
+        filedir, filename = osp.dirname(path), osp.basename(path)
+        f = open(path, "rb+")
+
+        progress = get_rich_progress_download(disable=(self.verbose == 0))
+        progress.start()
+        task_id = progress.add_task(filename, total=filesize)
+        f.seek(0, os.SEEK_END)
+        progress.update(task_id, advance=f.tell())
+
+        with self.client.stream("GET", url) as r:
+            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                f.write(chunk)
+                progress.update(filename, advance=len(chunk))
+
+        progress.stop()
 
 
 def retry_wrapper(max_retries=10):
@@ -88,32 +119,23 @@ class MultiThreadDownloader(Downloader):
         max_retries=10,
         proxy=None,
         verbose=1,
-        chunk_size_download=1024 * 100,
-        chunk_size_merge=1024**3,
+        chunk_size_download=1024 * 300,
+        chunk_size_merge=1024 * 1024 * 500,
         # proxy=None,
     ):
         super().__init__(
             chunk_size_download=chunk_size_download,
             headers=headers,
+            max_retries=max_retries,
+            proxy=proxy,
             verbose=verbose,
         )
         self.num_threads = num_threads
-        self.max_retries = max_retries
-        print("Proxy:", proxy)
-        self.client = httpx.Client(
-            headers=headers,
-            follow_redirects=True,
-            proxy=proxy,
-            timeout=None,
-        )
         self.chunk_size_merge = chunk_size_merge
 
     def is_support_range(self, url):
         headers = self.client.head(url).headers
         return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
-
-    def get_filesize(self, url):
-        return int(self.client.head(url).headers["Content-Length"])
 
     def range_merge(self, shard_path, output_file, s_pos, e_pos):
         with open(shard_path, "rb") as f:
@@ -231,7 +253,7 @@ class MultiThreadDownloader(Downloader):
         self.resolve_download_meta(url, path, filesize)
 
         if not self.is_support_range(url):
-            print(f"{url} does not support range download")
+            super().download(url, path)
             return
 
         progress: Progress = get_rich_progress_download(disable=(self.verbose == 0))
