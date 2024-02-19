@@ -1,6 +1,7 @@
 import subprocess
 import socket
 import os.path as osp
+import os
 
 
 def run_cmd(cmd, verbose=False, async_cmd=False):
@@ -25,9 +26,16 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
 
 
 def clear_process(path):
+    path = osp.abspath(path)
     dirname, filename = osp.dirname(path), osp.basename(path)
-    # print(run_cmd(f"lsof +D {dirname} | grep {path}").stdout)
-    run_cmd(f"lsof +D {dirname} | grep {filename} | awk '{{print $2}}' | xargs kill -9")
+    processes = run_cmd(
+        f"lsof +D {dirname} | grep {filename} | awk '{{print $2}}'"
+    ).stdout
+    cur_pid = os.getpid()
+    processes = [int(_.strip()) for _ in processes.split("\n") if _.strip() != ""]
+    processes = [pid for pid in processes if pid != cur_pid]
+
+    run_cmd(f"kill -9 {' '.join(map(str, processes))}")
 
 
 def force_delete(path):
