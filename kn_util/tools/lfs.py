@@ -92,8 +92,8 @@ def download(
     if not osp.exists(".downloaded"):
         run_cmd("touch .downloaded")
 
-    meta_handler = open(".downloaded", "r")
-    downloaded = set([_.strip() for _ in meta_handler.readlines()])
+    with open(".downloaded", "r") as f:
+        downloaded = set([_.strip() for _ in f.readlines()])
     print(f"=> Found {len(downloaded)} files already downloaded")
 
     headers = get_hf_headers()
@@ -101,6 +101,8 @@ def download(
         headers=headers,
         **downloader_kwargs,
     )
+
+    meta_writer = open(".downloaded", "a")
 
     for path in paths:
         if path in downloaded:
@@ -112,8 +114,8 @@ def download(
         print(f"{url} \n=> {path}")
         downloader.download(url=url, path=path)
 
-        meta_handler.write(path + "\n")
-        meta_handler.flush()
+        meta_writer.write(path + "\n")
+        meta_writer.flush()
 
 
 def download_recursive(**download_kwargs):

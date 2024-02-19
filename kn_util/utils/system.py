@@ -26,6 +26,7 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
 
 def clear_process(path):
     dirname = osp.dirname(path)
+    print(run_cmd(f"lsof +D {dirname} | grep {path}").stdout)
     run_cmd(f"lsof +D {dirname} | grep {path} | awk '{{print $2}}' | xargs kill -9")
 
 

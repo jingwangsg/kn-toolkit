@@ -9,6 +9,7 @@ import os
 import os.path as osp
 import tempfile
 import random
+from functools import lru_cache
 from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
 from ..utils.rich import get_rich_progress_download, add_tasks
@@ -74,8 +75,12 @@ class Downloader:
         print("=> Using Proxy:", proxy)
         print("=> Using Headers:", headers)
 
+    @lru_cache()
+    def get_file_headers(self, url):
+        return self.client.head(url).headers
+
     def get_filesize(self, url):
-        return int(self.client.head(url).headers["Content-Length"])
+        return int(self.get_file_headers(url)["Content-Length"])
 
     def download(self, url, path):
         filesize = self.get_filesize(url)
@@ -134,7 +139,7 @@ class MultiThreadDownloader(Downloader):
         self.chunk_size_merge = chunk_size_merge
 
     def is_support_range(self, url):
-        headers = self.client.head(url).headers
+        headers = self.get_file_headers(url)
         return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
 
     def range_merge(self, shard_path, output_file, s_pos, e_pos):
@@ -251,6 +256,9 @@ class MultiThreadDownloader(Downloader):
             for i in range(self.num_threads)
         ]
         self.resolve_download_meta(url, path, filesize)
+        import ipdb
+
+        ipdb.set_trace()
 
         if not self.is_support_range(url):
             super().download(url, path)

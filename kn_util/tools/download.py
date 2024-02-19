@@ -21,7 +21,9 @@ def add_thread_parser(parser):
     parser.add_argument(
         "--chunk-size", type=int, help="The chunk size", default=1024 * 100
     )
-    parser.add_argument("-v", "--verbose", type=int, help="The verbosity level", default=1)
+    parser.add_argument(
+        "-v", "--verbose", type=int, help="The verbosity level", default=1
+    )
 
 
 def main():
@@ -35,7 +37,6 @@ def main():
     if "huggingface" in url:
         print("=> Detected huggingface url, using huggingface headers")
         headers = get_hf_headers()
-
 
     if args.mode == "thread":
         add_thread_parser(parser)
