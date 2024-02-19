@@ -58,6 +58,7 @@ class Downloader:
         headers=None,
         proxy=None,
         max_retries=10,
+        timeout=10,
         verbose=True,
     ):
         self.chunk_size_download = chunk_size_download
@@ -69,7 +70,7 @@ class Downloader:
             headers=headers,
             follow_redirects=True,
             proxy=proxy,
-            timeout=None,
+            timeout=timeout,
         )
 
         print("=> Using Proxy:", proxy)
@@ -123,6 +124,7 @@ class MultiThreadDownloader(Downloader):
         headers=None,
         num_threads=4,
         max_retries=10,
+        timeout=10,
         proxy=None,
         verbose=1,
         chunk_size_download=1024 * 300,
@@ -133,6 +135,7 @@ class MultiThreadDownloader(Downloader):
             chunk_size_download=chunk_size_download,
             headers=headers,
             max_retries=max_retries,
+            timeout=timeout,
             proxy=proxy,
             verbose=verbose,
         )
@@ -287,7 +290,7 @@ class MultiThreadDownloader(Downloader):
         for i, (s_pos, e_pos) in enumerate(ranges):
             shard_path = self.get_shard_path(path, i, s_pos, e_pos)
             future = executor.submit(
-                self.range_download,
+                retry_wrapper(self.max_retries)(self.range_download),
                 url=url,
                 s_pos=s_pos,
                 e_pos=e_pos,

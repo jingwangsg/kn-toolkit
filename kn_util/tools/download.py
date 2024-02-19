@@ -22,6 +22,8 @@ def add_thread_parser(parser):
         "--chunk-size", type=int, help="The chunk size", default=1024 * 100
     )
     parser.add_argument(
+        "--timeout", type=int, help="The timeout", default=10)
+    parser.add_argument(
         "-v", "--verbose", type=int, help="The verbosity level", default=1
     )
 
@@ -46,6 +48,7 @@ def main():
             headers=headers,
             num_threads=args.num_threads,
             chunk_size_download=args.chunk_size,
+            timeout=args.timeout,
             verbose=args.verbose,
         )
         downloader.download(url=url, path=output)
