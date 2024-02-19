@@ -170,7 +170,8 @@ class MultiThreadDownloader(Downloader):
         buffer.seek(0, os.SEEK_END)
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
-        progress.update(thread_task_id, advance=skip_bytes)
+        if self.verbose == 2:
+            progress.update(thread_task_id, advance=skip_bytes)
         progress.update(total_task_id, advance=skip_bytes)
 
         if s_pos == e_pos + 1:
@@ -256,9 +257,6 @@ class MultiThreadDownloader(Downloader):
             for i in range(self.num_threads)
         ]
         self.resolve_download_meta(url, path, filesize)
-        import ipdb
-
-        ipdb.set_trace()
 
         if not self.is_support_range(url):
             super().download(url, path)
