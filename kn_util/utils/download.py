@@ -179,6 +179,27 @@ class MultiThreadDownloader(Downloader):
 
             assert output_file.tell() == e_pos + 1
 
+    def gather_task_progress(self, progress, path, ranges, task_ids):
+        # resume task progress
+        # don't put this logic inside range_download, which will be called multiple time when reconnect
+
+        total_progress = 0
+        for i, (s_pos, e_pos) in enumerate(ranges):
+            shard_path = self.get_shard_path(path, i, s_pos, e_pos)
+            if osp.exists(shard_path):
+                buffer = open(shard_path, "rb+")
+            else:
+                buffer = open(shard_path, "wb+")
+            buffer.seek(0, os.SEEK_END)
+            thread_progress = buffer.tell()
+            if self.verbose == 2:
+                progress.update(task_ids[i + 1], completed=thread_progress)
+            total_progress += buffer.tell()
+            buffer.close()
+        progress.update(task_ids[0], completed=total_progress)
+
+        return total_progress
+
     def range_download(
         self,
         url,
@@ -199,9 +220,6 @@ class MultiThreadDownloader(Downloader):
         buffer.seek(0, os.SEEK_END)
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
-        if self.verbose == 2:
-            progress.update(thread_task_id, advance=skip_bytes)
-        progress.update(total_task_id, advance=skip_bytes)
 
         if s_pos == e_pos + 1:
             return
@@ -305,6 +323,12 @@ class MultiThreadDownloader(Downloader):
         progress.start()
 
         task_ids = self.get_task_ids(progress, ranges, filesize)
+        self.gather_task_progress(
+            progress,
+            path=path,
+            ranges=ranges,
+            task_ids=task_ids,
+        )
 
         executor = ThreadPoolExecutor(max_workers=self.num_threads)
         futures = []
