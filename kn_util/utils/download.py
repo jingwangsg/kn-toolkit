@@ -206,9 +206,6 @@ class MultiThreadDownloader(Downloader):
         filenames = self.get_cache_files(path)
         filename = osp.basename(path)
 
-        if osp.exists(path):
-            force_delete(path)
-
         try:
             assert all(force_delete(filename) for filename in filenames)
         except:
@@ -267,6 +264,7 @@ class MultiThreadDownloader(Downloader):
         self.resolve_download_meta(url, path, filesize)
 
         if not self.is_support_range(url):
+            print("=> Server does not support range, use single thread download")
             super().download(url, path)
             return
 
