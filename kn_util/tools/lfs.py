@@ -116,7 +116,7 @@ def download(
         meta_handler.flush()
 
 
-def download_recursive(num_threads=4, verbose=1):
+def download_recursive(**download__kwargs):
     cwd = os.getcwd()
     repos = run_cmd("find ./ -name '.git' -type d", return_output=True).splitlines()
     repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
@@ -125,7 +125,8 @@ def download_recursive(num_threads=4, verbose=1):
         print(f"=> Downloading {repo}")
         os.chdir(repo)
         download(
-            url_template=HF_DOWNLOAD_TEMPLATE, num_threads=num_threads, verbose=verbose
+            url_template=HF_DOWNLOAD_TEMPLATE,
+            **download__kwargs,
         )
 
 
@@ -208,4 +209,9 @@ def main():
             print(
                 "=> Downloading recursively! only supports huggingface git repos for now"
             )
-            download_recursive(num_threads=args.num_threads, verbose=args.verbose)
+            download_recursive(
+                num_threads=args.num_threads,
+                max_retries=args.max_retries,
+                proxy=args.proxy,
+                verbose=args.verbose,
+            )
