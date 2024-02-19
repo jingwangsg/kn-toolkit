@@ -116,7 +116,7 @@ def download(
         meta_handler.flush()
 
 
-def download_recursive(**download__kwargs):
+def download_recursive(**download_kwargs):
     cwd = os.getcwd()
     repos = run_cmd("find ./ -name '.git' -type d", return_output=True).splitlines()
     repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
@@ -126,7 +126,7 @@ def download_recursive(**download__kwargs):
         os.chdir(repo)
         download(
             url_template=HF_DOWNLOAD_TEMPLATE,
-            **download__kwargs,
+            **download_kwargs,
         )
 
 
