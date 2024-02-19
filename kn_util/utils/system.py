@@ -25,9 +25,9 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
 
 
 def clear_process(path):
-    dirname = osp.dirname(path)
-    print(run_cmd(f"lsof +D {dirname} | grep {path}").stdout)
-    run_cmd(f"lsof +D {dirname} | grep {path} | awk '{{print $2}}' | xargs kill -9")
+    dirname, filename = osp.dirname(path), osp.basename(path)
+    # print(run_cmd(f"lsof +D {dirname} | grep {path}").stdout)
+    run_cmd(f"lsof +D {dirname} | grep {filename} | awk '{{print $2}}' | xargs kill -9")
 
 
 def force_delete(path):

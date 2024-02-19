@@ -206,7 +206,15 @@ class MultiThreadDownloader(Downloader):
         filenames = self.get_cache_files(path)
         filename = osp.basename(path)
 
-        assert all(force_delete(filename) for filename in filenames)
+        if osp.exists(path):
+            force_delete(path)
+
+        try:
+            assert all(force_delete(filename) for filename in filenames)
+        except:
+            import ipdb
+
+            ipdb.set_trace()
         print(f"=> Cache of {filename} cleared")
 
     def resolve_download_meta(self, url, path, filesize):
