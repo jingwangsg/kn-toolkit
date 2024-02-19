@@ -272,9 +272,7 @@ class MultiThreadDownloader(Downloader):
             )
             futures.append(future)
 
-        wait(futures)
-
-        thread_pool.shutdown(wait=True)
+        executor.shutdown(wait=True)
         self.clear_cache(path)
 
 
