@@ -99,6 +99,7 @@ class MultiThreadDownloader(Downloader):
         )
         self.num_threads = num_threads
         self.max_retries = max_retries
+        print("Proxy:", proxy)
         self.client = httpx.Client(
             headers=headers,
             follow_redirects=True,
