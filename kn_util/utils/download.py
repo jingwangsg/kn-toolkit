@@ -62,6 +62,19 @@ class Downloader:
         timeout=10,
         verbose=True,
     ):
+        print("=> Downloader Configuration:")
+        print(
+            json.dumps(
+                {
+                    "headers": headers,
+                    "proxy": proxy,
+                    "timeout": timeout,
+                    "max_retries": max_retries,
+                },
+                indent=4,
+            )
+        )
+
         self.chunk_size_download = chunk_size_download
         self.headers = headers
         self.verbose = verbose
@@ -72,17 +85,6 @@ class Downloader:
             follow_redirects=True,
             proxy=proxy,
             timeout=timeout,
-        )
-        print("=> Client Configuration:")
-        print(
-            json.dumps(
-                {
-                    "headers": headers,
-                    "proxy": proxy,
-                    "timeout": timeout,
-                },
-                indent=4,
-            )
         )
 
     @lru_cache()
