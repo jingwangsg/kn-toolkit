@@ -95,8 +95,9 @@ class Downloader:
 
         with self.client.stream("GET", url) as r:
             for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
-                f.write(chunk)
-                progress.update(filename, advance=len(chunk))
+                if chunk:
+                    f.write(chunk)
+                    progress.update(filename, advance=len(chunk))
 
         progress.stop()
 
@@ -143,12 +144,16 @@ class MultiThreadDownloader(Downloader):
         return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
 
     def range_merge(self, shard_path, output_file, s_pos, e_pos):
+        output_file = open(output_file, "wb+")
+        # each thread write to the same file
+        cnt = 0
         with open(shard_path, "rb") as f:
-            f.seek(s_pos)
             output_file.seek(s_pos)
             for chunk in iter(lambda: f.read(self.chunk_size_merge), b""):
                 output_file.write(chunk)
-            assert f.tell() == e_pos + 1
+                cnt += len(chunk)
+
+            assert output_file.tell() == e_pos + 1
 
     def range_download(
         self,
@@ -252,6 +257,10 @@ class MultiThreadDownloader(Downloader):
             )
         return task_ids
 
+    def get_shard_path(self, path, i, s_pos, e_pos):
+        file_dir, filename = osp.dirname(path), osp.basename(path)
+        return osp.join(file_dir, f".{filename}.part{s_pos}-{e_pos}")
+
     def download(self, url, path):
         file_dir, filename = osp.dirname(path), osp.basename(path)
 
@@ -276,7 +285,7 @@ class MultiThreadDownloader(Downloader):
         executor = ThreadPoolExecutor(max_workers=self.num_threads)
         futures = []
         for i, (s_pos, e_pos) in enumerate(ranges):
-            shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
+            shard_path = self.get_shard_path(path, i, s_pos, e_pos)
             future = executor.submit(
                 self.range_download,
                 url=url,
@@ -294,14 +303,13 @@ class MultiThreadDownloader(Downloader):
 
         progress.stop()
 
-        output_file = open(path, "wb+")
         futures = []
         for i, (s_pos, e_pos) in enumerate(ranges):
-            shard_path = osp.join(file_dir, f".{filename}.{i:02d}")
+            shard_path = self.get_shard_path(path, i, s_pos, e_pos)
             future = executor.submit(
                 self.range_merge,
                 shard_path=shard_path,
-                output_file=output_file,
+                output_file=path,
                 s_pos=s_pos,
                 e_pos=e_pos,
             )
