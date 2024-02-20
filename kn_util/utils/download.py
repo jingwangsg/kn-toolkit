@@ -4,6 +4,8 @@ from tqdm import tqdm
 import json
 from huggingface_hub.utils._headers import build_hf_headers
 from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
+
+# from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
 import io
 import os
@@ -15,15 +17,7 @@ from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
 from ..utils.rich import get_rich_progress_download, add_tasks
 
-from rich.progress import (
-    Progress,
-    TextColumn,
-    BarColumn,
-    DownloadColumn,
-    TransferSpeedColumn,
-    TimeRemainingColumn,
-    Console,
-)
+from rich.progress import Progress
 
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [
@@ -36,12 +30,14 @@ USER_AGENT_LIST = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36",
 ]
 
+HUGGINGFACE_HEADER_X_LINKED_SIZE = "X-Linked-Size"
 
 def get_hf_headers():
     user_agent_header = http_user_agent()
-    headers = build_hf_headers(
-        user_agent=user_agent_header, token="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"
-    )
+    token = os.getenv("HF_TOKEN", None)
+    assert token is not None, "Please set HF_TOKEN in environment variable"
+    headers = build_hf_headers(user_agent=user_agent_header, token=token)
+    headers["Accept-Encoding"] = "identity"
     return headers
 
 
@@ -89,15 +85,22 @@ class Downloader:
 
     @lru_cache()
     def get_file_headers(self, url):
-        return self.client.head(url).headers
+        file_headers = self.client.head(url, follow_redirects=False).headers
+        return file_headers
 
     def get_filesize(self, url):
-        return int(self.get_file_headers(url)["Content-Length"])
+        file_headers = self.get_file_headers(url)
+        if HUGGINGFACE_HEADER_X_LINKED_SIZE in file_headers:
+            return int(file_headers[HUGGINGFACE_HEADER_X_LINKED_SIZE])
+        return int(file_headers["Content-Length"])
 
     def download(self, url, path):
         filesize = self.get_filesize(url)
         filedir, filename = osp.dirname(path), osp.basename(path)
-        f = open(path, "rb+")
+        if osp.exists(path):
+            f = open(path, "rb+")
+        else:
+            f = open(path, "wb+")
 
         progress = get_rich_progress_download(disable=(self.verbose == 0))
         progress.start()
@@ -109,7 +112,7 @@ class Downloader:
             for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
                 if chunk:
                     f.write(chunk)
-                    progress.update(filename, advance=len(chunk))
+                    progress.update(task_id, advance=len(chunk))
 
         progress.stop()
 
