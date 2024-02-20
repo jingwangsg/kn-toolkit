@@ -30,4 +30,4 @@ httpx
 nest_asyncio
 Pyarrow
 huggingface_hub
-proxy.py # great tool for proxy
+h5py
