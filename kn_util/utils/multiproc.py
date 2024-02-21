@@ -17,8 +17,8 @@ import threading
 from .rich import get_rich_progress_mofn, add_tasks
 
 
-def _run_sequential(iterable, func, desc=""):
-    pbar = tqdm(total=len(iterable), desc=desc)
+def _run_sequential(iterable, func, desc="", verbose=True):
+    pbar = tqdm(total=len(iterable), desc=desc, disable=not verbose)
     ret = []
     for it in iterable:
         ret.append(func(it))
@@ -61,7 +61,7 @@ def map_async(
 ):
     """while test_flag=True, run sequentially"""
     if test_flag:
-        return _run_sequential(iterable, func, desc=desc)
+        return _run_sequential(iterable, func, desc=desc, verbose=verbose)
     else:
         p = Pool(num_process)
         # ret = []

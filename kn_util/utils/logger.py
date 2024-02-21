@@ -13,6 +13,7 @@ import sys
 
 import torch
 import torch.distributed as dist
+from collections import defaultdict
 from .dist_utils import is_dist_avail_and_initialized, is_main_process
 
 
@@ -86,6 +87,7 @@ class MetricLogger(object):
         self.delimiter = delimiter
         if logger is None:
             from loguru import logger
+
             self.logger = logger
 
     def update(self, **kwargs):
@@ -159,7 +161,8 @@ class MetricLogger(object):
                             time=str(iter_time),
                             data=str(data_time),
                             memory=torch.cuda.max_memory_allocated() / MB,
-                        ))
+                        )
+                    )
                 else:
                     self.logger.info(
                         log_msg.format(
@@ -169,7 +172,8 @@ class MetricLogger(object):
                             meters=str(self),
                             time=str(iter_time),
                             data=str(data_time),
-                        ))
+                        )
+                    )
             i += 1
             end = time.time()
         total_time = time.time() - start_time
@@ -212,3 +216,31 @@ def setup_logger_loguru(
         logger.add(filename, level="INFO", format=template, enqueue=True)
     if stdout:
         logger.add(sys.stdout, format=template, enqueue=True)
+
+# ======================== for YTDLP ========================
+
+class FakeLogger(object):
+    def debug(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        pass
+
+
+class StorageLogger:
+    def __init__(self):
+        self.storage = defaultdict(list)
+
+    def debug(self, msg):
+        self.storage["debug"].append(msg)
+
+    def warning(self, msg):
+        self.storage["warning"].append(msg)
+
+    def error(self, msg):
+        self.storage["error"].append(msg)
+
+# ======================================================

@@ -10,78 +10,7 @@ from contextlib import redirect_stdout
 import ffmpeg
 import cv2
 import av
-
-
-class __FFMPEG:
-
-    @classmethod
-    def single_video_process(cls, video_path, output_video_path, frame_scale=None, fps=None, quiet=True):
-        flags = ""
-        if quiet:
-            flags += " -hide_banner -loglevel error"
-
-        vf_flags = []
-        if frame_scale:
-            vf_flags += [f"scale={frame_scale}"]
-        if fps:
-            vf_flags += [f"fps=fps={fps}"]
-
-        if len(vf_flags) > 0:
-            flags += " -vf " + ",".join(vf_flags)
-
-        cmd = f"ffmpeg -i {video_path} {flags} {output_video_path}"
-        if not quiet:
-            print(cmd)
-
-        subprocess.run(cmd, shell=True)
-
-    @classmethod
-    def single_video_to_image(cls, video_path, cur_image_dir, max_frame=None, frame_scale=None, fps=None, quiet=True, overwrite=False):
-        # if not overwrite and osp.exists(osp.join(cur_image_dir, ".finish")):
-        #     return
-        os.makedirs(cur_image_dir, exist_ok=True)
-        subprocess.run(f"rm -rf {cur_image_dir}/*", shell=True)
-        flag = ""
-        if quiet:
-            flag += "-hide_banner -loglevel error "
-        # filter:v
-        filter_v = []
-        if frame_scale:
-            if isinstance(frame_scale, int):
-                frame_scale = f"{frame_scale}:{frame_scale}"
-            assert isinstance(frame_scale, str)
-            filter_v += [f"scale={frame_scale}"]
-        if fps:
-            filter_v += [f"fps=fps={fps}"]
-        if len(filter_v) > 0:
-            flag += f" -filter:v {','.join(filter_v)}"
-        if max_frame:
-            flag += f"-frames:v {max_frame} "
-
-        cmd = f"ffmpeg -i {video_path} {flag} {osp.join(cur_image_dir, '%04d.png')}"
-        if not quiet:
-            print(cmd)
-
-        subprocess.run(
-            cmd,
-            shell=True,
-        )
-        # subprocess.run(f"cd {cur_image_dir} && touch .finish", shell=True)
-
-    @classmethod
-    def multiple_video_to_image_async(cls, video_dir, image_root, **kwargs):
-        video_paths = glob.glob(video_dir + "*")
-
-        def func_single(inputs):
-            return cls.single_video_to_image(**inputs)
-
-        args = []
-        for video_path in video_paths:
-            video_id = osp.basename(video_path)[:-4]
-            cur_image_dir = osp.join(image_root, video_id)
-            args += [dict(video_path=video_path, cur_image_dir=cur_image_dir, **kwargs)]
-
-        map_async(args, func_single, num_process=64)
+from ...utils.logger import FakeLogger, StorageLogger
 
 
 class OpenCVVideoLoader:
@@ -132,7 +61,7 @@ class PyAVVideoLoader(OpenCVVideoLoader):
         self.container = av.open(file_obj)
 
         if multi_thread:
-            self.container.streams.video[0].thread_type = 'AUTO'
+            self.container.streams.video[0].thread_type = "AUTO"
 
     def get_frames(self):
         container = self.container
@@ -157,17 +86,17 @@ class PyAVVideoLoader(OpenCVVideoLoader):
 class FFMPEGVideoLoader:
     def __init__(self, video_path):
         metadata = ffmpeg.probe(video_path)
-        video_stream = next((stream for stream in metadata['streams'] if stream['codec_type'] == 'video'), None)
+        video_stream = next((stream for stream in metadata["streams"] if stream["codec_type"] == "video"), None)
 
-        self._fps = metadata['streams'][0]['r_frame_rate']
-        self._duration = metadata['streams'][0]['duration']
-        self._width = metadata['streams'][0]['width']
-        self._height = metadata['streams'][0]['height']
-    
+        self._fps = metadata["streams"][0]["r_frame_rate"]
+        self._duration = metadata["streams"][0]["duration"]
+        self._width = metadata["streams"][0]["width"]
+        self._height = metadata["streams"][0]["height"]
+
     @property
     def hw(self):
         return self._height, self._width
-    
+
     @property
     def length(self):
         return int(float(self._duration) * float(self._fps))
@@ -187,15 +116,18 @@ class FFMPEGVideoLoader:
         #     filter_kwargs = {"vf": filter_string}
 
         buffer, _ = (
-            ffmpeg.input(self.video_path).output(
-                'pipe:',
-                format='rawvideo',
-                pix_fmt='rgb24',
+            ffmpeg.input(self.video_path)
+            .output(
+                "pipe:",
+                format="rawvideo",
+                pix_fmt="rgb24",
                 # **filter_kwargs,
-            ).run(
+            )
+            .run(
                 capture_stdout=True,
                 quiet=True,
-            ))
+            )
+        )
         frames = np.frombuffer(buffer, np.uint8).reshape([-1, h, w, 3])
         return frames
 
@@ -207,6 +139,7 @@ class AVVideoLoader(OpenCVVideoLoader):
 
 
 import yt_dlp
+import re
 
 
 class YTDLPDownloader:
@@ -214,32 +147,43 @@ class YTDLPDownloader:
     @staticmethod
     def _maybe_youtube_id(url):
         if url.startswith("http"):
-            return osp.basename(url)
+            return re.match(r".*v=([^&]+)", url).group(1)
         else:
             return url
 
     @classmethod
-    def download(cls, youtube_id, video_path, video_format="worst[ext=mp4][height>=224]", quiet=True):
+    def download(
+        cls,
+        youtube_id,
+        video_path,
+        video_format="worst[ext=mp4][height>=224]",
+        quiet=True,
+        logger=None,
+    ):
         # scale should be conditon like "<=224" or ">=224"
         youtube_id = cls._maybe_youtube_id(youtube_id)
-        ydl_opts = {'ignoreerrors': True, 'format': video_format, 'outtmpl': video_path, 'quiet': quiet, 'noprogress': quiet}
+        ydl_opts = {
+            "ignoreerrors": True,
+            "format": video_format,
+            "outtmpl": video_path,
+            "quiet": quiet,
+            "noprogress": quiet,
+            "logger": logger,
+        }
+        if quiet and logger is None:
+            # completely suppress yt-dlp output
+            ydl_opts["logger"] = FakeLogger()
 
         url = f"https://www.youtube.com/watch?v={youtube_id}"
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download(url)
 
-        return error_code == 0
+        return error_code
 
     @staticmethod
-    def _check_format_dict(format_dict,
-                           is_storyboad=False,
-                           has_video=True,
-                           has_audio=True,
-                           h_min=0,
-                           h_max=np.inf,
-                           w_min=0,
-                           w_max=np.inf,
-                           ext=None):
+    def _check_format_dict(
+        format_dict, is_storyboad=False, has_video=True, has_audio=True, h_min=0, h_max=np.inf, w_min=0, w_max=np.inf, ext=None
+    ):
         if is_storyboad:
             if format_dict["ext"] == "mhtml":
                 return True
@@ -265,7 +209,7 @@ class YTDLPDownloader:
 
     @classmethod
     def extract_formats(cls, youtube_id, quiet=True, **format_kwargs):
-        ydl_opts = {'ignoreerrors': True, 'logtostderr': True, 'quiet': quiet, 'noprogress': quiet}
+        ydl_opts = {"ignoreerrors": True, "logtostderr": True, "quiet": quiet, "noprogress": quiet}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             infos = ydl.extract_info(youtube_id, download=False)
             formats = [_ for _ in infos["formats"] if cls._check_format_dict(_, **format_kwargs)]
@@ -276,7 +220,7 @@ class YTDLPDownloader:
 
     @staticmethod
     def _download_ydl(youtube_id, buffer, video_format, quiet=True):
-        ydl_opts = {'ignoreerrors': True, 'format': video_format, 'outtmpl': "-", 'logtostderr': True, 'quiet': quiet, 'noprogress': quiet}
+        ydl_opts = {"ignoreerrors": True, "format": video_format, "outtmpl": "-", "logtostderr": True, "quiet": quiet, "noprogress": quiet}
         with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([youtube_id])
         return error_code
@@ -303,6 +247,7 @@ class YTDLPDownloader:
 
 import decord
 from decord import VideoReader
+
 # decord.bridge.set_bridge('numpy')
 
 
@@ -311,7 +256,7 @@ class DecordVideoLoader:
     def __init__(self, video_path):
         # super().__init__(video_path)
         self.vr = VideoReader(video_path)
-    
+
     @property
     def hw(self):
         return self.vr[0].shape[:2]
@@ -319,7 +264,7 @@ class DecordVideoLoader:
     @property
     def length(self):
         return len(self.vr)
-    
+
     @property
     def fps(self):
         return self.vr.get_avg_fps()
@@ -329,6 +274,7 @@ class DecordVideoLoader:
             frame_ids = range(self.length)
         frames = self.vr.get_batch(frame_ids)
         return frames.asnumpy()
+
 
 """
 Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf521ae1ff5573358e632f/base/base_dataset.py
@@ -393,7 +339,7 @@ def fill_temporal_param(num_frames=None, fps=None, duration=None):
 def get_frame_indices(
     num_frames,
     vlen,
-    sample='rand',
+    sample="rand",
     offset_from_start=None,
     max_num_frames=-1,
 ):
@@ -406,7 +352,7 @@ def get_frame_indices(
     for idx, interv in enumerate(intervals[:-1]):
         ranges.append((interv, intervals[idx + 1] - 1))
 
-    if sample == 'rand':
+    if sample == "rand":
         try:
             frame_indices = [random.choice(range(x[0], x[1])) for x in ranges]
         except:
@@ -416,7 +362,7 @@ def get_frame_indices(
     elif sample == "start":
         offset_from_start = offset_from_start if offset_from_start is not None else 0
         frame_indices = [np.minimum(x[0] + offset_from_start, x[1]) for x in ranges]
-    elif sample == 'middle':
+    elif sample == "middle":
         frame_indices = [(x[0] + x[1]) // 2 for x in ranges]
     else:
         raise NotImplementedError
@@ -424,7 +370,7 @@ def get_frame_indices(
     return frame_indices
 
 
-def read_frames_av(video_path, num_frames, sample='rand', fix_start=None, max_num_frames=-1):
+def read_frames_av(video_path, num_frames, sample="rand", fix_start=None, max_num_frames=-1):
     reader = av.open(video_path)
     frames = [torch.from_numpy(f.to_rgb().to_ndarray()) for f in reader.decode(video=0)]
     vlen = len(frames)
@@ -439,7 +385,7 @@ def read_frames_av(video_path, num_frames, sample='rand', fix_start=None, max_nu
 def read_frames_gif(
     video_path,
     num_frames,
-    sample='rand',
+    sample="rand",
     fix_start=None,
     max_num_frames=-1,
 ):
@@ -463,7 +409,7 @@ def read_frames_decord(
     video_path,
     num_frames=None,
     fps=None,
-    sample='rand',
+    sample="rand",
     offset_from_start=None,
     truncate_secs=None,
 ):
@@ -491,7 +437,7 @@ def read_frames_decord(
 
 
 VIDEO_READER_FUNCS = {
-    'av': read_frames_av,
-    'decord': read_frames_decord,
-    'gif': read_frames_gif,
+    "av": read_frames_av,
+    "decord": read_frames_decord,
+    "gif": read_frames_gif,
 }

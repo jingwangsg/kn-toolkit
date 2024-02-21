@@ -4,13 +4,11 @@ import torch.nn.functional as F
 from typing import List, Optional, Union
 import numpy as np
 from .tensor_ops import general_pad_np_arr, general_pad_pt_tensor
-from beartype import beartype
 
 ListOfArrayLike = List[Union[np.ndarray, torch.Tensor]]
 Scaler = Union[int, float]
 
 
-@beartype
 def pad_sequence_general(arr_list: ListOfArrayLike,
                          fill_value: Scaler,
                          to_length: Optional[int] = None,
