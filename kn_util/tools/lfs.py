@@ -6,7 +6,7 @@ import subprocess
 import argparse
 import os.path as osp
 from ..utils.git_utils import get_origin_url
-from ..utils.download import MultiThreadDownloader, get_hf_headers
+from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -101,6 +101,7 @@ def download(
         headers=headers,
         **downloader_kwargs,
     )
+    downloader = MultiThreadDownloader(headers=headers, **downloader_kwargs)
 
     for path in paths:
         if path in downloaded:
@@ -180,7 +181,7 @@ def main():
             "--num-threads",
             type=int,
             help="The number of threads to use",
-            default=8,
+            default=4,
         )
         parser.add_argument("--timeout", type=int, help="The timeout", default=10)
         parser.add_argument(

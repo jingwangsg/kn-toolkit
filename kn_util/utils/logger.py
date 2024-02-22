@@ -15,6 +15,7 @@ import torch
 import torch.distributed as dist
 from collections import defaultdict
 from .dist_utils import is_dist_avail_and_initialized, is_main_process
+from loguru import logger
 
 
 class SmoothedValue(object):
@@ -190,6 +191,7 @@ def setup_logger_logging():
 
 
 def setup_logger_loguru(
+    logger=logger,
     name=None,
     filename=None,
     stdout=True,
@@ -198,7 +200,6 @@ def setup_logger_loguru(
 ):
     # when filename = None and stdout=False, loguru will not log anything
     # this is espeically useful for distributed training
-    from loguru import logger
 
     template = ""
     if name is not None:

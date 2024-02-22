@@ -32,6 +32,7 @@ USER_AGENT_LIST = [
 
 HUGGINGFACE_HEADER_X_LINKED_SIZE = "X-Linked-Size"
 
+
 def get_hf_headers():
     user_agent_header = http_user_agent()
     token = os.getenv("HF_TOKEN", None)
@@ -51,7 +52,7 @@ def get_random_headers():
 class Downloader:
     def __init__(
         self,
-        chunk_size_download=1024,
+        chunk_size_download=1024 * 100,
         headers=None,
         proxy=None,
         max_retries=10,
@@ -75,6 +76,8 @@ class Downloader:
         self.headers = headers
         self.verbose = verbose
         self.max_retries = max_retries
+        self.proxy = proxy
+        self.timeout = timeout
 
         self.client = httpx.Client(
             headers=headers,
@@ -151,7 +154,7 @@ class MultiThreadDownloader(Downloader):
         timeout=10,
         proxy=None,
         verbose=1,
-        chunk_size_download=1024 * 300,
+        chunk_size_download=1024 * 10,
         chunk_size_merge=1024 * 1024 * 500,
         # proxy=None,
     ):
@@ -307,7 +310,6 @@ class MultiThreadDownloader(Downloader):
         return osp.join(file_dir, f".{filename}.part{s_pos}-{e_pos}")
 
     def download(self, url, path):
-        file_dir, filename = osp.dirname(path), osp.basename(path)
 
         filesize = self.get_filesize(url)
         file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
@@ -315,12 +317,13 @@ class MultiThreadDownloader(Downloader):
             (i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1))
             for i in range(self.num_threads)
         ]
-        self.resolve_download_meta(url, path, filesize)
-
         if not self.is_support_range(url):
             print("=> Server does not support range, use single thread download")
             super().download(url, path)
             return
+
+        # enter this step only when decided to use multi-thread download
+        self.resolve_download_meta(url, path, filesize)
 
         progress: Progress = get_rich_progress_download(disable=(self.verbose == 0))
         progress.start()
