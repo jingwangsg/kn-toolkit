@@ -10,8 +10,8 @@ def split_path(path):
     return os.path.split(path.rstrip(os.path.sep))
 
 
-def cmd_list_files(path):
-    return f"cd {path} && find ./ -type f -print0"
+def cmd_list_files(path, size="+1g"):
+    return f"cd {path} && fd --type f --size {size}"
 
 
 def cmd_get_path(path):
@@ -60,9 +60,7 @@ class RsyncTool:
         path_delimiter = " :" if is_remote else " "
 
         if isinstance(path, list):
-            return _combine(
-                hostname, path_delimiter.join([f"'{it_path}'" for it_path in path])
-            )
+            return _combine(hostname, path_delimiter.join([f"'{it_path}'" for it_path in path]))
         else:
             return _combine(hostname, path)
 
@@ -88,9 +86,7 @@ class RsyncTool:
         if exclude is not None:
             rsync_args += f" --exclude={exclude} "
 
-        from_path_for_rsync = cls.prepare_path_for_rsync(
-            hostname=from_host, path=from_path
-        )
+        from_path_for_rsync = cls.prepare_path_for_rsync(hostname=from_host, path=from_path)
         to_path_for_rsync = cls.prepare_path_for_rsync(hostname=to_host, path=to_path)
 
         return f"rsync {rsync_args} {from_path_for_rsync} {to_path_for_rsync}"
@@ -104,9 +100,7 @@ class RsyncTool:
     def delete(cls, dir_path):
         empty_dir = osp.expanduser("~/.empty")
         run_cmd(f"rm -rf {empty_dir} && mkdir {empty_dir}")
-        run_cmd(
-            f"rsync --delete-before --force -r {empty_dir} {dir_path}", verbose=True
-        )
+        run_cmd(f"rsync --delete-before --force -r {empty_dir} {dir_path}", verbose=True)
         run_cmd(f"rm -rf {empty_dir}")
         run_cmd(f"rm -rf {dir_path}")
 
@@ -118,7 +112,7 @@ class RsyncTool:
         async_dir=False,
         path_filter=lambda x: True,
         chunk_size=100,
-        num_process=30,
+        num_thread=30,
         **rsync_kwargs,
     ):
         # async_dir: rsync all files in from_addr to to_addr asychronously
@@ -128,13 +122,9 @@ class RsyncTool:
         to_host, to_path = parse(to_addr)
 
         if from_host is not None:
-            assert cls.check_hostname_available(
-                from_host
-            ), f"hostname {from_host} not available"
+            assert cls.check_hostname_available(from_host), f"hostname {from_host} not available"
         if to_host is not None:
-            assert cls.check_hostname_available(
-                to_host
-            ), f"hostname {to_host} not available"
+            assert cls.check_hostname_available(to_host), f"hostname {to_host} not available"
 
         num_remotes = (from_host is not None) + (to_host is not None)
         if num_remotes == 2:
@@ -161,38 +151,41 @@ class RsyncTool:
             subprocess.run(cmd, shell=True)
         else:
             # list all files recursively in from_path
-            cmd = cmd_list_files(from_path)
-            if from_mode == "remote":
-                cmd = cmd_on_ssh(from_host, cmd)
-            out = run_cmd(cmd).stdout.strip()
-            from_files = out.split("\0")
-            from_files = [x for x in from_files if len(x.strip()) > 0]
-            from_files = [x for x in from_files if path_filter(x)]
+            def list_files(from_path, size="+1g"):
+                cmd = cmd_list_files(from_path, size=size)
+                if from_mode == "remote":
+                    cmd = cmd_on_ssh(from_host, cmd)
+
+                out = run_cmd(cmd).stdout.strip()
+                from_files = out.split("\n")
+                from_files = [x for x in from_files if len(x.strip()) > 0 and path_filter(x)]
+                from_paths = [osp.join(from_path, ".", fn) for fn in from_files]
+                return from_paths
 
             # construct as relative path for --relative rsync
-            from_paths = [osp.join(from_path, x) for x in from_files]
 
-            assert len(from_files) > 0, "no files found for async dir"
             print("=> using async dir")
 
-            # construct chunks
-            path_chunks = [
-                from_paths[i : i + chunk_size]
-                for i in range(0, len(from_files), chunk_size)
-            ]
+            def rsync_in_chunk(paths, chunk_size, desc="Rsync"):
+                # construct chunks
+                path_chunks = [paths[i : i + chunk_size] for i in range(0, len(paths), chunk_size)]
 
-            def _apply(path_chunk):
-                cmd = construct_cmd(path_chunk)
-                # print(cmd)
-                # print("=====================================")
-                run_cmd(cmd, verbose=True)
+                def _apply(path_chunk):
+                    cmd = construct_cmd(path_chunk)
+                    run_cmd(cmd, verbose=True)
 
-            map_async_with_thread(
-                func=_apply,
-                iterable=path_chunks,
-                num_thread=num_process,
-                desc=f"Rsync {from_addr} -> {to_addr}",
-            )
+                map_async_with_thread(
+                    func=_apply,
+                    iterable=path_chunks,
+                    num_thread=num_thread,
+                    desc=desc,
+                )
+
+            file_small = list_files(from_path, size="-512m")
+            rsync_in_chunk(file_small, chunk_size=chunk_size, desc="Rsync Small")
+
+            files_large = list_files(from_path, size="+512m")
+            rsync_in_chunk(files_large, chunk_size=1, desc="Rsync Large")
 
 
 def main():
@@ -210,8 +203,8 @@ def main():
             action="store_true",
             help="async download/upload dir",
         )
-        parser.add_argument("-n", "--chunk-size", type=int, default=100)
-        parser.add_argument("-P", "--num-process", type=int, default=30)
+        parser.add_argument("-n", "--chunk-size", type=int, default=10)
+        parser.add_argument("-P", "--num-thread", type=int, default=30)
 
         args = parser.parse_args()
 
@@ -220,7 +213,7 @@ def main():
             to_addr=args.to_dir,
             async_dir=args.async_dir,
             chunk_size=args.chunk_size,
-            num_process=args.num_process,
+            num_thread=args.num_thread,
         )
     elif command == "delete":
         parser.add_argument("dir_path", type=str, help="dir to delete")
