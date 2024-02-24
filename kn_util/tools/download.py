@@ -3,6 +3,7 @@ import argparse
 from ..utils.download import get_hf_headers, get_random_headers, MultiThreadDownloader
 from fire import Fire
 import os.path as osp
+import os
 
 
 def add_basic_parser(parser):
@@ -13,6 +14,7 @@ def add_basic_parser(parser):
     parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
     parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
+    parser.add_argument("--token", type=str, help="The token to use", default=None)
 
 
 def add_thread_parser(parser):
@@ -31,6 +33,10 @@ def add_thread_parser(parser):
 def main():
     parser = argparse.ArgumentParser()
     add_basic_parser(parser)
+
+    if args.token is not None:
+        os.environ["HF_TOKEN"] = args.token
+
     args = parser.parse_known_args()[0]
     url = args.url
     output = osp.basename(url) if args.output is None else args.output

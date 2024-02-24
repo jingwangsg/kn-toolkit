@@ -190,7 +190,11 @@ def main():
             default=1,
             help="Whether to print verbose information",
         )
+        parser.add_argument("--token", type=str, help="The token to use", default=None)
         args = parser.parse_args()
+
+        if args.token is not None:
+            os.environ["HF_TOKEN"] = args.token
 
         if not args.recursive:
             download(

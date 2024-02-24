@@ -257,3 +257,4 @@ else
 fi
 unset __conda_setup
 # <<< conda initialize <<<
+export HF_TOKEN="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"
