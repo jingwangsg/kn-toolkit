@@ -8,9 +8,7 @@ import os
 
 def add_basic_parser(parser):
     parser.add_argument("url", type=str, help="The url to download")
-    parser.add_argument(
-        "-o", "--output", type=str, help="The output path", default=None
-    )
+    parser.add_argument("-o", "--output", type=str, help="The output path", default=None)
     parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
     parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
@@ -18,26 +16,19 @@ def add_basic_parser(parser):
 
 
 def add_thread_parser(parser):
-    parser.add_argument(
-        "-n", "--num-threads", type=int, help="The number of threads", default=8
-    )
-    parser.add_argument(
-        "--chunk-size", type=int, help="The chunk size", default=1024 * 100
-    )
+    parser.add_argument("-n", "--num-threads", type=int, help="The number of threads", default=8)
+    parser.add_argument("--chunk-size", type=int, help="The chunk size", default=1024 * 100)
     parser.add_argument("--timeout", type=int, help="The timeout", default=10)
-    parser.add_argument(
-        "-v", "--verbose", type=int, help="The verbosity level", default=1
-    )
+    parser.add_argument("-v", "--verbose", type=int, help="The verbosity level", default=1)
 
 
 def main():
     parser = argparse.ArgumentParser()
     add_basic_parser(parser)
 
+    args = parser.parse_known_args()[0]
     if args.token is not None:
         os.environ["HF_TOKEN"] = args.token
-
-    args = parser.parse_known_args()[0]
     url = args.url
     output = osp.basename(url) if args.output is None else args.output
 
