@@ -173,17 +173,17 @@ class MultiThreadDownloader(Downloader):
         headers = self.get_file_headers(url)
         return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
 
-    def range_merge(self, shard_path, output_file, s_pos, e_pos):
-        output_file = open(output_file, "wb+")
-        # each thread write to the same file
-        cnt = 0
-        with open(shard_path, "rb") as f:
-            output_file.seek(s_pos)
-            for chunk in iter(lambda: f.read(self.chunk_size_merge), b""):
-                output_file.write(chunk)
-                cnt += len(chunk)
+    # def range_merge(self, shard_path, output_file, s_pos, e_pos):
+    #     output_file = open(output_file, "wb+")
+    #     # each thread write to the same file
+    #     cnt = 0
+    #     with open(shard_path, "rb") as f:
+    #         output_file.seek(s_pos)
+    #         for chunk in iter(lambda: f.read(self.chunk_size_merge), b""):
+    #             output_file.write(chunk)
+    #             cnt += len(chunk)
 
-            assert output_file.tell() == e_pos + 1
+    #         assert output_file.tell() == e_pos + 1
 
     def gather_task_progress(self, progress, path, ranges, task_ids):
         # resume task progress
@@ -357,19 +357,23 @@ class MultiThreadDownloader(Downloader):
 
         progress.stop()
 
-        futures = []
-        for i, (s_pos, e_pos) in enumerate(ranges):
-            shard_path = self.get_shard_path(path, i, s_pos, e_pos)
-            future = executor.submit(
-                self.range_merge,
-                shard_path=shard_path,
-                output_file=path,
-                s_pos=s_pos,
-                e_pos=e_pos,
-            )
-            futures.append(future)
+        shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
+        run_cmd(f"cat {' '.join(shard_paths)} > {path}", async_cmd=False)
 
-        executor.shutdown(wait=True)
+        # futures = []
+        # for i, (s_pos, e_pos) in enumerate(ranges):
+            # shard_path = self.get_shard_path(path, i, s_pos, e_pos)
+            # future = executor.submit(
+            #     self.range_merge,
+            #     shard_path=shard_path,
+            #     output_file=path,
+            #     s_pos=s_pos,
+            #     e_pos=e_pos,
+            # )
+            # futures.append(future)
+            # self.range_merge(shard_path, output_file=path, s_pos=s_pos, e_pos=e_pos,)
+
+        # executor.shutdown(wait=True)
         self.clear_cache(path)
 
 
