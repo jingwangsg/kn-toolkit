@@ -22,9 +22,7 @@ from kn_util.utils.multiproc import map_async_with_thread
 class GPUCluster:
 
     def __init__(self, server_info_fn, timeout):
-        server_info = pd.read_csv(
-            server_info_fn, names=["node_idx", "partition", "gpu_type"]
-        )
+        server_info = pd.read_csv(server_info_fn, names=["node_idx", "partition", "gpu_type"])
         server_info["partition"] = server_info["partition"].astype(str)
         server_info["gpu_type"] = server_info["gpu_type"].astype(str)
         self.server_info = server_info
@@ -51,28 +49,18 @@ class GPUCluster:
 
         cmd_with_timeout = prefix + cmd
 
-        result = subprocess.run(
-            cmd_with_timeout, shell=True, capture_output=True, text=True
-        )
+        result = subprocess.run(cmd_with_timeout, shell=True, capture_output=True, text=True)
 
         output = result.stdout.strip()
 
-        if (
-            result.stderr.strip() != ""
-            and "has been allocated resources" not in result.stderr
-        ):
-            self.failed += [
-                {"node": f"node{node_idx:02d}", "err": result.stderr.split("\n")[0]}
-            ]
+        if result.stderr.strip() != "" and "has been allocated resources" not in result.stderr:
+            self.failed += [{"node": f"node{node_idx:02d}", "err": result.stderr.split("\n")[0]}]
             return node_idx, None
 
         return node_idx, output
 
     def query_all_node(self, cmd):
-        inputs_list = [
-            (row["node_idx"], row["partition"], cmd, self.timeout)
-            for _, row in self.server_info.iterrows()
-        ]
+        inputs_list = [(row["node_idx"], row["partition"], cmd, self.timeout) for _, row in self.server_info.iterrows()]
         self.failed = []
 
         st = time.time()
@@ -93,7 +81,68 @@ class GPUCluster:
 
         return node_stdout
 
-    def get_memory_dataframe(self):
+    def get_dataframe_by_node(self):
+        gpu_query_cmd = "gpustat --json"
+        node_stdouts = self.query_all_node(gpu_query_cmd)
+        node_stdouts = [x for x in node_stdouts if x[1]]
+
+        df_list = []
+
+        for node_idx, node_out in node_stdouts:
+            json_dict = json.loads(node_out)
+            gpu_infos = json_dict["gpus"]
+            system_infos = json_dict["system"]
+            user_cpu_percent = system_infos["user_cpu_percent"]
+            user_cpu_percent.pop("root")
+
+            def _rnd(x):
+                return int(np.round(x))
+
+            mem_usage_gb = system_infos["vmem_used"] / 1024 / 1024 / 1024
+            mem_total_gb = system_infos["vmem_total"] / 1024 / 1024 / 1024
+            mem_str = f"{_rnd(mem_usage_gb):03d} / {_rnd(mem_total_gb)}"
+
+            cpu_total = system_infos["cpu_count"]
+            cpu_usage = int(_rnd(system_infos["cpu_percent"] * cpu_total / 100))
+
+            cpu_usage_str = f"{cpu_usage:03d}/{cpu_total}"
+
+            gpu_memory_free_vals = [_rnd((gpu["memory.total"] - gpu["memory.used"]) / 1024) for gpu in gpu_infos]
+            gpu_memory_free = "|".join([f"{v:>2d}" for v in gpu_memory_free_vals])
+
+            gpu_mem_by_user = {}
+            for gpu in gpu_infos:
+                for p in gpu["processes"]:
+                    gpu_mem_by_user[p["username"]] = gpu_mem_by_user.get(p["username"], 0) + p["gpu_memory_usage"]
+
+            max_key_len = 13
+            max_val_len = 6
+            max_gpu_mem_len = 7
+
+            user_str = "\n".join(
+                [
+                    f"{k:{max_key_len}}: {v:>{max_val_len}.1f} {gpu_mem_by_user.get(k, 0):>{max_gpu_mem_len}}"
+                    for k, v in user_cpu_percent.items()
+                ]
+            )
+
+            df_list += [
+                {
+                    "node": f"node{node_idx:02d}",
+                    "gpu\n.name": gpu_infos[0]["name"],
+                    "gpu\n.count": len(gpu_infos),
+                    "gpu\n.mem.free (G)": gpu_memory_free,
+                    "mem\n.usage": mem_str,
+                    "cpu\n.usage": cpu_usage_str,
+                    "node\n.users (cpu gpu_mem)": user_str,
+                }
+            ]
+
+        df = pd.DataFrame(df_list)
+        df = df.sort_values(by=["node"])
+        return df
+
+    def get_dataframe_by_gpu(self):
         gpu_query_cmd = "gpustat --json"
         node_stdouts = self.query_all_node(gpu_query_cmd)
         node_stdouts = [x for x in node_stdouts if x[1]]
@@ -108,22 +157,9 @@ class GPUCluster:
             # mem_usage = np.sum(
             #     [p["cpu_memory_usage"] for gpu in gpu_infos for p in gpu["processes"]]
             # )
-            def _rnd(x):
-                return int(np.round(x))
-
-            mem_usage_gb = system_infos["vmem_used"] / 1024 / 1024 / 1024
-            mem_total_gb = system_infos["vmem_total"] / 1024 / 1024 / 1024
-            mem_str = f"{_rnd(mem_usage_gb):03d} / {_rnd(mem_total_gb)}"
-
-            cpu_total = system_infos["cpu_count"]
-            cpu_usage = int(_rnd(system_infos["cpu_percent"] * cpu_total / 100))
-
-            cpu_usage_str = f"{cpu_usage:03d}/{cpu_total}"
 
             for gpu in gpu_infos:
-                users = ", ".join(
-                    list(set(f'{p["username"]}' for p in gpu["processes"]))
-                )
+                users = ", ".join(list(set(f'{p["username"]}' for p in gpu["processes"])))
                 item = {
                     "gpu.id": f"node{node_idx:02d}_gpu#{gpu['index']}",
                     "name": gpu["name"],
@@ -131,8 +167,6 @@ class GPUCluster:
                     "memory\n.free": gpu["memory.total"] - gpu["memory.used"],
                     "memory\n.total": gpu["memory.total"],
                     "proc\n.users": users,
-                    "node\n.cpu": cpu_usage_str,
-                    "node\n.mem": mem_str,
                 }
                 df_list += [item]
         df = pd.DataFrame(df_list)
@@ -140,7 +174,7 @@ class GPUCluster:
         return df
 
     def find_gpu_available(self, full=True, sorted=True):
-        df = self.get_memory_dataframe()
+        df = self.get_dataframe_by_gpu()
         if not full:
             columns = [
                 "gpu.id",
@@ -148,7 +182,6 @@ class GPUCluster:
                 "gpu\n.util",
                 "memory\n.free",
                 "memory\n.total",
-                "node\n.cpu",
             ]
             df = df[columns]
 
@@ -177,9 +210,7 @@ class GPUCluster:
             for gpu in node_stdout["gpus"]:
                 for process in gpu["processes"]:
                     item = {
-                        "gpu\n.name": self.server_info[
-                            self.server_info["node_idx"] == node_idx
-                        ]["partition"].item(),
+                        "gpu\n.name": self.server_info[self.server_info["node_idx"] == node_idx]["partition"].item(),
                         "gpu\n.id": f"{node_stdout['hostname']}_#{gpu['index']}",
                         "gpu\n.used": process["gpu_memory_usage"],
                         "gpu\n.util": gpu["utilization.gpu"],
@@ -242,9 +273,7 @@ def update_server_list(server_info_fn):
         if not_gpu_node:
             continue
 
-        ordered_item = OrderedDict(
-            [("node_idx", item["NodeName"][-2:]), ("partition", item["Partitions"])]
-        )
+        ordered_item = OrderedDict([("node_idx", item["NodeName"][-2:]), ("partition", item["Partitions"])])
 
         item_list += [ordered_item]
 
@@ -289,11 +318,12 @@ if __name__ == "__main__":
             print(df.to_markdown(index=False))
         else:
             print(df.iloc[: args.n_gpu, :].to_markdown(index=False))
+    elif args.task == "query_node":
+        df = gpu_cluster.get_dataframe_by_node()
+        print(df.to_markdown(index=False))
     elif args.task == "stat":
         df = gpu_cluster.get_usage_dataframe()
-        result = df.groupby("user").agg(
-            {"gpu\n.id": ["nunique", "count"], "gpu\n.used": ["sum"]}
-        )
+        result = df.groupby("user").agg({"gpu\n.id": ["nunique", "count"], "gpu\n.used": ["sum"]})
         result.columns = ["ngpu", "nproc", "mem"]
         result.sort_values(by=["ngpu", "nproc"], ascending=False, inplace=True)
         print(result.to_markdown(index=True))
