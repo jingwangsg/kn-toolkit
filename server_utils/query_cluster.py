@@ -123,6 +123,7 @@ class GPUCluster:
                 [
                     f"{k:{max_key_len}}: {v:>{max_val_len}.1f} {gpu_mem_by_user.get(k, 0):>{max_gpu_mem_len}}"
                     for k, v in user_cpu_percent.items()
+                    if v > 100 or gpu_mem_by_user.get(k, 0) > 0
                 ]
             )
 
