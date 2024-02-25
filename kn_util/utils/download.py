@@ -13,6 +13,9 @@ import os.path as osp
 import tempfile
 import random
 from functools import lru_cache
+from queue import Queue
+from queue import Empty as EmptyQueue
+
 from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
 from ..utils.rich import get_rich_progress_download, add_tasks
@@ -129,16 +132,12 @@ def retry_wrapper(max_retries=10):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    print(
-                        f"=> Thread {thread_idx} retry {retry_cnt+1}/{max_retries} failed: {e}"
-                    )
+                    print(f"=> Thread {thread_idx} retry {retry_cnt+1}/{max_retries} failed: {e}")
                     retry_cnt += 1
                     if max_retries is not None and retry_cnt >= max_retries:
                         break
 
-            raise Exception(
-                f"=> Thread {thread_idx} retry {max_retries} times, still failed"
-            )
+            raise Exception(f"=> Thread {thread_idx} retry {max_retries} times, still failed")
 
         return wrapper
 
@@ -168,24 +167,13 @@ class MultiThreadDownloader(Downloader):
         )
         self.num_threads = num_threads
         self.chunk_size_merge = chunk_size_merge
+        self.message_queue = Queue()
 
     def is_support_range(self, url):
         headers = self.get_file_headers(url)
         return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
 
-    # def range_merge(self, shard_path, output_file, s_pos, e_pos):
-    #     output_file = open(output_file, "wb+")
-    #     # each thread write to the same file
-    #     cnt = 0
-    #     with open(shard_path, "rb") as f:
-    #         output_file.seek(s_pos)
-    #         for chunk in iter(lambda: f.read(self.chunk_size_merge), b""):
-    #             output_file.write(chunk)
-    #             cnt += len(chunk)
-
-    #         assert output_file.tell() == e_pos + 1
-
-    def gather_task_progress(self, progress, path, ranges, task_ids):
+    def gather_for_resume(self, path, ranges, message_queue):
         # resume task progress
         # don't put this logic inside range_download, which will be called multiple time when reconnect
 
@@ -197,14 +185,9 @@ class MultiThreadDownloader(Downloader):
             else:
                 buffer = open(shard_path, "wb+")
             buffer.seek(0, os.SEEK_END)
-            thread_progress = buffer.tell()
-            if self.verbose == 2:
-                progress.update(task_ids[i + 1], completed=thread_progress)
-            total_progress += buffer.tell()
-            buffer.close()
-        progress.update(task_ids[0], completed=total_progress)
 
-        return total_progress
+            message_queue.put_nowait((buffer.tell(), i))
+            buffer.close()
 
     def range_download(
         self,
@@ -212,10 +195,8 @@ class MultiThreadDownloader(Downloader):
         s_pos,
         e_pos,
         shard_path,
-        thread_idx,
-        total_task_id,
-        thread_task_id,
-        progress,
+        thread_id,
+        message_queue: Queue,
     ):
 
         if osp.exists(shard_path):
@@ -230,6 +211,13 @@ class MultiThreadDownloader(Downloader):
         if s_pos == e_pos + 1:
             return
 
+        message_byte_cnt = 0
+        nbytes_per_message = 1024 * 1024 * 5  # 5Mb
+
+        def upload_progress_message():
+            message_queue.put_nowait((message_byte_cnt, thread_id))
+            message_byte_cnt = 0
+
         with self.client.stream(
             "GET",
             url,
@@ -240,19 +228,17 @@ class MultiThreadDownloader(Downloader):
         ) as r:
             for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
                 buffer.write(chunk)
-                if self.verbose == 2:
-                    progress.update(thread_task_id, advance=len(chunk))
-                progress.update(total_task_id, advance=len(chunk))
+                message_byte_cnt += len(chunk)
+                if message_byte_cnt >= nbytes_per_message:
+                    upload_progress_message()
+            upload_progress_message()
+
             assert buffer.tell() == e_pos + 1
 
     def get_cache_files(self, path):
         dirname, filename = osp.dirname(path), osp.basename(path)
         cache_pattern = osp.join(dirname, f".{filename}.*")
-        filenames = [
-            _.strip()
-            for _ in run_cmd(f"ls {cache_pattern}").stdout.split("\n")
-            if _.strip() != ""
-        ]
+        filenames = [_.strip() for _ in run_cmd(f"ls {cache_pattern}").stdout.split("\n") if _.strip() != ""]
         return filenames
 
     def clear_cache(self, path):
@@ -294,8 +280,7 @@ class MultiThreadDownloader(Downloader):
             task_ids = add_tasks(
                 progress,
                 names=["Total"] + [f"Thread {i}" for i in range(self.num_threads)],
-                totals=[filesize]
-                + [ranges[i][1] - ranges[i][0] + 1 for i in range(self.num_threads)],
+                totals=[filesize] + [ranges[i][1] - ranges[i][0] + 1 for i in range(self.num_threads)],
             )
         else:
             task_ids = add_tasks(
@@ -310,13 +295,13 @@ class MultiThreadDownloader(Downloader):
         return osp.join(file_dir, f".{filename}.part{s_pos}-{e_pos}")
 
     def download(self, url, path):
+        # push all message to message queue by default
+        # only deal with message queue in main thread when verbose > 0
+        # when using MultiThreadDownloader as part of multi-process, set verbose=0
 
         filesize = self.get_filesize(url)
         file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
-        ranges = [
-            (i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1))
-            for i in range(self.num_threads)
-        ]
+        ranges = [(i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1)) for i in range(self.num_threads)]
         if not self.is_support_range(url):
             print("=> Server does not support range, use single thread download")
             super().download(url, path)
@@ -325,56 +310,54 @@ class MultiThreadDownloader(Downloader):
         # enter this step only when decided to use multi-thread download
         self.resolve_download_meta(url, path, filesize)
 
-        progress: Progress = get_rich_progress_download(disable=(self.verbose == 0))
-        progress.start()
+        progress: Progress = get_rich_progress_download() if self.verbose > 0 else nullcontext()
+        if self.verbose == 1:
+            progress.add_task("Total", total=filesize)
+        if self.verbose == 2:
+            for i in range(self.num_threads):
+                progress.add_task(f"Thread {i}", total=ranges[i][1] - ranges[i][0])
 
-        task_ids = self.get_task_ids(progress, ranges, filesize)
-        self.gather_task_progress(
-            progress,
-            path=path,
-            ranges=ranges,
-            task_ids=task_ids,
-        )
-
-        executor = ThreadPoolExecutor(max_workers=self.num_threads)
-        futures = []
-        for i, (s_pos, e_pos) in enumerate(ranges):
-            shard_path = self.get_shard_path(path, i, s_pos, e_pos)
-            future = executor.submit(
-                retry_wrapper(self.max_retries)(self.range_download),
-                url=url,
-                s_pos=s_pos,
-                e_pos=e_pos,
-                shard_path=shard_path,
-                thread_idx=i,
-                total_task_id=task_ids[0],
-                thread_task_id=task_ids[i + 1] if self.verbose == 2 else None,
-                progress=progress,
+        with progress:
+            self.gather_for_resume(
+                path=path,
+                ranges=ranges,
+                message_queue=self.message_queue,
             )
-            futures.append(future)
 
-        wait(futures, return_when="ALL_COMPLETED")
+            executor = ThreadPoolExecutor(max_workers=self.num_threads)
+            not_done = []
+            for i, (s_pos, e_pos) in enumerate(ranges):
+                shard_path = self.get_shard_path(path, i, s_pos, e_pos)
+                # use a message queue here
+                # https://github.com/EleutherAI/tqdm-multiprocess/blob/master/tqdm_multiprocess/std.py
+                future = executor.submit(
+                    retry_wrapper(self.max_retries)(self.range_download),
+                    url=url,
+                    s_pos=s_pos,
+                    e_pos=e_pos,
+                    shard_path=shard_path,
+                    thread_idx=i,
+                    message_queue=self.message_queue,
+                )
+                not_done.append(future)
 
-        progress.stop()
+            if self.verbose > 0:
+                # process message queue for verbose > 0
+                while len(not_done) > 0:
+                    done, not_done = wait(not_done, return_when="FIRST_COMPLETED")
+                    try:
+                        message_byte_cnt, thread_id = self.message_queue.get_nowait()
+                        if self.verbose == 1:
+                            progress.update(0, advance=message_byte_cnt)
+                        if self.verbose == 2:
+                            progress.update(thread_id + 1, advance=message_byte_cnt)
+                    except (EmptyQueue, InterruptedError):
+                        pass
 
-        shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
-        run_cmd(f"cat {' '.join(shard_paths)} > {path}", async_cmd=False)
+            shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
+            run_cmd(f"cat {' '.join(shard_paths)} > {path}", async_cmd=False)
 
-        # futures = []
-        # for i, (s_pos, e_pos) in enumerate(ranges):
-            # shard_path = self.get_shard_path(path, i, s_pos, e_pos)
-            # future = executor.submit(
-            #     self.range_merge,
-            #     shard_path=shard_path,
-            #     output_file=path,
-            #     s_pos=s_pos,
-            #     e_pos=e_pos,
-            # )
-            # futures.append(future)
-            # self.range_merge(shard_path, output_file=path, s_pos=s_pos, e_pos=e_pos,)
-
-        # executor.shutdown(wait=True)
-        self.clear_cache(path)
+            self.clear_cache(path)
 
 
 class CommandDownloader(Downloader):
@@ -420,9 +403,7 @@ class CommandDownloader(Downloader):
             return buffer
 
     @classmethod
-    def download_wget(
-        cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True
-    ):
+    def download_wget(cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -433,9 +414,7 @@ class CommandDownloader(Downloader):
         if proxy:
             wget_args += f" --proxy=on --proxy http://{proxy}"
 
-        wget_args += (
-            f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
-        )
+        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
 
         if headers:
             for k, v in headers.items():

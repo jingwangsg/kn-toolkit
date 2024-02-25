@@ -7,6 +7,11 @@ import argparse
 import os.path as osp
 from ..utils.git_utils import get_origin_url
 from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader
+from ..utils.rich import get_rich_progress_download
+from rich.console import Group
+from rich.live import Live
+from rich.progress import Progress
+from concurrent.futures import ProcessPoolExecutor, wait
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -20,9 +25,7 @@ def parse_args():
 def run_cmd(cmd, return_output=False):
     # print('Running: {}'.format(cmd))
     if return_output:
-        return subprocess.run(
-            cmd, shell=True, check=True, capture_output=True, text=True
-        ).stdout
+        return subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True).stdout
     else:
         subprocess.run(cmd, shell=True, check=True)
 
@@ -78,9 +81,22 @@ def _parse_repo_url(url):
     return org, repo
 
 
-def download(
+def download_file(url, headers, path, progress=None, **downloader_kwargs):
+    downloader = MultiThreadDownloader(headers=headers, **downloader_kwargs)
+
+    # print(f"{url} \n=> {path}")
+    downloader.download(
+        url=url,
+        path=path,
+        progress=progress,
+    )
+    return path, progress
+
+
+def download_repo(
     url_template,
     include=None,
+    num_processes=1,
     **downloader_kwargs,
 ):
     # clone the repo
@@ -101,20 +117,56 @@ def download(
         headers=headers,
         **downloader_kwargs,
     )
-    downloader = MultiThreadDownloader(headers=headers, **downloader_kwargs)
+    # downloader_kwargs["verbose"] = 1
 
-    for path in paths:
-        if path in downloaded:
-            print(f"=> {path} already downloaded")
-            continue
+    paths = [path for path in paths if path not in downloaded]
+    urls = [url_template.format(org=org, repo=repo, path=path) for path in paths]
 
-        url = url_template.format(org=org, repo=repo, path=path)
+    for url, path in zip(urls, paths):
+        download_file(
+            url,
+            headers=headers,
+            path=path,
+            **downloader_kwargs,
+        )
 
-        print(f"{url} \n=> {path}")
-        downloader.download(url=url, path=path)
+    # executor = ProcessPoolExecutor(max_workers=num_processes)
+    # not_done = []
 
-        meta_handler.write(path + "\n")
-        meta_handler.flush()
+    # progresses = [get_rich_progress_download() for _ in range(num_processes)]
+
+    # url_path = iter(zip(urls, paths))
+
+    # for process_id in range(num_processes):
+    #     url, path = next(url_path)
+
+    #     future = executor.submit(
+    #         download_file,
+    #         url=url,
+    #         headers=headers,
+    #         path=path,
+    #         **downloader_kwargs,
+    #     )
+    #     not_done.append(future)
+
+    # while not_done:
+    #     done, not_done = wait(not_done, return_when="FIRST_COMPLETED")
+    #     for future in done:
+    #         path, progress = future.result()
+    #         meta_handler.write(path + "\n")
+    #         meta_handler.flush()
+    #         url, path = next(url_path, (None, None))
+    #         progress.remove_task(0)
+    #         if url is not None:
+    #             future = executor.submit(
+    #                 download_file,
+    #                 url=url,
+    #                 progress=progress,
+    #                 headers=headers,
+    #                 path=path,
+    #                 **downloader_kwargs,
+    #             )
+    #             not_done.add(future)
 
 
 def download_recursive(**download_kwargs):
@@ -125,7 +177,7 @@ def download_recursive(**download_kwargs):
     for repo in repos:
         print(f"=> Downloading {repo}")
         os.chdir(repo)
-        download(
+        download_repo(
             url_template=HF_DOWNLOAD_TEMPLATE,
             **download_kwargs,
         )
@@ -136,9 +188,7 @@ def main():
     command = parser.parse_known_args()[0].command
 
     if command == "pull":
-        parser.add_argument(
-            "--chunk", type=int, help="The chunk number to fetch", default=100
-        )
+        parser.add_argument("--chunk", type=int, help="The chunk number to fetch", default=100)
         parser.add_argument(
             "--include",
             type=str,
@@ -170,12 +220,8 @@ def main():
             help="Whether to download recursively",
             default=False,
         )
-        parser.add_argument(
-            "--num-shards", type=int, help="The number of shards to use", default=1
-        )
-        parser.add_argument(
-            "--max-retries", type=int, help="The number of retries to use", default=None
-        )
+        parser.add_argument("--num-processes", type=int, help="The number of process to use", default=1)
+        parser.add_argument("--max-retries", type=int, help="The number of retries to use", default=None)
         parser.add_argument(
             "-n",
             "--num-threads",
@@ -197,20 +243,20 @@ def main():
             os.environ["HF_TOKEN"] = args.token
 
         if not args.recursive:
-            download(
+            download_repo(
                 url_template=args.template,
                 include=args.include,
                 num_threads=args.num_threads,
+                num_processes=args.num_processes,
                 max_retries=args.max_retries,
                 timeout=args.timeout,
                 proxy=args.proxy,
                 verbose=args.verbose,
             )
         else:
-            print(
-                "=> Downloading recursively! only supports huggingface git repos for now"
-            )
+            print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive(
+                num_processes=args.num_processes,
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
                 timeout=args.timeout,
