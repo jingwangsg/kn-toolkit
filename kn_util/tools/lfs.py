@@ -180,6 +180,7 @@ def download_repo(
                         progress.update(
                             process_id,
                             total=message[1],
+                            completed=0,
                             description=f"{path} [{process_id:02d}]",
                             visible=True,
                             refresh=True,
