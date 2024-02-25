@@ -84,6 +84,7 @@ def map_async(
                 progress.refresh()
             time.sleep(0.1)
 
+        progress.update(task_id, completed=total)
         progress.stop()
 
         return ret.get()

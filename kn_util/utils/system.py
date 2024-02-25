@@ -7,9 +7,7 @@ import os
 def run_cmd(cmd, verbose=False, async_cmd=False):
     if verbose:
         assert not async_cmd, "async_cmd is not supported when verbose=True"
-        popen = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
+        popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         for line in popen.stdout:
             print(line.rstrip().decode("utf-8"))
         popen.wait()
@@ -19,21 +17,16 @@ def run_cmd(cmd, verbose=False, async_cmd=False):
             ret = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             return ret
         else:
-            popen = subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
+            popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             return popen
 
 
 def clear_process(path):
     path = osp.abspath(path)
-    dirname, filename = osp.dirname(path), osp.basename(path)
-    processes = run_cmd(
-        f"lsof +D {dirname} | grep {filename} | awk '{{print $2}}'"
-    ).stdout
+    processes = run_cmd(f"lsof -n {path} 2>/dev/null | tail -n +2 | awk '{{print $2}}' ").stdout
     cur_pid = os.getpid()
     processes = [int(_.strip()) for _ in processes.split("\n") if _.strip() != ""]
-    processes = [pid for pid in processes if pid != cur_pid]
+    processes = list(set([pid for pid in processes if pid != cur_pid]))
 
     run_cmd(f"kill -9 {' '.join(map(str, processes))}")
 

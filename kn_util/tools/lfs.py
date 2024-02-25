@@ -11,7 +11,12 @@ from ..utils.rich import get_rich_progress_download
 from rich.console import Group
 from rich.live import Live
 from rich.progress import Progress
-from concurrent.futures import ProcessPoolExecutor, wait
+import copy
+import time
+import multiprocessing as mp
+
+# from concurrent.futures import ProcessPoolExecutor, wait
+from pathos.multiprocessing import ProcessPool
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -81,16 +86,20 @@ def _parse_repo_url(url):
     return org, repo
 
 
-def download_file(url, headers, path, progress=None, **downloader_kwargs):
-    downloader = MultiThreadDownloader(headers=headers, **downloader_kwargs)
+def download_file(downloader, url, path):
+    downloader.download(url, path)
 
-    # print(f"{url} \n=> {path}")
-    downloader.download(
-        url=url,
-        path=path,
-        progress=progress,
-    )
-    return path, progress
+
+def wait(not_done, timeout=0.5):
+    done = set()
+    time.sleep(timeout)
+    _not_done = copy.copy(not_done)
+    for future in _not_done:
+        if future.ready():
+            not_done.remove(future)
+            done.add(future)
+            continue
+    return done, not_done
 
 
 def download_repo(
@@ -113,60 +122,95 @@ def download_repo(
     print(f"=> Found {len(downloaded)} files already downloaded")
 
     headers = get_hf_headers()
-    downloader = MultiThreadDownloader(
-        headers=headers,
-        **downloader_kwargs,
-    )
-    # downloader_kwargs["verbose"] = 1
 
     paths = [path for path in paths if path not in downloaded]
     urls = [url_template.format(org=org, repo=repo, path=path) for path in paths]
 
-    for url, path in zip(urls, paths):
-        download_file(
-            url,
-            headers=headers,
-            path=path,
-            **downloader_kwargs,
-        )
-
     # executor = ProcessPoolExecutor(max_workers=num_processes)
-    # not_done = []
+    process_pool = ProcessPool(num_processes)
 
-    # progresses = [get_rich_progress_download() for _ in range(num_processes)]
+    progress = get_rich_progress_download()
+    for _ in range(num_processes):
+        progress.add_task("", visible=False)
 
-    # url_path = iter(zip(urls, paths))
+    progress.start()
 
-    # for process_id in range(num_processes):
-    #     url, path = next(url_path)
+    url_path = iter(zip(urls, paths))
 
-    #     future = executor.submit(
-    #         download_file,
-    #         url=url,
-    #         headers=headers,
-    #         path=path,
-    #         **downloader_kwargs,
-    #     )
-    #     not_done.append(future)
+    downloader_kwargs["verbose"] = 0
 
-    # while not_done:
-    #     done, not_done = wait(not_done, return_when="FIRST_COMPLETED")
-    #     for future in done:
-    #         path, progress = future.result()
-    #         meta_handler.write(path + "\n")
-    #         meta_handler.flush()
-    #         url, path = next(url_path, (None, None))
-    #         progress.remove_task(0)
-    #         if url is not None:
-    #             future = executor.submit(
-    #                 download_file,
-    #                 url=url,
-    #                 progress=progress,
-    #                 headers=headers,
-    #                 path=path,
-    #                 **downloader_kwargs,
-    #             )
-    #             not_done.add(future)
+    #TODO: why do we need a manager here? mp.Queue fails
+    manager = mp.Manager()
+    downloaders = [
+        MultiThreadDownloader(
+            headers=headers,
+            **downloader_kwargs,
+            queue=manager.Queue(),
+        )
+        for _ in range(num_processes)
+    ]
+
+    not_done = set()
+    for process_id in range(num_processes):
+        url, path = next(url_path)
+
+        future = process_pool.apipe(
+            downloaders[process_id].download,
+            url=url,
+            path=path,
+        )
+        downloaders[process_id]._path = path
+        future._process_id = process_id
+        future._path = path
+
+        not_done.add(future)
+
+    # start polling
+    while not_done:
+        done, not_done = wait(not_done, timeout=0.5)
+
+        for process_id in range(num_processes):
+            message_queue = downloaders[process_id].message_queue
+
+            path = downloaders[process_id]._path
+            while True:
+                try:
+                    message = message_queue.get_nowait()
+                    if message[0] == "filesize":
+                        progress.update(
+                            process_id,
+                            total=message[1],
+                            description=f"{path} [{process_id:02d}]",
+                            visible=True,
+                            refresh=True,
+                        )
+                    elif message[0] == "advance":
+                        progress.update(process_id, advance=message[1])
+                except:
+                    break
+
+        for future in done:
+            process_id = future._process_id
+            path = future._path
+            downloaders[process_id].clear_message()
+
+            meta_handler.write(path + "\n")
+            meta_handler.flush()
+
+            url, path = next(url_path, (None, None))
+            if url is not None:
+                # apipe equals to submit in ProcessPoolExecutor
+                future = process_pool.apipe(
+                    downloaders[process_id].download,
+                    url=url,
+                    path=path,
+                )
+                downloaders[process_id]._path = path
+                future._process_id = process_id
+                future._path = path
+                not_done.add(future)
+
+    progress.stop()
 
 
 def download_recursive(**download_kwargs):
@@ -251,7 +295,7 @@ def main():
                 max_retries=args.max_retries,
                 timeout=args.timeout,
                 proxy=args.proxy,
-                verbose=args.verbose,
+                # verbose=args.verbose,
             )
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
@@ -261,5 +305,5 @@ def main():
                 max_retries=args.max_retries,
                 timeout=args.timeout,
                 proxy=args.proxy,
-                verbose=args.verbose,
+                # verbose=args.verbose,
             )

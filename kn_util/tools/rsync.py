@@ -11,7 +11,7 @@ def split_path(path):
 
 
 def cmd_list_files(path, size="+1g"):
-    return f"cd {path} && fd --type f --size {size}"
+    return f"$HOME/homebrew/bin/fd --type f --size {size} --base-directory {path}"
 
 
 def cmd_get_path(path):
@@ -172,7 +172,7 @@ class RsyncTool:
 
                 def _apply(path_chunk):
                     cmd = construct_cmd(path_chunk)
-                    run_cmd(cmd, verbose=True)
+                    run_cmd(cmd, verbose=False)
 
                 map_async_with_thread(
                     func=_apply,
@@ -203,8 +203,13 @@ def main():
             action="store_true",
             help="async download/upload dir",
         )
-        parser.add_argument("-n", "--chunk-size", type=int, default=10)
-        parser.add_argument("-P", "--num-thread", type=int, default=30)
+        parser.add_argument(
+            "--chunk-size",
+            default=30,
+            type=int,
+            help="chunk size for async dir",
+        )
+        parser.add_argument("-P", "--num-thread", type=int, default=16)
 
         args = parser.parse_args()
 
