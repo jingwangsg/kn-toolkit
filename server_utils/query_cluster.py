@@ -132,10 +132,10 @@ class GPUCluster:
                     "node": f"node{node_idx:02d}",
                     "gpu\n.name": gpu_infos[0]["name"],
                     "gpu\n.count": len(gpu_infos),
-                    "gpu\n.mem.free (G)": gpu_memory_free,
+                    "gpu\n.mem.free(G)": gpu_memory_free,
                     "mem\n.usage": mem_str,
                     "cpu\n.usage": cpu_usage_str,
-                    "node\n.users (cpu gpu_mem)": user_str,
+                    "node\n.users(cpu% gpu.mem)": user_str,
                 }
             ]
 
