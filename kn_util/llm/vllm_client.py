@@ -32,23 +32,30 @@ class LLMClient(ResponseUnwrapMixin):
         self.max_tokens = max_tokens
         self.model = model
 
-    def apply_template(self, prompt):
-        assert self.model in ["google/gemma-7b-it"], f"Model {self.model} not supported."
-
-        chat = [
-            {"role": "user", "content": prompt},
-        ]
-        return self.tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
 
     def get_token_length(self, prompts):
         return self.tokenizer(prompts, return_length=True)["length"]
 
-    def generate(
+    def generate(self, prompt):
+        tokenized_prompt = self.tokenizer(prompt, return_length=True)
+        length = tokenized_prompt["length"][0]
+
+        response = requests.post(
+            self.endpoint + "v1/completions",
+            json={
+                "prompt": prompt,
+                "max_tokens": self.max_tokens - length,
+                **self.params,
+            },
+        )
+
+        return response.json()
+
+    def generate_batch(
         self,
         prompts,
         num_thread=32,
     ):
-        prompts = [self.apply_template(prompt) for prompt in prompts]
         tokenized_prompt = self.tokenizer(prompts, return_length=True)
         lengths = tokenized_prompt["length"]
 

@@ -152,7 +152,9 @@ def download_repo(
 
     not_done = set()
     for process_id in range(num_processes):
-        url, path = next(url_path)
+        url, path = next(url_path, (None, None))
+        if (url is None) or (path is None):
+            continue
 
         future = process_pool.apipe(
             downloaders[process_id].download,
@@ -172,7 +174,10 @@ def download_repo(
         for process_id in range(num_processes):
             message_queue = downloaders[process_id].message_queue
 
-            path = downloaders[process_id]._path
+            path = getattr(downloaders[process_id], "_path", None)
+            if path is None:
+                # this means downloader is not downloading anything
+                continue
             while True:
                 try:
                     message = message_queue.get_nowait()
