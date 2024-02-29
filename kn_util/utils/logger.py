@@ -11,10 +11,7 @@ import time
 from collections import defaultdict, deque
 import sys
 
-import torch
-import torch.distributed as dist
 from collections import defaultdict
-from .dist_utils import is_dist_avail_and_initialized, is_main_process
 from loguru import logger
 
 
@@ -40,6 +37,10 @@ class SmoothedValue(object):
         """
         Warning: does not synchronize the deque!
         """
+        from .dist_utils import is_dist_avail_and_initialized, is_main_process
+        import torch
+        import torch.distributed as dist
+
         if not is_dist_avail_and_initialized():
             return
         t = torch.tensor([self.count, self.total], dtype=torch.float64, device="cuda")
@@ -218,7 +219,9 @@ def setup_logger_loguru(
     if stdout:
         logger.add(sys.stdout, format=template, enqueue=True)
 
+
 # ======================== for YTDLP ========================
+
 
 class FakeLogger(object):
     def debug(self, msg):
@@ -243,5 +246,6 @@ class StorageLogger:
 
     def error(self, msg):
         self.storage["error"].append(msg)
+
 
 # ======================================================
