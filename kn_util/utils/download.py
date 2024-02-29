@@ -1,9 +1,13 @@
+from kn_util.utils.logger import setup_logger_loguru
+
+setup_logger_loguru(stdout=False, filename=None)
 from concurrent.futures import ThreadPoolExecutor, wait
 import httpx
 from tqdm import tqdm
 import json
 from huggingface_hub.utils._headers import build_hf_headers
 from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
+from loguru import logger
 
 # from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
@@ -62,8 +66,8 @@ class Downloader:
         timeout=10,
         verbose=True,
     ):
-        print("=> Downloader Configuration:")
-        print(
+        logger.info("=> Downloader Configuration:")
+        logger.info(
             json.dumps(
                 {
                     "headers": headers,
@@ -114,11 +118,14 @@ class Downloader:
         f.seek(0, os.SEEK_END)
         progress.update(task_id, advance=f.tell())
 
-        with client.stream("GET", url) as r:
-            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
-                if chunk:
-                    f.write(chunk)
-                    progress.update(task_id, advance=len(chunk))
+        try:
+            with client.stream("GET", url) as r:
+                for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                    if chunk:
+                        f.write(chunk)
+                        progress.update(task_id, advance=len(chunk))
+        except Exception as e:
+            logger.error(f"=> Download failed: {e} Pos: {f.tell()}")
 
         progress.stop()
 
@@ -132,7 +139,7 @@ def retry_wrapper(max_retries=10):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    print(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
+                    # logger.info(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
                     retry_cnt += 1
                     if max_retries is not None and retry_cnt >= max_retries:
                         break
@@ -219,20 +226,29 @@ class MultiThreadDownloader(Downloader):
             message_queue.put_nowait(("advance", message_byte_cnt, thread_id))
             message_byte_cnt = 0
 
-        with client.stream(
-            "GET",
-            url,
-            headers={
-                **self.headers,
-                "Range": f"bytes={s_pos}-{e_pos}",
-            },
-        ) as r:
-            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
-                buffer.write(chunk)
-                message_byte_cnt += len(chunk)
-                if message_byte_cnt >= nbytes_per_message:
-                    upload_progress_message()
-            upload_progress_message()
+        try:
+            with client.stream(
+                "GET",
+                url,
+                headers={
+                    **self.headers,
+                    "Range": f"bytes={s_pos}-{e_pos}",
+                },
+            ) as r:
+                for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                    # when status_code != 206, chunk will contain the error message
+                    # the GET request is spoiled, give up and retry
+                    if r.status_code != 206:
+                        raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
+
+                    buffer.write(chunk)
+                    message_byte_cnt += len(chunk)
+                    if message_byte_cnt >= nbytes_per_message:
+                        upload_progress_message()
+                upload_progress_message()
+        except Exception as e:
+            # when using multiple threads, the exception often happens at 0
+            logger.error(f"=> Thread {thread_id} failed: {e} Pos: {buffer.tell()}")
 
         assert buffer.tell() == e_pos + 1
 
