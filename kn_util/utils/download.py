@@ -177,8 +177,16 @@ class MultiThreadDownloader(Downloader):
         self.message_queue = Queue() if queue is None else queue
 
     def is_support_range(self, client, url):
-        headers = self.get_file_headers(client, url)
-        return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
+        # headers = self.get_file_headers(client, url)
+        # return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
+        # download 1 bytes to check if server supports range
+
+        with client.stream(
+            "GET",
+            url,
+            headers={**self.headers, "Range": "bytes=0-0"},
+        ) as r:
+            return r.status_code == 206
 
     def gather_for_resume(self, path, ranges, message_queue):
         # resume task progress
