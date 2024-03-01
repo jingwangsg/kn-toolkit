@@ -107,20 +107,20 @@ class Downloader:
 
         filesize = self.get_filesize(client, url)
         filedir, filename = osp.dirname(path), osp.basename(path)
-        if osp.exists(path):
-            f = open(path, "rb+")
-        else:
-            f = open(path, "wb+")
+        f = open(path, "wb+")
 
         progress = get_rich_progress_download(disable=(self.verbose == 0))
         progress.start()
         task_id = progress.add_task(filename, total=filesize)
-        f.seek(0, os.SEEK_END)
-        progress.update(task_id, advance=f.tell())
+        # f.seek(0, os.SEEK_END)
+        # not really necessary, if it is resumable, it can be handled by multi-thread downloader
+        # progress.update(task_id, completed=f.tell())
 
         try:
             with client.stream("GET", url) as r:
                 for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                    if r.status_code != 200:
+                        raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
                     if chunk:
                         f.write(chunk)
                         progress.update(task_id, advance=len(chunk))
