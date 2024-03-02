@@ -43,7 +43,7 @@ def main():
         args = parser.parse_args()
 
         proxy = None
-        if args.port or args.proxy_port:
+        if args.proxy or args.proxy_port:
             proxy = f"http://127.0.0.1:{args.proxy_port}" if args.proxy_port else args.proxy
 
         downloader = MultiThreadDownloader(
