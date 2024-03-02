@@ -11,6 +11,7 @@ def add_basic_parser(parser):
     parser.add_argument("-o", "--output", type=str, help="The output path", default=None)
     parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
+    parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
     parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
     parser.add_argument("--token", type=str, help="The token to use", default=None)
 
@@ -41,12 +42,16 @@ def main():
         add_thread_parser(parser)
         args = parser.parse_args()
 
+        proxy = None
+        if args.port or args.proxy_port:
+            proxy = f"http://127.0.0.1:{args.proxy_port}" if args.proxy_port else args.proxy
+
         downloader = MultiThreadDownloader(
             headers=headers,
             num_threads=args.num_threads,
             chunk_size_download=args.chunk_size,
             max_retries=args.max_retries,
-            proxy=args.proxy,
+            proxy=proxy,
             timeout=args.timeout,
             verbose=args.verbose,
         )

@@ -139,7 +139,7 @@ def download_repo(
 
     downloader_kwargs["verbose"] = 0
 
-    #TODO: why do we need a manager here? mp.Queue fails
+    # TODO: why do we need a manager here? mp.Queue fails
     manager = mp.Manager()
     downloaders = [
         MultiThreadDownloader(
@@ -264,6 +264,7 @@ def main():
             default=HF_DOWNLOAD_TEMPLATE,
         )
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
+        parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
         parser.add_argument(
             "--recursive",
             action="store_true",
@@ -292,6 +293,10 @@ def main():
         if args.token is not None:
             os.environ["HF_TOKEN"] = args.token
 
+        proxy = None
+        if args.proxy or args.proxy_port:
+            proxy = f"http://127.0.0.1:{args.proxy_port}" if args.proxy_port else args.proxy
+
         if not args.recursive:
             download_repo(
                 url_template=args.template,
@@ -300,7 +305,7 @@ def main():
                 num_processes=args.num_processes,
                 max_retries=args.max_retries,
                 timeout=args.timeout,
-                proxy=args.proxy,
+                proxy=proxy,
                 # verbose=args.verbose,
             )
         else:
@@ -310,6 +315,6 @@ def main():
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
                 timeout=args.timeout,
-                proxy=args.proxy,
+                proxy=proxy,
                 # verbose=args.verbose,
             )
