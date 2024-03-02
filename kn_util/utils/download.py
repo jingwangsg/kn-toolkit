@@ -401,9 +401,15 @@ class MultiThreadDownloader(Downloader):
                     progress.refresh()
 
             shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
-            run_cmd(f"cat {' '.join(shard_paths)} > {path}", async_cmd=False)
+            cmds = "&&".join(
+                [
+                    f"cat {' '.join(shard_paths)} > {path}",
+                    f"rm -rf {' '.join(shard_paths)}",
+                ]
+            )
+            run_cmd(cmds, async_cmd=True)
 
-            self.clear_cache(path)
+            # self.clear_cache(path)
 
 
 class CommandDownloader(Downloader):

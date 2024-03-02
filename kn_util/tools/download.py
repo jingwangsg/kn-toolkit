@@ -46,6 +46,7 @@ def main():
             num_threads=args.num_threads,
             chunk_size_download=args.chunk_size,
             max_retries=args.max_retries,
+            proxy=args.proxy,
             timeout=args.timeout,
             verbose=args.verbose,
         )
