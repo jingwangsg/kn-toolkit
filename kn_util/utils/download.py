@@ -401,10 +401,11 @@ class MultiThreadDownloader(Downloader):
                     progress.refresh()
 
             shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
+            dirname, filename = osp.dirname(path), osp.basename(path)
             cmds = "&&".join(
                 [
                     f"cat {' '.join(shard_paths)} > {path}",
-                    f"rm -rf {' '.join(shard_paths)}",
+                    f"rm -rf {osp.join(dirname, f'.{filename}.*')}",
                 ]
             )
             run_cmd(cmds, async_cmd=True)
