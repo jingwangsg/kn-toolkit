@@ -129,6 +129,9 @@ def download_repo(
 
     # executor = ProcessPoolExecutor(max_workers=num_processes)
     process_pool = ProcessPool(num_processes)
+    # FIXME: seems like ProcessPool is singleton
+    # restart & close is needed for chdir to work (or old cwd will be inherited)
+    process_pool.restart()
 
     progress = get_rich_progress_download()
     for _ in range(num_processes):
@@ -224,7 +227,7 @@ def download_repo(
 def download_recursive(**download_kwargs):
     cwd = os.getcwd()
     repos = run_cmd("fd --no-ignore -H --glob '**/.git' --type d", return_output=True).splitlines()
-    repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
+    repos = [osp.join(cwd, osp.dirname(osp.dirname(_))) for _ in repos]
     print(f"=> Found {len(repos)} repos")
     for repo in repos:
         print(f"=> Downloading {repo}")
