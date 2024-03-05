@@ -218,11 +218,12 @@ def download_repo(
                 not_done.add(future)
 
     progress.stop()
-
+    process_pool.close()
+    manager.shutdown()
 
 def download_recursive(**download_kwargs):
     cwd = os.getcwd()
-    repos = run_cmd("find ./ -name '.git' -type d", return_output=True).splitlines()
+    repos = run_cmd("fd --no-ignore -H --glob '**/.git' --type d", return_output=True).splitlines()
     repos = [osp.join(cwd, osp.dirname(_)) for _ in repos]
     print(f"=> Found {len(repos)} repos")
     for repo in repos:

@@ -197,7 +197,7 @@ def setup_logger_loguru(
     filename=None,
     stdout=True,
     include_function=False,
-    include_filepath=True,
+    include_filepath=False,
 ):
     # when filename = None and stdout=False, loguru will not log anything
     # this is espeically useful for distributed training

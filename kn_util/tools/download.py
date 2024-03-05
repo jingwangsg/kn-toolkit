@@ -1,3 +1,4 @@
+from kn_util.utils.logger import setup_logger_loguru
 from ..utils.download import CommandDownloader
 import argparse
 from ..utils.download import get_hf_headers, get_random_headers, MultiThreadDownloader
@@ -14,6 +15,8 @@ def add_basic_parser(parser):
     parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
     parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
     parser.add_argument("--token", type=str, help="The token to use", default=None)
+    parser.add_argument("--log-file", type=str, help="The log file to use", default=None)
+    parser.add_argument("--log-stdout", action="store_true", help="Whether to log to stdout", default=False)
 
 
 def add_thread_parser(parser):
@@ -32,6 +35,8 @@ def main():
         os.environ["HF_TOKEN"] = args.token
     url = args.url
     output = osp.basename(url) if args.output is None else args.output
+
+    setup_logger_loguru(stdout=args.log_stdout, filename=args.log_file)
 
     headers = get_random_headers()
     if "huggingface" in url:
