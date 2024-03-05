@@ -49,11 +49,10 @@ def is_proxy_valid(proxy):
         return False
 
 
-def retry_wrapper(max_retries=10):
+def retry_wrapper(max_retries=10, detect_proxy=True):
     def decorator(func):
         def wrapper(*args, **kwargs):
             thread_id = kwargs.get("thread_id", None)
-            client = kwargs.get("client", None)
             retry_cnt = 0
             while True:
                 try:
@@ -61,7 +60,8 @@ def retry_wrapper(max_retries=10):
                 except Exception as e:
                     logger.info(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
 
-                    if client is not None:
+                    client = kwargs.get("client", None)
+                    if detect_proxy and client is not None:
 
                         # check if proxy is valid
                         if len(client._mounts) > 0:
