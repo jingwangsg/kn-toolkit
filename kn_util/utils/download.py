@@ -17,6 +17,7 @@ import random
 from functools import lru_cache
 from queue import Queue
 from queue import Empty as EmptyQueue
+import socket
 
 from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
@@ -38,15 +39,40 @@ USER_AGENT_LIST = [
 HUGGINGFACE_HEADER_X_LINKED_SIZE = "X-Linked-Size"
 
 
-def is_proxy_valid(proxy):
+# def is_proxy_valid(proxy):
+#     logger.info(f"=> Testing proxy: {proxy}")
+#     # r = httpx.get("https://www.google.com", proxy=proxy)
+
+#     from pudb.remote import set_trace; set_trace()
+#     try:
+#         r = httpx.get("https://www.google.com", proxy=proxy)
+#         return r.status_code == 200
+#     except httpx.ConnectError as e:
+#         return False
+#     except Exception as e:
+#         logger.error(f"=> Proxy test failed: {e}")
+#         return False
+
+
+def is_proxy_valid(
+    proxy,
+    timeout=None,
+):
     try:
-        with httpx.get("https://www.google.com", proxy=proxy) as r:
-            return r.status_code == 200
-    except httpx.ConnectError as e:
+        _, address = proxy.split("//")
+        hostname, port = address.split(":")
+        port = int(port)
+    except ValueError as e:
+        logger.error(f"parse proxy failed: {e}")
         return False
-    except Exception as e:
-        logger.error(f"=> Proxy test failed: {e}")
-        return False
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        try:
+            sock.connect((hostname, port))
+            return True
+        except socket.error as e:
+            logger.error(f"connect to proxy failed: {e}")
+            return False
 
 
 def retry_wrapper(max_retries=10, detect_proxy=True):
@@ -305,9 +331,9 @@ class MultiThreadDownloader(Downloader):
         try:
             assert all(force_delete(filename) for filename in filenames)
         except:
-            import ipdb
+            from pudb.remote import set_trace
 
-            ipdb.set_trace()
+            set_trace()
         print(f"=> Cache of {filename} cleared")
 
     def resolve_download_meta(self, url, path, filesize):
