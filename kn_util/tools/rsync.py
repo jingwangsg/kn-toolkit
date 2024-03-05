@@ -210,13 +210,18 @@ def main():
             help="chunk size for async dir",
         )
         parser.add_argument("-P", "--num-thread", type=int, default=16)
+        parser.add_argument("--paths", type=str, help="python expression to generate paths", default=None)
 
         args = parser.parse_args()
+
+        paths = eval(args.paths) if args.paths is not None else None
+        path_filter = (lambda x: True) if paths is None else (lambda x: x in paths)
 
         RsyncTool.launch_rsync(
             from_addr=args.from_dir,
             to_addr=args.to_dir,
             async_dir=args.async_dir,
+            path_filter=path_filter,
             chunk_size=args.chunk_size,
             num_thread=args.num_thread,
         )
