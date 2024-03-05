@@ -1,6 +1,4 @@
 from kn_util.utils.logger import setup_logger_loguru
-
-setup_logger_loguru(stdout=False, filename=None)
 from concurrent.futures import ThreadPoolExecutor, wait
 import httpx
 from tqdm import tqdm
@@ -38,6 +36,50 @@ USER_AGENT_LIST = [
 ]
 
 HUGGINGFACE_HEADER_X_LINKED_SIZE = "X-Linked-Size"
+
+
+def is_proxy_valid(proxy):
+    try:
+        with httpx.get("https://www.google.com", proxy=proxy) as r:
+            return r.status_code == 200
+    except httpx.ConnectError as e:
+        return False
+    except Exception as e:
+        logger.error(f"=> Proxy test failed: {e}")
+        return False
+
+
+def retry_wrapper(max_retries=10):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            thread_id = kwargs.get("thread_id", None)
+            client = kwargs.get("client", None)
+            retry_cnt = 0
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    logger.info(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
+
+                    if client is not None:
+
+                        # check if proxy is valid
+                        if len(client._mounts) > 0:
+                            proxy_url = list(client._mounts.values())[0]._pool._proxy_url
+                            proxy = f"{proxy_url.scheme.decode('utf-8')}://{proxy_url.host.decode('utf-8')}:{proxy_url.port}"
+                            if not is_proxy_valid(proxy):
+                                client._mounts = {}  # a hack to disable proxy
+                                logger.info(f"=> Proxy {proxy} is invalid, disable it")
+
+                    retry_cnt += 1
+                    if max_retries is not None and retry_cnt >= max_retries:
+                        break
+
+            raise Exception(f"=> Thread {thread_id} retry {max_retries} times, still failed")
+
+        return wrapper
+
+    return decorator
 
 
 def get_hf_headers():
@@ -91,8 +133,9 @@ class Downloader:
         file_headers = client.head(url, follow_redirects=False).headers
         return file_headers
 
+    @retry_wrapper(max_retries=None)
     def get_filesize(self, client, url):
-        file_headers = self.get_file_headers(client, url)
+        file_headers = self.get_file_headers(client=client, url=url)
         if HUGGINGFACE_HEADER_X_LINKED_SIZE in file_headers:
             return int(file_headers[HUGGINGFACE_HEADER_X_LINKED_SIZE])
         return int(file_headers["Content-Length"])
@@ -102,10 +145,10 @@ class Downloader:
         client = httpx.Client(
             headers=self.headers,
             timeout=self.timeout,
-            proxies=self.proxy,
+            proxy=self.proxy,
         )
 
-        filesize = self.get_filesize(client, url)
+        filesize = self.get_filesize(client=client, url=url)
         filedir, filename = osp.dirname(path), osp.basename(path)
         f = open(path, "wb+")
 
@@ -128,27 +171,6 @@ class Downloader:
             logger.error(f"=> Download failed: {e} Pos: {f.tell()}")
 
         progress.stop()
-
-
-def retry_wrapper(max_retries=10):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            thread_id = kwargs["thread_id"]
-            retry_cnt = 0
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    # logger.info(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
-                    retry_cnt += 1
-                    if max_retries is not None and retry_cnt >= max_retries:
-                        break
-
-            raise Exception(f"=> Thread {thread_id} retry {max_retries} times, still failed")
-
-        return wrapper
-
-    return decorator
 
 
 class MultiThreadDownloader(Downloader):
@@ -176,16 +198,22 @@ class MultiThreadDownloader(Downloader):
         self.chunk_size_merge = chunk_size_merge
         self.message_queue = Queue() if queue is None else queue
 
+    @retry_wrapper(max_retries=None)
     def is_support_range(self, client, url):
         # headers = self.get_file_headers(client, url)
         # return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
         # download 1 bytes to check if server supports range
+
+        logger.info("=> Check if server supports range")
 
         with client.stream(
             "GET",
             url,
             headers={**self.headers, "Range": "bytes=0-0"},
         ) as r:
+            if r.status_code in [503, 504]:
+                raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
+
             return r.status_code == 206
 
     def gather_for_resume(self, path, ranges, message_queue):
@@ -204,7 +232,7 @@ class MultiThreadDownloader(Downloader):
 
     def range_download(
         self,
-        client,
+        client: httpx.Client,
         url,
         s_pos,
         e_pos,
@@ -212,6 +240,8 @@ class MultiThreadDownloader(Downloader):
         thread_id,
         message_queue: Queue,
     ):
+        # if not self.is_proxy_valid(self.proxy):
+        #     client._mounts = {} # a hack to disable proxy
 
         if osp.exists(shard_path):
             buffer = open(shard_path, "rb+")
@@ -221,6 +251,8 @@ class MultiThreadDownloader(Downloader):
         buffer.seek(0, os.SEEK_END)
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
+
+        logger.info(f"=> Thread {thread_id} resume from {skip_bytes} bytes")
 
         if s_pos == e_pos + 1:
             return
@@ -318,17 +350,17 @@ class MultiThreadDownloader(Downloader):
         client = httpx.Client(
             headers=self.headers,
             timeout=self.timeout,
-            proxies=self.proxy,
+            proxy=self.proxy,
             follow_redirects=True,
         )
 
-        filesize = self.get_filesize(client, url)
+        filesize = self.get_filesize(client=client, url=url)
 
         self.message_queue.put_nowait(("filesize", filesize))
 
         file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
         ranges = [(i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1)) for i in range(self.num_threads)]
-        if not self.is_support_range(client, url):
+        if not self.is_support_range(client=client, url=url):
             print("=> Server does not support range, use single thread download")
             super().download(url, path)
             return

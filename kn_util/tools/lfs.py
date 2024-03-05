@@ -2,6 +2,7 @@ import sys
 import os
 
 sys.path.insert(0, os.getcwd())
+from kn_util.utils.logger import setup_logger_loguru
 import subprocess
 import argparse
 import os.path as osp
@@ -287,11 +288,19 @@ def main():
             default=1,
             help="Whether to print verbose information",
         )
+        parser.add_argument("--log-stdout", action="store_true", help="Whether to log to stdout")
+        parser.add_argument("--log-file", type=str, help="The log file to use", default=None)
         parser.add_argument("--token", type=str, help="The token to use", default=None)
         args = parser.parse_args()
 
         if args.token is not None:
             os.environ["HF_TOKEN"] = args.token
+
+        setup_logger_loguru(
+            filename=args.log_file,
+            stdout=args.log_stdout,
+            include_filepath=False,
+        )
 
         proxy = None
         if args.proxy or args.proxy_port:
