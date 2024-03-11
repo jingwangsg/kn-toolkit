@@ -209,7 +209,7 @@ def main():
             type=int,
             help="chunk size for async dir",
         )
-        parser.add_argument("-P", "--num-thread", type=int, default=16)
+        parser.add_argument("-n", "--num-thread", type=int, default=16)
         parser.add_argument("--paths", type=str, help="python expression to generate paths", default=None)
 
         args = parser.parse_args()
