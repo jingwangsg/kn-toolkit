@@ -1,7 +1,7 @@
-
 """
 Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf521ae1ff5573358e632f/base/base_dataset.py
 """
+
 import random
 import io
 import av
@@ -13,8 +13,7 @@ import torch
 import numpy as np
 import math
 from loguru import logger
-
-decord.bridge.set_bridge("torch")
+from einops import rearrange
 
 
 def pts_to_secs(pts: int, time_base: float, start_pts: int) -> float:
@@ -58,7 +57,7 @@ def fill_temporal_param(num_frames=None, fps=None, duration=None):
 def get_frame_indices(
     num_frames,
     vlen,
-    sample='rand',
+    sample="rand",
     offset_from_start=None,
     max_num_frames=-1,
 ):
@@ -71,7 +70,7 @@ def get_frame_indices(
     for idx, interv in enumerate(intervals[:-1]):
         ranges.append((interv, intervals[idx + 1] - 1))
 
-    if sample == 'rand':
+    if sample == "rand":
         try:
             frame_indices = [random.choice(range(x[0], x[1])) for x in ranges]
         except:
@@ -81,7 +80,7 @@ def get_frame_indices(
     elif sample == "start":
         offset_from_start = offset_from_start if offset_from_start is not None else 0
         frame_indices = [np.minimum(x[0] + offset_from_start, x[1]) for x in ranges]
-    elif sample == 'middle':
+    elif sample == "middle":
         frame_indices = [(x[0] + x[1]) // 2 for x in ranges]
     else:
         raise NotImplementedError
@@ -89,7 +88,7 @@ def get_frame_indices(
     return frame_indices
 
 
-def read_frames_av(video_path, num_frames, sample='rand', fix_start=None, max_num_frames=-1):
+def read_frames_av(video_path, num_frames, sample="rand", fix_start=None, max_num_frames=-1):
     reader = av.open(video_path)
     frames = [torch.from_numpy(f.to_rgb().to_ndarray()) for f in reader.decode(video=0)]
     vlen = len(frames)
@@ -104,7 +103,7 @@ def read_frames_av(video_path, num_frames, sample='rand', fix_start=None, max_nu
 def read_frames_gif(
     video_path,
     num_frames,
-    sample='rand',
+    sample="rand",
     fix_start=None,
     max_num_frames=-1,
 ):
@@ -127,13 +126,21 @@ def read_frames_gif(
 def read_frames_decord(
     video_path,
     num_frames=None,
+    frame_size=(-1, -1),
     fps=None,
-    sample='rand',
+    sample="rand",
     offset_from_start=None,
     truncate_secs=None,
+    output_format="tchw",
+    bridge="native",
 ):
-
-    video_reader = VideoReader(video_path, num_threads=1)
+    decord.bridge.set_bridge(bridge)
+    video_reader = VideoReader(
+        video_path,
+        num_threads=1,
+        width=frame_size[0],
+        height=frame_size[1],
+    )
     vlen = len(video_reader)
     fps_orig = video_reader.get_avg_fps()
     duration = vlen / float(fps_orig)
@@ -150,13 +157,15 @@ def read_frames_decord(
         sample=sample,
         offset_from_start=offset_from_start,
     )
-    frames = video_reader.get_batch(frame_indices)  # (T, H, W, C), torch.uint8
-    frames = frames.permute(0, 3, 1, 2)  # (T, C, H, W), torch.uint8
+    frames = video_reader.get_batch(frame_indices).asnumpy()  # (T, H, W, C)
+    output_format = " ".join(output_format)
+    frames = rearrange(frames, f"t h w c -> {output_format}")
+
     return frames, frame_indices, duration
 
 
 VIDEO_READER_FUNCS = {
-    'av': read_frames_av,
-    'decord': read_frames_decord,
-    'gif': read_frames_gif,
+    "av": read_frames_av,
+    "decord": read_frames_decord,
+    "gif": read_frames_gif,
 }

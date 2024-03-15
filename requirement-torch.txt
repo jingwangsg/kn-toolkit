@@ -19,9 +19,3 @@ triton >= 2.1.0
 cupy-cuda11x == 12.1.0
 timm
 https://github.com/vllm-project/vllm/releases/download/v0.3.1/vllm-0.3.1+cu118-cp310-cp310-manylinux1_x86_64.whl
-opencv-python
-av
-decord
-imageio
-ffmpeg-python
-yt_dlp

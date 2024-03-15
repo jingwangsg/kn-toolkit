@@ -31,3 +31,9 @@ nest_asyncio
 Pyarrow
 huggingface_hub
 h5py
+opencv-python
+av
+decord
+imageio
+ffmpeg-python
+yt_dlp

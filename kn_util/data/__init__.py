@@ -11,3 +11,4 @@ from .video import (
 from .seq import sample_sequence_general
 from .masking import mask_safe
 from .numpy import to_numpy
+from .collection_ops import collection_to_device, collection_apply

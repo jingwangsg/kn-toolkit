@@ -6,12 +6,16 @@ import copy
 import numpy as np
 
 
-def broadcast_all(tensors):
-    shape_tensor = torch.concat([t.shape for t in tensors], dim=0)
+def broadcast_all(tensors, exclude_dims=None):
+    # dim: dim_th axis will not be broadcasted
+
+    shape_tensor = torch.stack([torch.tensor(t.shape) for t in tensors], dim=0)
     to_shape = shape_tensor.max(dim=0).values.tolist()
     new_tensors = []
 
     for t in tensors:
+        for dim in exclude_dims:
+            to_shape[dim] = t.shape[dim]
         new_tensors.append(t.expand(*to_shape))
 
     return new_tensors
@@ -21,7 +25,7 @@ def broadcast_concat(tensors, dim):
     """
     Concatenate tensors with broadcasting
     """
-    new_tensors = broadcast_all(tensors)
+    new_tensors = broadcast_all(tensors, exclude_dims=(dim,))
 
     return torch.cat(new_tensors, dim=dim)
 
@@ -31,7 +35,6 @@ def broadcast_stack(tensors, dim):
     Stack tensors with broadcasting
     """
     new_tensors = broadcast_all(tensors)
-
     return torch.stack(new_tensors, dim=dim)
 
 
@@ -83,9 +86,9 @@ def broadcast_stack(tensors, dim):
 # def gather_general(tensor, indices, pattern):
 #     """
 #     This is an extended version of torch.gather,
-#     For original torch.gather, it only supports the case where "tensor.ndim == indices.ndim" 
+#     For original torch.gather, it only supports the case where "tensor.ndim == indices.ndim"
 #     Then depending on `dim`, it gathers the value from dim-th axis
-    
+
 #     However, suppose we have a case below
 #     * tensor (M, N, D)
 #     * indices (M, K, L)
@@ -100,7 +103,7 @@ def broadcast_stack(tensors, dim):
 #       these extra axis will act similar as batch axis for the output tensor
 #     * allow for indices to ignore some axis from tensor (e.g. D in this case)
 #       these axes will expand to a hyperplane, which means we are gathering "hyperplane" instead of "value"
-    
+
 #     The output dimension must be union of (1) common axis from both tensor and indices (2) extra axis from indices
 #     We define the notation in light of einops
 #     ```
