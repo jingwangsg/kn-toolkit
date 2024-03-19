@@ -9,7 +9,6 @@ import io
 from contextlib import redirect_stdout
 import ffmpeg
 import cv2
-import av
 from ...utils.logger import FakeLogger, StorageLogger
 
 
@@ -281,7 +280,6 @@ Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf
 """
 import random
 import io
-import av
 import cv2
 import decord
 import imageio

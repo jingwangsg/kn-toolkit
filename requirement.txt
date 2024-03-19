@@ -37,3 +37,4 @@ decord
 imageio
 ffmpeg-python
 yt_dlp
+braceexpand

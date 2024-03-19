@@ -3,6 +3,7 @@
 # See the LICENSE file for licensing terms (BSD-style).
 #
 # flake8: noqa
+import torch
 
 from .wids import (
     ChunkedSampler,

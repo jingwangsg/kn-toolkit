@@ -5,6 +5,7 @@ import glob
 import os
 import os.path as osp
 from webdataset import WebLoader
+from tqdm import tqdm
 
 """
 Example of json file
@@ -36,29 +37,44 @@ Example of json file
 
 
 def count_samples(tarfile, num_workers=0):
-    with WebLoader(tarfile, num_workers=num_workers) as stream:
-        cnt = 0
-        for _ in stream:
-            cnt += 1
+    loader = WebLoader(tarfile, num_workers=num_workers)
+    cnt = 0
+    for _ in loader:
+        cnt += 1
     return cnt
 
 
-def main(input_dir, output_file, dataset, name=None, num_workers=8):
+def main(input_dir, dataset, name=None, num_workers=8, output_file=None):
     tarfiles = glob.glob(f"{input_dir}/*.tar")
+    input_dir = osp.abspath(input_dir)
+
+    if output_file is None:
+        output_file = osp.join(input_dir, f"wids_meta.json")
+    elif not output_file.startswith("/"):
+        output_file = osp.join(input_dir, output_file)
+    else:
+        assert output_file.startswith("/")
+
     meta = {
         "name": default(dataset, name),
-        "base_path": osp.abspath(input_dir),
+        "base_path": input_dir,
+        "wids_version": 1,
     }
     shardlist = []
-    for tarfile in tarfiles:
+    for tarfile in tqdm(tarfiles, desc="Counting samples"):
         shardlist.append(
             {
-                "url": tarfile,
+                "url": osp.basename(tarfile),
                 "nsamples": count_samples(tarfile, num_workers=num_workers),
                 "filesize": osp.getsize(tarfile),
                 "dataset": dataset,
             }
         )
 
+    shardlist = sorted(shardlist, key=lambda x: x["url"])
     meta["shardlist"] = shardlist
-    save_json(output_file, meta)
+    save_json(meta, output_file)
+    print(f"=> Saved to {output_file}")
+
+
+Fire(main)

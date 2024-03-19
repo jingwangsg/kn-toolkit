@@ -1,16 +1,15 @@
 from typing import Any, Dict, Optional
-import numpy as np
 import os
 import random
-import torch
 
+import numpy as np
+max_seed_value = np.iinfo(np.uint32).max
+min_seed_value = np.iinfo(np.uint32).min
 
 def add_prefix_dict(cur_dict, prefix=""):
     return {prefix + k: v for k, v in cur_dict.items()}
 
 
-max_seed_value = np.iinfo(np.uint32).max
-min_seed_value = np.iinfo(np.uint32).min
 
 
 def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
@@ -29,6 +28,8 @@ def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
             for their dataloaders, setting this argument will have no influence. See also:
             :func:`~lightning_lite.utilities.seed.pl_worker_init_function`.
     """
+
+    import torch
     if seed is None:
         env_seed = os.environ.get("PL_GLOBAL_SEED")
         if env_seed is None:

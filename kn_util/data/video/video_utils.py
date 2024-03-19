@@ -4,7 +4,8 @@ Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf
 
 import random
 import io
-import av
+
+# import av
 import cv2
 import decord
 import imageio
@@ -89,16 +90,16 @@ def get_frame_indices(
     return frame_indices
 
 
-def read_frames_av(video_path, num_frames, sample="rand", fix_start=None, max_num_frames=-1):
-    reader = av.open(video_path)
-    frames = [torch.from_numpy(f.to_rgb().to_ndarray()) for f in reader.decode(video=0)]
-    vlen = len(frames)
-    duration = get_pyav_video_duration(reader)
-    fps = vlen / float(duration)
-    frame_indices = get_frame_indices(num_frames, vlen, sample=sample, fix_start=fix_start, input_fps=fps, max_num_frames=max_num_frames)
-    frames = torch.stack([frames[idx] for idx in frame_indices])  # (T, H, W, C), torch.uint8
-    frames = frames.permute(0, 3, 1, 2)  # (T, C, H, W), torch.uint8
-    return frames, frame_indices, duration
+# def read_frames_av(video_path, num_frames, sample="rand", fix_start=None, max_num_frames=-1):
+#     reader = av.open(video_path)
+#     frames = [torch.from_numpy(f.to_rgb().to_ndarray()) for f in reader.decode(video=0)]
+#     vlen = len(frames)
+#     duration = get_pyav_video_duration(reader)
+#     fps = vlen / float(duration)
+#     frame_indices = get_frame_indices(num_frames, vlen, sample=sample, fix_start=fix_start, input_fps=fps, max_num_frames=max_num_frames)
+#     frames = torch.stack([frames[idx] for idx in frame_indices])  # (T, H, W, C), torch.uint8
+#     frames = frames.permute(0, 3, 1, 2)  # (T, C, H, W), torch.uint8
+#     return frames, frame_indices, duration
 
 
 def read_frames_gif(
@@ -169,7 +170,7 @@ def read_frames_decord(
 
 
 VIDEO_READER_FUNCS = {
-    "av": read_frames_av,
+    # "av": read_frames_av,
     "decord": read_frames_decord,
     "gif": read_frames_gif,
 }

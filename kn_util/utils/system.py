@@ -2,6 +2,8 @@ import subprocess
 import socket
 import os.path as osp
 import os
+from tqdm import tqdm
+from .multiproc import map_async_with_thread
 
 
 def run_cmd(cmd, verbose=False, async_cmd=False):
@@ -38,12 +40,12 @@ def force_delete(path):
     return not osp.exists(path)
 
 
-def force_delete_dir(directory):
+def force_delete_dir(directory, quiet=True):
     all_files = run_cmd(
-        f"find {directory} -type f",
-    ).splitlines()
+        f"find {directory} -type f", 
+    ).stdout.splitlines()
     all_files = [_.strip() for _ in all_files if _.strip() != ""]
-    return (force_delete(file) for file in all_files)
+    return map_async_with_thread(iterable=all_files, func=force_delete, verbose=not quiet)
 
 
 def get_available_port():
