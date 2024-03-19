@@ -80,3 +80,6 @@ def eval_env(name, default=False):
         return eval(os.getenv(name, str(default)))
     except:
         return os.getenv(name, str(default))
+
+def default(val, default_val):
+    return val if val is not None else default_val
