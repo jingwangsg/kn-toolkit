@@ -129,7 +129,7 @@ def get_dist_info():
     return rank, world_size
 
 
-def main_process(func):
+def on_main_process(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):

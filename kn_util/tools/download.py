@@ -8,8 +8,9 @@ import os
 
 
 def add_basic_parser(parser):
-    parser.add_argument("url", type=str, help="The url to download")
+    parser.add_argument("url", type=str, help="The url to download", default=None)
     parser.add_argument("-o", "--output", type=str, help="The output path", default=None)
+    parser.add_argument("-i", "--input", type=str, help="The input file consisting of urls", default=None)
     parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
     parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
@@ -34,7 +35,6 @@ def main():
     if args.token is not None:
         os.environ["HF_TOKEN"] = args.token
     url = args.url
-    output = osp.basename(url) if args.output is None else args.output
 
     setup_logger_loguru(stdout=args.log_stdout, filename=args.log_file)
 
@@ -60,7 +60,25 @@ def main():
             timeout=args.timeout,
             verbose=args.verbose,
         )
-        downloader.download(url=url, path=output)
+
+        def get_output_path(url, output):
+            if output is None:
+                path = osp.basename(url)
+            elif output.endswith("/"):
+                path = osp.join(output, osp.basename(url))
+            else:
+                path = output
+            return path
+
+        if args.url is None and args.input is not None:
+            with open(args.input, "r") as f:
+                urls = f.read().strip().split("\n")
+            for url in urls:
+                path = get_output_path(url, args.output)
+                downloader.download(url=url, path=path)
+        else:
+            path = get_output_path(url, args.output)
+            downloader.download(url=url, path=path)
 
     elif args.mode in ["axel", "wget"]:
 

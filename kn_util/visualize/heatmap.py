@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 import numpy as np
-from ..utils import explore_content as EC
+from ..utils.debug import explore_content as EC
 
 def _to_numpy(x):
     if torch.is_tensor(x):

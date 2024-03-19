@@ -70,9 +70,12 @@ class VideoVisualizer:
     @classmethod
     def output_array_to_video_ffmpeg(cls, array, video_path, fps=2, vcodec="libx264", quiet=True):
         n, height, width, channels = array.shape
-        process = (ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgb24',
-                                s='{}x{}'.format(width, height)).output(video_path, pix_fmt='yuv420p', vcodec=vcodec,
-                                                                        r=fps).overwrite_output().run_async(pipe_stdin=True, quiet=quiet))
+        process = (
+            ffmpeg.input("pipe:", format="rawvideo", pix_fmt="rgb24", s="{}x{}".format(width, height))
+            .output(video_path, pix_fmt="yuv420p", vcodec=vcodec, r=fps)
+            .overwrite_output()
+            .run_async(pipe_stdin=True, quiet=quiet)
+        )
         for frame in array:
             process.stdin.write(frame.astype(np.uint8).tobytes())
         process.stdin.close()
@@ -84,7 +87,12 @@ class VideoVisualizer:
         #     img = Image.fromarray(img)
         #     img.save(osp.join(image_dir, f"{idx}.jpg"))
         from kn_util.utils.multiproc import map_async
-        map_async(iterable=enumerate(array), func=lambda x: Image.fromarray(x[1]).save(osp.join(image_dir, f"{x[0]}.jpg")))
+
+        map_async(
+            iterable=enumerate(array),
+            func=lambda x: Image.fromarray(x[1]).save(osp.join(image_dir, f"{x[0]}.jpg")),
+            verbose=False,
+        )
 
 
 class Visualizer:

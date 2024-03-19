@@ -37,7 +37,7 @@ def get_pyav_video_duration(video_reader):
     return float(video_duration)
 
 
-def fill_temporal_param(num_frames=None, fps=None, duration=None):
+def fill_temporal_param(duration, num_frames=None, fps=None):
     if num_frames is None:
         assert fps is not None
         assert duration is not None
@@ -46,10 +46,11 @@ def fill_temporal_param(num_frames=None, fps=None, duration=None):
         assert num_frames is not None
         assert duration is not None
         fps = num_frames / duration
-    elif duration is None:
-        assert fps is not None
-        assert num_frames is not None
-        duration = num_frames / fps
+    # duration should always be given
+    # elif duration is None:
+    #     assert fps is not None
+    #     assert num_frames is not None
+    #     duration = num_frames / fps
 
     return num_frames, fps, duration
 
@@ -144,7 +145,10 @@ def read_frames_decord(
     vlen = len(video_reader)
     fps_orig = video_reader.get_avg_fps()
     duration = vlen / float(fps_orig)
-    num_frames, fps, duration = fill_temporal_param(num_frames, fps, duration)
+    if num_frames is None and fps is None:
+        num_frames = vlen
+
+    num_frames, fps, duration = fill_temporal_param(duration=duration, num_frames=num_frames, fps=fps)
 
     # only truncate if duration is longer than truncate
     if truncate_secs is not None and duration > truncate_secs:

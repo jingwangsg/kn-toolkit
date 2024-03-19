@@ -12,6 +12,8 @@ import os.path as osp
 import glob
 from tqdm import tqdm
 import warnings
+import h5py
+from ..utils.multiproc import map_async_with_thread
 
 
 def load_json(fn):
@@ -23,6 +25,7 @@ def save_json(obj: dict, fn):
     with open(fn, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=4)
 
+
 def load_jsonl(fn, as_generator=False):
     with open(fn, "r", encoding="utf-8") as f:
         # FIXME: as_generator not working
@@ -31,6 +34,7 @@ def load_jsonl(fn, as_generator=False):
         #         yield json.loads(line)
         # else:
         return [json.loads(line) for line in f]
+
 
 def save_jsonl(obj: Sequence[dict], fn):
     with open(fn, "w", encoding="utf-8") as f:
@@ -69,22 +73,25 @@ def load_csv(fn, delimiter=",", has_header=True):
 
     return ret_list
 
+
 def save_csv(obj, fn, delimiter=",", has_header=True):
     fn = open(fn, "w")
     if has_header:
         assert isinstance(obj[0], dict), "obj should be a list of dict"
         keys = list(obj[0].keys())
         fn.write(delimiter.join(keys) + "\n")
-    
+
     for row in obj:
         if isinstance(row, dict):
             row = [row[k] for k in keys]
         fn.write(delimiter.join(row) + "\n")
-    
+
     fn.close()
+
 
 def save_hdf5(obj, fn, **kwargs):
     import h5py
+
     if isinstance(fn, str):
         with h5py.File(fn, "a") as f:
             save_hdf5_recursive(obj, f, **kwargs)
@@ -111,6 +118,7 @@ def save_hdf5_recursive(kv, cur_handler, **kwargs):
 
 def load_hdf5(fn):
     import h5py
+
     if isinstance(fn, str):
         with h5py.File(fn, "r") as f:
             return load_hdf5_recursive(f)
@@ -136,7 +144,7 @@ def load_hdf5_recursive(cur_handler):
 class LargeHDF5Cache:
     """to deal with IO comflict during large scale prediction,
     we mock the behavior of single hdf5 and build hierarchical cache according to hash_key
-    this class is only for saving large hdf5 with dense IO
+    this class is only for saving large hdf5 with parallel workers
     """
 
     def __init__(self, hdf5_path, **kwargs):
@@ -161,6 +169,7 @@ class LargeHDF5Cache:
 
     def final_save(self):
         from torch.utils.data import DataLoader
+
         tmp_files = glob.glob(osp.join(self.tmp_dir, "*.hdf5"))
         result_handle = h5py.File(self.hdf5_path, "a")
         loader = DataLoader(tmp_files, batch_size=1, collate_fn=lambda x: load_hdf5(x[0]), num_workers=8, prefetch_factor=6)

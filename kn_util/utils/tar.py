@@ -1,5 +1,5 @@
 from .system import run_cmd
-from ..basic import map_async
+from .multiproc import map_async
 import tarfile
 from tqdm import tqdm
 import os.path as osp
