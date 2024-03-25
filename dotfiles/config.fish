@@ -24,8 +24,8 @@ abbr nvp "gpustat -f"
 abbr base "conda activate base"
 abbr tc 'conda activate torch'
 abbr zh 'conda activate zh'
-abbr pyipdb "python -m ipdb -c continue "
-abbr pypdb "python -m pdb -c continue "
+abbr pyipdb "python -m ipdb -c continue"
+abbr pypdb "python -m pdb -c continue"
 # abbr aner "conda activate decouplener"
 abbr fgA "python ~/server_utils/query_cluster.py --task available --all -f"
 abbr fst "python ~/server_utils/query_cluster.py --task stat"
@@ -158,8 +158,21 @@ function knkill
     ps -u (whoami) --no-headers -o pid,comm= | grep -v -E "^\$|((string echo $PPID))|slurmstepd|python311|python39|tmux|bash|fish" | grep -- $filter | awk '{print $1}' | xargs kill -9
 end
 
-function gpukill
+function _gpustr
     set variable $argv[1]
+    set gpu_count (gpustat --no-header | wc -l)
+    set last_gpu_index (math $gpu_count - 1)
+
+    if test "$variable" = "-1"
+        echo (seq 0 $last_gpu_index | string join ",")
+    else
+        echo $variable
+    end
+
+end
+
+function gpukill
+    set variable (_gpustr $argv[1])
     for i in (string split "," $variable)
         gpustat --id $i --json | grep pid | awk '{print $2}' | tr -d ',' | xargs kill -9
     end
@@ -199,8 +212,18 @@ function pcmd
   ps -p $argv[1] -o pid,ppid,cmd
 end
 
+function wait_gpu
+    set fetch_gpu $argv[1]
+    set -e argv[1]
 
+    set cmd (string join " " -- $argv) # so that fish can handle --args correctly
+    echo -e "\e[32m[START] $cmd\e[0m"
+    sg $fetch_gpu -m peace --threshold 0.95
+    sleep 30
+    gpukill $fetch_gpu
 
+    eval $cmd
 
-
-
+    echo -e "\e[32m[END] $cmd\e[0m"
+    sg $fetch_gpu
+end

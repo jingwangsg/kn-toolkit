@@ -9,5 +9,16 @@ from .video import (
 )
 from .seq import sample_sequence_general
 from .masking import mask_safe
+
+from .collection_ops import (
+    collection_get,
+    nested_to,
+    nested_apply_tensor,
+    collection_extend_multikeys,
+    collection_extend,
+    collection_get_multikeys,
+)
+
 from .numpy import to_numpy
-from .collection_ops import collection_get, nested_to, nested_apply_tensor
+from .vocab import delete_noisy_char
+from .dataset import Subset

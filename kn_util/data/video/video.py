@@ -9,7 +9,63 @@ import io
 from contextlib import redirect_stdout
 import ffmpeg
 import cv2
-from ...utils.logger import FakeLogger, StorageLogger
+from ...utils.error import SuppressStdoutStderr
+from ...data.video.video_utils import validate_bytes
+from collections import defaultdict
+import requests
+import webvtt
+
+
+def sub_to_dict(sub, dedupe=True, single=False) -> list:
+    """Convert WebVTT to JSON, optionally removing duplicate lines"""
+
+    captions = webvtt.read_buffer(io.StringIO(sub))
+    dicts = [{"start": c.start, "end": c.end, "lines": c.lines} for c in captions]
+    if dedupe:
+        dicts = []
+        prev_line = None
+        for c in captions:
+            if any("<c>" in l for l in c.lines):
+                continue
+            # Collect lines that are not dupes
+            not_dupe_lines = []
+            for line in c.lines:
+                if not line.strip():
+                    continue
+                if line != prev_line:
+                    not_dupe_lines.append(line)
+                prev_line = line
+            if not_dupe_lines:
+                dicts.append({"start": c.start, "end": c.end, "lines": not_dupe_lines})
+    if single:
+        for d in dicts:
+            d["line"] = "\n".join(d.pop("lines"))
+    return dicts
+
+
+class FakeLogger(object):
+    def debug(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        pass
+
+
+class StorageLogger:
+    def __init__(self):
+        self.storage = defaultdict(list)
+
+    def debug(self, msg):
+        self.storage["debug"].append(msg)
+
+    def warning(self, msg):
+        self.storage["warning"].append(msg)
+
+    def error(self, msg):
+        self.storage["error"].append(msg)
 
 
 class OpenCVVideoLoader:
@@ -52,34 +108,34 @@ class OpenCVVideoLoader:
         self.cap.release()
 
 
-class PyAVVideoLoader(OpenCVVideoLoader):
+# class PyAVVideoLoader(OpenCVVideoLoader):
 
-    def __init__(self, video_path, multi_thread=True):
-        super().__init__(video_path)
-        file_obj = open(video_path, "rb")
-        self.container = av.open(file_obj)
+#     def __init__(self, video_path, multi_thread=True):
+#         super().__init__(video_path)
+#         file_obj = open(video_path, "rb")
+#         self.container = av.open(file_obj)
 
-        if multi_thread:
-            self.container.streams.video[0].thread_type = "AUTO"
+#         if multi_thread:
+#             self.container.streams.video[0].thread_type = "AUTO"
 
-    def get_frames(self):
-        container = self.container
+#     def get_frames(self):
+#         container = self.container
 
-        total_frames = self.length
+#         total_frames = self.length
 
-        i = 0
-        imgs = []
-        for frame in container.decode(video=0):
-            if i >= total_frames:
-                break
-            imgs.append(frame.to_rgb().to_ndarray())
-            i += 1
-        imgs = np.stack(imgs)
-        return imgs
+#         i = 0
+#         imgs = []
+#         for frame in container.decode(video=0):
+#             if i >= total_frames:
+#                 break
+#             imgs.append(frame.to_rgb().to_ndarray())
+#             i += 1
+#         imgs = np.stack(imgs)
+#         return imgs
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        super().__exit__(exc_type, exc_value, traceback)
-        self.container.close()
+#     def __exit__(self, exc_type, exc_value, traceback):
+#         super().__exit__(exc_type, exc_value, traceback)
+#         self.container.close()
 
 
 class FFMPEGVideoLoader:
@@ -131,17 +187,18 @@ class FFMPEGVideoLoader:
         return frames
 
 
-class AVVideoLoader(OpenCVVideoLoader):
-
-    def decode_frames(self):
-        pass
-
-
 import yt_dlp
 import re
 
 
 class YTDLPDownloader:
+    DEFAULT_YTMETA_ARGS = {
+        "writesubtitles": "first",
+        "subtitleslangs": ["en"],
+        "writeautomaticsub": True,
+        "get_info": True,
+    }
+    DEFAULT_VIDEO_FORMAT = "worst[ext=mp4][height>=224]"
 
     @staticmethod
     def _maybe_youtube_id(url):
@@ -155,7 +212,7 @@ class YTDLPDownloader:
         cls,
         youtube_id,
         video_path,
-        video_format="worst[ext=mp4][height>=224]",
+        video_format=DEFAULT_VIDEO_FORMAT,
         quiet=True,
         logger=None,
     ):
@@ -207,41 +264,101 @@ class YTDLPDownloader:
         return True
 
     @classmethod
-    def extract_formats(cls, youtube_id, quiet=True, **format_kwargs):
-        ydl_opts = {"ignoreerrors": True, "logtostderr": True, "quiet": quiet, "noprogress": quiet}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            infos = ydl.extract_info(youtube_id, download=False)
-            formats = [_ for _ in infos["formats"] if cls._check_format_dict(_, **format_kwargs)]
+    def get_yt_meta(
+        cls,
+        url,
+        yt_metadata_args: dict = DEFAULT_YTMETA_ARGS,
+    ):
+        """Return yt meta dict with meta data and/or subtitles
+        yt_metadata_args is a dict of follwing format:
+        yt_metadata_args = {
+            'writesubtitles': 'first',
+            'subtitleslangs': ['en'],
+            'writeautomaticsub': True,
+            'get_info': True
+        }
 
-        formats = sorted(formats, key=lambda _: _["height"])
+        writesubtitles:    Whether to write subtitles for each provided language or just the first present
+        writeautomaticsub: Write the automatically generated subtitles to a file
+        subtitleslangs:    List of languages of the subtitles to download.
+        get_info:          Whether to add info (title, description, tags etc) to the output.
+        """
 
-        return formats
+        write_subs = yt_metadata_args.get("writesubtitles", None)
+
+        yt_metadata_args["skip_download"] = True
+        yt_metadata_args["ignoreerrors"] = True
+        yt_metadata_args["quiet"] = True
+
+        info_dict, full_sub_dict = None, None
+
+        with yt_dlp.YoutubeDL(yt_metadata_args) as yt:
+            info_dict = yt.extract_info(url, download=False)
+
+        if write_subs:
+            full_sub_dict = {}
+            for lang in yt_metadata_args["subtitleslangs"]:
+                # if info_dict["requested_subtitles"] is None:
+                #     import ipdb; ipdb.set_trace()
+                if info_dict["requested_subtitles"] is None:
+                    break
+                if lang not in info_dict["requested_subtitles"]:
+                    continue
+                sub_url = info_dict["requested_subtitles"][lang]["url"]
+                res = requests.get(sub_url, timeout=10)
+                sub = io.TextIOWrapper(io.BytesIO(res.content)).read()
+                full_sub_dict[lang] = sub_to_dict(sub)
+
+                if write_subs == "first":
+                    break
+
+        if yt_metadata_args["get_info"]:
+            info_dict.pop("subtitles")
+            info_dict.pop("requested_formats")
+            info_dict.pop("formats")
+            info_dict.pop("thumbnails")
+            info_dict.pop("automatic_captions")
+        else:
+            info_dict = None
+
+        yt_meta_dict = {"info": info_dict, "subtitles": full_sub_dict}
+
+        return yt_meta_dict
 
     @staticmethod
-    def _download_ydl(youtube_id, buffer, video_format, quiet=True):
+    def _download_ydl(youtube_id, buffer, video_format=DEFAULT_VIDEO_FORMAT, quiet=True):
         ydl_opts = {"ignoreerrors": True, "format": video_format, "outtmpl": "-", "logtostderr": True, "quiet": quiet, "noprogress": quiet}
         with redirect_stdout(buffer), yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([youtube_id])
         return error_code
 
-    @staticmethod
-    def _download_async(youtubu_id, buffer, video_format, quiet):
-        pass
-
     @classmethod
-    def load_to_buffer(cls, youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True):
-        # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+    def download_bytes(cls, youtube_id, video_format=DEFAULT_VIDEO_FORMAT, quiet=True, logger=None):
         youtube_id = cls._maybe_youtube_id(youtube_id)
 
         buffer = io.BytesIO()
-        error_code = cls._download_ydl(youtube_id=youtube_id, buffer=buffer, video_format=video_format, quiet=quiet)
 
-        buffer.seek(0)
+        # ! hack workaround to prevent buffer from closing
+        # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+        old_buffer_close = buffer.close
+        buffer.close = lambda *_: ...
+
+        with redirect_stdout(buffer):
+
+            error_code = cls.download(
+                youtube_id=youtube_id,
+                video_path="-",
+                video_format=video_format,
+                quiet=quiet,
+                logger=logger,
+            )
+
+        m = buffer.getvalue()
+        old_buffer_close()
 
         # write out the buffer for demonstration purposes
         # Path(f"{youtube_id}.mp4").write_bytes(buffer.getvalue())
-
-        return buffer, error_code == 0
+        return m, error_code
 
 
 import decord
@@ -273,169 +390,3 @@ class DecordVideoLoader:
             frame_ids = range(self.length)
         frames = self.vr.get_batch(frame_ids)
         return frames.asnumpy()
-
-
-"""
-Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf521ae1ff5573358e632f/base/base_dataset.py
-"""
-import random
-import io
-import cv2
-import decord
-import imageio
-from decord import VideoReader
-import torch
-import numpy as np
-import math
-from loguru import logger
-
-decord.bridge.set_bridge("torch")
-
-
-def pts_to_secs(pts: int, time_base: float, start_pts: int) -> float:
-    """
-    Converts a present time with the given time base and start_pts offset to seconds.
-
-    Returns:
-        time_in_seconds (float): The corresponding time in seconds.
-
-    https://github.com/facebookresearch/pytorchvideo/blob/main/pytorchvideo/data/utils.py#L54-L64
-    """
-    if pts == math.inf:
-        return math.inf
-
-    return int(pts - start_pts) * time_base
-
-
-def get_pyav_video_duration(video_reader):
-    video_stream = video_reader.streams.video[0]
-    video_duration = pts_to_secs(video_stream.duration, video_stream.time_base, video_stream.start_time)
-    return float(video_duration)
-
-
-def get_frame_indices_by_fps():
-    pass
-
-
-def fill_temporal_param(num_frames=None, fps=None, duration=None):
-    if num_frames is None:
-        assert fps is not None
-        assert duration is not None
-        num_frames = int(duration * fps)
-    elif fps is None:
-        assert num_frames is not None
-        assert duration is not None
-        fps = num_frames / duration
-    elif duration is None:
-        assert fps is not None
-        assert num_frames is not None
-        duration = num_frames / fps
-
-    return num_frames, fps, duration
-
-
-def get_frame_indices(
-    num_frames,
-    vlen,
-    sample="rand",
-    offset_from_start=None,
-    max_num_frames=-1,
-):
-
-    assert sample in ["rand", "middle", "start"]
-    acc_samples = min(num_frames, vlen)
-    # split the video into `acc_samples` intervals, and sample from each interval.
-    intervals = np.linspace(start=0, stop=vlen, num=acc_samples + 1).astype(int)
-    ranges = []
-    for idx, interv in enumerate(intervals[:-1]):
-        ranges.append((interv, intervals[idx + 1] - 1))
-
-    if sample == "rand":
-        try:
-            frame_indices = [random.choice(range(x[0], x[1])) for x in ranges]
-        except:
-            frame_indices = np.random.permutation(vlen)[:acc_samples]
-            frame_indices.sort()
-            frame_indices = list(frame_indices)
-    elif sample == "start":
-        offset_from_start = offset_from_start if offset_from_start is not None else 0
-        frame_indices = [np.minimum(x[0] + offset_from_start, x[1]) for x in ranges]
-    elif sample == "middle":
-        frame_indices = [(x[0] + x[1]) // 2 for x in ranges]
-    else:
-        raise NotImplementedError
-
-    return frame_indices
-
-
-def read_frames_av(video_path, num_frames, sample="rand", fix_start=None, max_num_frames=-1):
-    reader = av.open(video_path)
-    frames = [torch.from_numpy(f.to_rgb().to_ndarray()) for f in reader.decode(video=0)]
-    vlen = len(frames)
-    duration = get_pyav_video_duration(reader)
-    fps = vlen / float(duration)
-    frame_indices = get_frame_indices(num_frames, vlen, sample=sample, fix_start=fix_start, input_fps=fps, max_num_frames=max_num_frames)
-    frames = torch.stack([frames[idx] for idx in frame_indices])  # (T, H, W, C), torch.uint8
-    frames = frames.permute(0, 3, 1, 2)  # (T, C, H, W), torch.uint8
-    return frames, frame_indices, duration
-
-
-def read_frames_gif(
-    video_path,
-    num_frames,
-    sample="rand",
-    fix_start=None,
-    max_num_frames=-1,
-):
-    gif = imageio.get_reader(video_path)
-    vlen = len(gif)
-    frame_indices = get_frame_indices(num_frames, vlen, sample=sample, fix_start=fix_start, max_num_frames=max_num_frames)
-    frames = []
-    for index, frame in enumerate(gif):
-        # for index in frame_idxs:
-        if index in frame_indices:
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
-            frame = torch.from_numpy(frame).byte()
-            # # (H x W x C) to (C x H x W)
-            frame = frame.permute(2, 0, 1)
-            frames.append(frame)
-    frames = torch.stack(frames)  # .float() / 255
-    return frames, frame_indices, None
-
-
-def read_frames_decord(
-    video_path,
-    num_frames=None,
-    fps=None,
-    sample="rand",
-    offset_from_start=None,
-    truncate_secs=None,
-):
-
-    video_reader = VideoReader(video_path, num_threads=1)
-    vlen = len(video_reader)
-    fps_orig = video_reader.get_avg_fps()
-    duration = vlen / float(fps_orig)
-    num_frames, fps, duration = fill_temporal_param(num_frames, fps, duration)
-
-    # only truncate if duration is longer than truncate
-    if truncate_secs is not None and duration > truncate_secs:
-        duration = truncate_secs
-        vlen = int(truncate_secs * float(fps))
-
-    frame_indices = get_frame_indices(
-        num_frames,
-        vlen,
-        sample=sample,
-        offset_from_start=offset_from_start,
-    )
-    frames = video_reader.get_batch(frame_indices)  # (T, H, W, C), torch.uint8
-    frames = frames.permute(0, 3, 1, 2)  # (T, C, H, W), torch.uint8
-    return frames, frame_indices, duration
-
-
-VIDEO_READER_FUNCS = {
-    "av": read_frames_av,
-    "decord": read_frames_decord,
-    "gif": read_frames_gif,
-}

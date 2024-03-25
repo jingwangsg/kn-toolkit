@@ -16,3 +16,12 @@ def get_activation_fn(activation):
     if activation == "glu":
         return F.glu
     raise RuntimeError(f"activation should be relu/gelu, not {activation}.")
+
+
+def get_params_by_prefix(state_dict, prefix=None, remove_prefix=False):
+    if prefix is None:
+        return state_dict
+    if remove_prefix:
+        return {k[len(prefix) :].strip("."): v for k, v in state_dict.items() if k.startswith(prefix)}
+    else:
+        return {k: v for k, v in state_dict.items() if k.startswith(prefix)}

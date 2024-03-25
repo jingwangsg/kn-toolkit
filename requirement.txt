@@ -6,6 +6,7 @@ tabulate
 py3nvml
 ipdb
 ipython
+pickleshare
 yapf
 black
 hydra-core
@@ -32,9 +33,10 @@ Pyarrow
 huggingface_hub
 h5py
 opencv-python
-av
 decord
 imageio
 ffmpeg-python
 yt_dlp
 braceexpand
+webvtt-py
+icecream

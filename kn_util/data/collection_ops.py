@@ -1,6 +1,10 @@
 from typing import Mapping, Sequence
-import torch
-from torch.utils.data import default_collate
+
+try:
+    import torch
+    from torch.utils.data import default_collate
+except:
+    pass
 
 
 def nested_apply_tensor(sample, f):
@@ -30,8 +34,67 @@ def nested_to(batch, device, dtype=None, non_blocking=False):
 
 
 def collection_get(batch, key, default=None):
+    """
+    Return:
+        list: [b[key] for b in batch]
+    """
     # get the value of key in batch while maintaining the structure of batch
     if isinstance(batch, list):
         return [b.get(key, default) for b in batch]
-    if isinstance(batch, dict):
-        return {k: v.get(key, default) for k, v in batch.items()}
+    else:
+        raise NotImplementedError
+
+
+def collection_get_multikeys(batch, keys, default=None):
+    """
+    Return:
+        dict: {k: [v[k] for v in batch]}
+    """
+    if isinstance(batch, list):
+        ret = {}
+        for k in keys:
+            seq = collection_get(batch, key, default=default)
+            ret[k] = seq
+        return ret
+    else:
+        raise NotImplementedError
+
+
+def collection_extend(batch, key, return_batch_indices=False):
+    """an extend version of collection_get
+    Return:
+        list: join(b[key] for b in batch)
+    """
+    if isinstance(batch, list):
+        ret = []
+        batch_idxs = []
+        for batch_idx, b in enumerate(batch):
+            ret.extend(b[key])
+            batch_idxs.extend([batch_idx] * len(b[key]))
+        if return_batch_indices:
+            return ret, batch_idxs
+        else:
+            return ret
+    else:
+        raise NotImplementedError
+
+
+def collection_extend_multikeys(batch, keys):
+    """collection_extend that support multiple keys at once
+    Return:
+        dict: {k: join(v[k] for v in batch)}
+    """
+
+    if isinstance(batch, list):
+        ret = {}
+        batch_idxs = None
+        for idx, key in enumerate(keys):
+            if idx == 0:
+                seq, batch_idxs = collection_extend(batch, key, return_batch_indices=True)
+            else:
+                seq = collection_extend(batch, key, return_batch_indices=False)
+            ret[key] = seq
+        ret["batch_idxs"] = batch_idxs
+        return ret
+    else:
+        raise NotImplementedError

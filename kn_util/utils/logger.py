@@ -13,6 +13,15 @@ import sys
 
 from collections import defaultdict
 from loguru import logger
+import wandb
+
+
+try:
+    import torch
+except:
+    pass
+
+from ..dist import is_main_process
 
 
 class SmoothedValue(object):
@@ -84,15 +93,21 @@ class SmoothedValue(object):
 
 class MetricLogger(object):
 
-    def __init__(self, delimiter="\t", logger=None):
+    def __init__(self, delimiter="\t", logger=None, start_iter=0):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
+        self.start_iter = start_iter
+
         if logger is None:
             from loguru import logger
 
             self.logger = logger
+        else:
+            self.logger = logger
 
     def update(self, **kwargs):
+        import torch
+
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
@@ -125,7 +140,11 @@ class MetricLogger(object):
     def add_meter(self, name, meter):
         self.meters[name] = meter
 
-    def log_every(self, iterable, log_freq, header=None):
+    def log_every(self, iterable, log_freq, header=None, wandb_kwargs=None):
+        if wandb_kwargs is not None:
+            assert "prefix" in wandb_kwargs, "prefix is required in wandb_kwargs"
+            assert "start_iter" in wandb_kwargs, "start_iter is required in wandb_kwargs"
+
         i = 0
         if not header:
             header = ""
@@ -134,17 +153,18 @@ class MetricLogger(object):
         iter_time = SmoothedValue(fmt="{avg:.4f}")
         data_time = SmoothedValue(fmt="{avg:.4f}")
         space_fmt = ":" + str(len(str(len(iterable)))) + "d"
-        log_msg = [
+        log_template = [
             header,
-            "[{0" + space_fmt + "}/{1}]",
+            "[{niter" + space_fmt + "}/{total_iter}]",
             "eta: {eta}",
             "{meters}",
             "time: {time}",
             "data: {data}",
         ]
         if torch.cuda.is_available():
-            log_msg.append("max mem: {memory:.0f}")
-        log_msg = self.delimiter.join(log_msg)
+            log_template.append("max mem: {memory:.0f}")
+        log_template = self.delimiter.join(log_template)
+
         MB = 1024.0 * 1024.0
         for obj in iterable:
             data_time.update(time.time() - end)
@@ -153,29 +173,28 @@ class MetricLogger(object):
             if i % log_freq == 0 or i == len(iterable) - 1:
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+
+                metric_dict = dict(
+                    niter=i,
+                    total_iter=len(iterable),
+                    eta=eta_string,
+                    meters=str(self),
+                    time=str(iter_time),
+                    data=str(data_time),
+                )
+
                 if torch.cuda.is_available():
-                    self.logger.info(
-                        log_msg.format(
-                            i,
-                            len(iterable),
-                            eta=eta_string,
-                            meters=str(self),
-                            time=str(iter_time),
-                            data=str(data_time),
-                            memory=torch.cuda.max_memory_allocated() / MB,
-                        )
-                    )
-                else:
-                    self.logger.info(
-                        log_msg.format(
-                            i,
-                            len(iterable),
-                            eta=eta_string,
-                            meters=str(self),
-                            time=str(iter_time),
-                            data=str(data_time),
-                        )
-                    )
+                    metric_dict["memory"] = torch.cuda.max_memory_reserved() / MB
+
+                if wandb_kwargs is not None:
+                    prefix = wandb_kwargs["prefix"]
+                    wandb_metric = {f"{prefix}/{k}": v for k, v in metric_dict.items()}
+                    niter = i + wandb_kwargs["start_iter"]
+                    wandb.log(**wandb_metric, step=niter)
+
+                log_str = log_template.format(**metric_dict)
+                self.logger.info(log_str)
+
             i += 1
             end = time.time()
         total_time = time.time() - start_time
@@ -198,6 +217,7 @@ def setup_logger_loguru(
     stdout=True,
     include_function=False,
     include_filepath=False,
+    master_only=True,
 ):
     # when filename = None and stdout=False, loguru will not log anything
     # this is espeically useful for distributed training
@@ -214,38 +234,9 @@ def setup_logger_loguru(
     template += " \033[1m{message}\033[0m"
 
     logger.remove(0)
+    if master_only and not is_main_process():
+        return
     if filename is not None:
         logger.add(filename, level="INFO", format=template, enqueue=True)
     if stdout:
         logger.add(sys.stdout, format=template, enqueue=True)
-
-
-# ======================== for YTDLP ========================
-
-
-class FakeLogger(object):
-    def debug(self, msg):
-        pass
-
-    def warning(self, msg):
-        pass
-
-    def error(self, msg):
-        pass
-
-
-class StorageLogger:
-    def __init__(self):
-        self.storage = defaultdict(list)
-
-    def debug(self, msg):
-        self.storage["debug"].append(msg)
-
-    def warning(self, msg):
-        self.storage["warning"].append(msg)
-
-    def error(self, msg):
-        self.storage["error"].append(msg)
-
-
-# ======================================================

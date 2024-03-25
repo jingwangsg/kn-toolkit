@@ -2,13 +2,31 @@ from IPython import embed
 from ipdb import set_trace as ipdb_set_trace
 from pdb import set_trace as pdb_set_trace
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, List
+from icecream import argumentToString, ic
 
 try:
     import torch
     import numpy as np
 except:
     pass
+
+
+@argumentToString.register(torch.Tensor)
+def _torch_tensor_to_string(x: torch.Tensor):
+    return f"torch.Tensor, shape={tuple(x.shape)}, dtype={x.dtype}, device={x.device}"
+
+
+@argumentToString.register(np.ndarray)
+def _numpy_ndarray_to_string(x: np.ndarray):
+    return f"numpy.ndarray, shape={tuple(x.shape)}, dtype={x.dtype}"
+
+
+# @argumentToString.register(List)
+# def _list_to_string(x: List):
+#     _examples = [str(v) for v in x[:3]]
+#     _str = f"List, len={len(x)}, examples={_examples}"
+#     return _str
 
 
 def explore_content(

@@ -6,7 +6,7 @@ import copy
 import numpy as np
 
 
-def broadcast_all(tensors, exclude_dims=None):
+def broadcast_all(tensors, exclude_dims=()):
     # dim: dim_th axis will not be broadcasted
 
     shape_tensor = torch.stack([torch.tensor(t.shape) for t in tensors], dim=0)

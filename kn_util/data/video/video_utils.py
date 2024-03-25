@@ -10,7 +10,6 @@ import cv2
 import decord
 import imageio
 from decord import VideoReader
-import torch
 import numpy as np
 import math
 from loguru import logger
@@ -162,11 +161,19 @@ def read_frames_decord(
         sample=sample,
         offset_from_start=offset_from_start,
     )
+
+    meta = {
+        "fps": fps,
+        "vlen": vlen,
+        "duration": duration,
+        "frame_indices": frame_indices,
+    }
+
     frames = video_reader.get_batch(frame_indices).asnumpy()  # (T, H, W, C)
     output_format = " ".join(output_format)
     frames = rearrange(frames, f"t h w c -> {output_format}")
 
-    return frames, frame_indices, duration
+    return frames, meta
 
 
 VIDEO_READER_FUNCS = {
@@ -174,3 +181,13 @@ VIDEO_READER_FUNCS = {
     "decord": read_frames_decord,
     "gif": read_frames_gif,
 }
+
+
+def validate_bytes(video_bytes):
+    try:
+        _ = read_frames_decord(io.BytesIO(video_bytes), num_frames=2, frame_size=(32, 32))
+        return True
+    except:
+        pass
+
+    return False

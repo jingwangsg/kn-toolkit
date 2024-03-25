@@ -15,6 +15,7 @@ from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
 from queue import Queue
 import threading
 from .rich import get_rich_progress_mofn, add_tasks
+import copy
 
 
 def _run_sequential(iterable, func, desc="", verbose=True):
@@ -209,3 +210,14 @@ def map_async_with_shard(
         num_process=num_process,
         verbose=verbose,
     )
+
+def pathos_wait(not_done, timeout=0.5):
+    done = set()
+    time.sleep(timeout)
+    _not_done = copy.copy(not_done)
+    for future in _not_done:
+        if future.ready():
+            not_done.remove(future)
+            done.add(future)
+            continue
+    return done, not_done
