@@ -104,8 +104,11 @@ class Config(object):
 
         cfg = eval_dict_leaf(cfg)
         # _variable only used for eval
-        cfg = {name: value for name, value in cfg.items() \
-            if not name.startswith("_") and not inspect.isclass(value) and not inspect.isfunction(value)}
+        cfg = {
+            name: value
+            for name, value in cfg.items()
+            if not name.startswith("_") and not inspect.isclass(value) and not inspect.isfunction(value)
+        }
         cfg = EasyDict(cfg)
 
         # update some keys to make them show at the last
@@ -154,7 +157,7 @@ class Config(object):
         if BASE_KEY in cfg_dict:  # load configs in `BASE_KEY`
             cfg_dir = osp.dirname(filepath)
             base_filename = cfg_dict.pop(BASE_KEY)
-            base_filename = (base_filename if isinstance(base_filename, list) else [base_filename])
+            base_filename = base_filename if isinstance(base_filename, list) else [base_filename]
 
             cfg_dict_list = list()
             for f in base_filename:
@@ -291,20 +294,3 @@ class LazyCall:
         return {"_target_": self._target, **kwargs}
 
 
-def instantiate(cfg, **kwargs):
-
-    def _instantiate(_cfg, **_kwargs):
-        _cfg = copy.deepcopy(_cfg)
-        if "_target_" in _cfg:
-            target = _cfg.pop("_target_")
-            for k, v in _cfg.items():
-                if isinstance(v, dict):
-                    _kwargs[k] = _instantiate(v)
-                else:
-                    _kwargs[k] = v
-
-            return target(**_kwargs)
-        else:
-            return _cfg
-
-    return _instantiate(cfg, **kwargs)

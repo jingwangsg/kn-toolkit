@@ -217,8 +217,9 @@ function wait_gpu
     set -e argv[1]
 
     set cmd (string join " " -- $argv) # so that fish can handle --args correctly
-    echo -e "\e[32m[START] $cmd\e[0m"
+    echo -e "\e[32m[WAIT] $cmd\e[0m"
     sg $fetch_gpu -m peace --threshold 0.95
+    echo -e "\e[32m[START] $cmd\e[0m"
     sleep 30
     gpukill $fetch_gpu
 

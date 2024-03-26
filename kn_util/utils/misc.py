@@ -3,13 +3,13 @@ import os
 import random
 
 import numpy as np
+
 max_seed_value = np.iinfo(np.uint32).max
 min_seed_value = np.iinfo(np.uint32).min
 
+
 def add_prefix_dict(cur_dict, prefix=""):
     return {prefix + k: v for k, v in cur_dict.items()}
-
-
 
 
 def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
@@ -30,6 +30,7 @@ def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
     """
 
     import torch
+
     if seed is None:
         env_seed = os.environ.get("PL_GLOBAL_SEED")
         if env_seed is None:
@@ -49,13 +50,10 @@ def seed_everything(seed: Optional[int] = None, workers: bool = False) -> int:
         seed = _select_seed_randomly(min_seed_value, max_seed_value)
 
     # log.info(rank_prefixed_message(f"Global seed set to {seed}", _get_rank()))
-    os.environ["PL_GLOBAL_SEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
-    # os.environ["PL_SEED_WORKERS"] = f"{int(workers)}"
 
     return seed
 
@@ -81,6 +79,7 @@ def eval_env(name, default=False):
         return eval(os.getenv(name, str(default)))
     except:
         return os.getenv(name, str(default))
+
 
 def default(val, default_val):
     return val if val is not None else default_val

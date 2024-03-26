@@ -16,6 +16,7 @@ from typing import List, Tuple, Union
 import cloudpickle
 import yaml
 from omegaconf import DictConfig, ListConfig, OmegaConf, SCMode
+import copy
 
 PathManager = PathManagerBase()
 
@@ -372,7 +373,7 @@ class LazyConfig:
             for idx in range(1, len(parts) + 1):
                 prefix = ".".join(parts[:idx])
                 v = OmegaConf.select(cfg, prefix, default="[MISSING]")
-                if v is "[MISSING]":
+                if v == "[MISSING]":
                     raise KeyError(f"Trying to update key {key}, but {prefix} does not exist.")
                 if idx < len(parts) and not OmegaConf.is_config(v):
                     raise KeyError(f"Trying to update key {key}, but {prefix} " f"is not a config, but has type {type(v)}.")
@@ -448,3 +449,34 @@ class LazyConfig:
             return black.format_str(py_str, mode=black.Mode())
         except black.InvalidInput:
             return py_str
+
+
+def instantiate(cfg, **kwargs):
+
+    def _instantiate(_cfg, **_kwargs):
+        _cfg = copy.deepcopy(_cfg)
+        if "_target_" in _cfg:
+            target = _cfg.pop("_target_")
+            for k, v in _cfg.items():
+                if isinstance(v, dict):
+                    _kwargs[k] = _instantiate(v)
+                else:
+                    _kwargs[k] = v
+
+            return target(**_kwargs)
+        else:
+            return _cfg
+
+    return _instantiate(cfg, **kwargs)
+
+
+def instantiate_config(cfg):
+    # replace all LazyCall with the real config
+    # this is especially useful for loading config dynamically with given string/name
+    for k, v in cfg.items():
+        if isinstance(v, DictConfig):
+            if "_target_" in v.keys():
+                ret_dict = instantiate(v)
+                cfg[k] = OmegaConf.create(ret_dict)
+            else:
+                instantiate_config(v)

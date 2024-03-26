@@ -34,6 +34,7 @@ class ModuleMixin:
 
     @property
     def device(self):
+        # FIXME: we temporarily assume all parameters are on the same device
         return next(self.parameters()).device
 
     @property
@@ -61,8 +62,7 @@ class ModuleMixin:
 
     def to(self, *args, **kwargs):
         for p in self.parameters():
-            if p.dtype == torch.float32:
-                p.data = p.data.to(*args, **kwargs)
+            p.data = p.data.to(*args, **kwargs)
         return self
 
     def pretty_format(self, list_limit=1):
@@ -72,9 +72,6 @@ class ModuleMixin:
 class BaseModule(nn.Module, ModuleMixin):
     def __init__(self):
         super().__init__()
-
-    def extra_repr(self):
-        return ""
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError
