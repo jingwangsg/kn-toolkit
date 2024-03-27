@@ -22,6 +22,7 @@ except:
     pass
 
 from ..dist import is_main_process
+import torch.distributed as torch_dist
 
 
 class SmoothedValue(object):
@@ -234,8 +235,12 @@ def setup_logger_loguru(
     template += " \033[1m{message}\033[0m"
 
     logger.remove(0)
-    if master_only and not is_main_process():
-        return
+    if master_only:
+        if not torch_dist.is_initialized():
+            print("[WARNING] torch distributed is not initialized before setting up logger")
+            print("master_only will be ignored")
+        if not is_main_process():
+            return
     if filename is not None:
         logger.add(filename, level="INFO", format=template, enqueue=True)
     if stdout:

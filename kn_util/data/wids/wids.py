@@ -474,11 +474,11 @@ class ShardListDataset(Dataset[T]):
             _shards = {}
             if is_main_process():
                 # only compute it once on the main process
-                logger.info("Shard lengths not provided, computing iteration needed for each shard...")
+                logger.info("Shard lengths not provided, indexing shards...")
                 _shards = get_file_lengths(shards)
+                logger.info("Indexing complete.")
             _shards_gathered = all_gather_object(_shards)
             shards = _shards_gathered[0]  # broadcast the result to all processes
-
 
         if options is None:
             options = {}
@@ -541,8 +541,10 @@ class ShardListDataset(Dataset[T]):
             logger.info(
                 "\t".join(
                     [
-                        f"[WebShardedList]" f"shards: {self.shards[:1]}...({len(self.shards)})",
-                        f"base: {self.base}" f"name: {self.spec.get('name')}",
+                        "[WebShardedList]",
+                        f"#shards: {len(self.shards)}",
+                        f"base: {self.base}",
+                        f"name: {self.spec.get('name')}",
                         f"nfiles: {len(self.shards)}",
                         f"nbytes: {nbytes}",
                         f"samples: {nsamples}",

@@ -14,4 +14,4 @@ def get_file_lengths(files):
         
         return file, len(members)
 
-    return map_async_with_thread(iterable=files, func=_get_key_number, num_thread=None, verbose=True)
+    return map_async_with_thread(iterable=files, func=_get_key_number, num_thread=None, verbose=False)
