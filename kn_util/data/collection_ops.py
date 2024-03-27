@@ -85,7 +85,11 @@ def collection_extend_multikeys(batch, keys):
         dict: {k: join(v[k] for v in batch)}
     """
 
+
     if isinstance(batch, list):
+        if len(keys) == 0:
+            return {}
+
         ret = {}
         batch_idxs = None
         for idx, key in enumerate(keys):

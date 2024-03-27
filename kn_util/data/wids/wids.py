@@ -10,8 +10,9 @@ import sys
 import uuid
 import warnings
 from functools import partial
-from typing import Any, BinaryIO, Dict, Optional, TypeVar, Union
+from typing import Any, BinaryIO, Dict, Optional, TypeVar, Union, List
 from urllib.parse import quote, urlparse
+from loguru import logger
 
 import numpy as np
 import torch.distributed as dist
@@ -21,6 +22,8 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
+from .wids_utils import get_file_lengths
+from ...dist import get_world_size
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -113,10 +116,10 @@ def group_by_key(names):
     for i, fname in enumerate(names):
         # Ignore files that are not in a subdirectory.
         if "." not in fname:
-            print(f"Warning: Ignoring file {fname} (no '.')")
+            logger.warning(f"Warning: Ignoring file {fname} (no '.')")
             continue
         if fname == ".":
-            print(f"Warning: Ignoring the '.' file.")
+            logger.warning(f"Warning: Ignoring the '.' file.")
             continue
         key, ext = splitname(fname)
         if key not in kmaps:
@@ -441,28 +444,35 @@ class ShardListDataset(Dataset[T]):
 
     def __init__(
         self,
-        shards,
-        *,
+        shards=None,
+        dataset_name=None,
+        # cache args
         cache_size=int(1e12),
         cache_dir=None,
         lru_size=10,
-        dataset_name=None,
         localname=None,
+        # other args
         transformations="PIL",
         keep=False,
         base=None,
         options=None,
+        verbose=False,
     ):
         """Create a ShardListDataset.
 
         Args:
-            shards: a list of (filename, length) pairs or a URL pointing to a JSON descriptor file
+            shards: a list of (filename, length) pairs or a URL pointing to a JSON descriptor file,
+                    or you can input filenames directly, dataset will generate the length automatically.
             cache_size: the number of shards to keep in the cache
             lru_size: the number of shards to keep in the LRU cache
             localname: a function that maps URLs to local filenames
 
         Note that there are two caches: an on-disk directory, and an in-memory LRU cache.
         """
+        if isinstance(shards, List) and isinstance(shards[0], str):
+            # only filenames are given, we need to compute the length
+            shards = get_file_lengths(shards)
+
         if options is None:
             options = {}
         super(ShardListDataset, self).__init__()
@@ -477,8 +487,20 @@ class ShardListDataset(Dataset[T]):
             self.spec = load_dsdesc_and_resolve(shards, options=options, base=base)
             self.shards = self.spec.get("shardlist", [])
             self.dataset_name = self.spec.get("name") or hash_dataset_name(str(shards))
+        elif isinstance(shards, List):
+            if base is None and isinstance(shards, str):
+                shards = osp.abspath(osp.expanduser(shards[0][0]))
+                base = urldir(shards)
+            self.base = base
+            self.spec = {"shardlist": [{"url": url, "nsamples": nsamples} for url, nsamples in shards]}
+            if dataset_name is not None:
+                self.spec["name"] = dataset_name
+            self.shards = self.spec.get("shardlist", [])
+            self.dataset_name = dataset_name or hash_dataset_name(str(shards))
         else:
-            raise NotImplementedError("Only support taking path/url to JSON descriptor file.")
+            raise NotImplementedError(
+                "Only support taking path/url to JSON descriptor file, list of (filename, length) pairs, or list of filenames."
+            )
             self.base = None
             self.spec = options
             self.shards = shards
@@ -505,25 +527,21 @@ class ShardListDataset(Dataset[T]):
             self.cache_dir = osp.expanduser(self.cache_dir)
             self.localname = default_localname(self.cache_dir)
 
-        if True or int(os.environ.get("WIDS_VERBOSE", 0)):
+        if verbose or int(os.environ.get("WIDS_VERBOSE", 0)):
             nbytes = sum(shard.get("filesize", 0) for shard in self.shards)
             nsamples = sum(shard["nsamples"] for shard in self.shards)
-            print(
-                "[WebShardedList]",
-                str(shards),
-                "base:",
-                self.base,
-                "name:",
-                self.spec.get("name"),
-                "nfiles:",
-                len(self.shards),
-                "nbytes:",
-                nbytes,
-                "samples:",
-                nsamples,
-                "cache:",
-                self.cache_dir,
-                file=sys.stderr,
+
+            logger.info(
+                "\t".join(
+                    [
+                        f"[WebShardedList]" f"shards: {self.shards}",
+                        f"base: {self.base}" f"name: {self.spec.get('name')}",
+                        f"nfiles: {len(self.shards)}",
+                        f"nbytes: {nbytes}",
+                        f"samples: {nsamples}",
+                        f"cache: {self.cache_dir}",
+                    ]
+                )
             )
         self.transformations = interpret_transformations(transformations)
 
@@ -550,7 +568,7 @@ class ShardListDataset(Dataset[T]):
         if accesses > 100 and misses / accesses > 0.3:
             # output a warning only once
             self.check_cache_misses = lambda: None
-            print("Warning: ShardListDataset has a cache miss rate of {:.1%}%".format(misses * 100.0 / accesses))
+            logger.warning("Warning: ShardListDataset has a cache miss rate of {:.1%}%".format(misses * 100.0 / accesses))
 
     def get_shard(self, index):
         """Get the shard and index within the shard corresponding to the given index."""
@@ -581,7 +599,7 @@ class ShardListDataset(Dataset[T]):
         try:
             shard = self.cache.get_shard(url)
         except UnicodeDecodeError as e:
-            print("UnicodeDecodeError:", desc)
+            logger.error("UnicodeDecodeError:", desc)
             raise e
         return shard, inner_idx, desc
 
@@ -637,7 +655,7 @@ def intersect_ranges(rangelist, r):
     return result
 
 
-def iterate_ranges(ranges, rng, indexshuffle=True, shardshuffle=True):
+def iterate_ranges(ranges, rng, indexshuffle=True, shardshuffle=True, total_size=None):
     """Iterate over the ranges in a random order."""
     shard_indexes = list(range(len(ranges)))
     if shardshuffle:
@@ -645,6 +663,9 @@ def iterate_ranges(ranges, rng, indexshuffle=True, shardshuffle=True):
     for i in shard_indexes:
         lo, hi = ranges[i]
         sample_indexes = list(range(lo, hi))
+        if total_size is not None:
+            # to support drop_last=True
+            sample_indexes = [_ if _ < total_size else (_ % total_size) for _ in sample_indexes]
         if indexshuffle:
             rng.shuffle(sample_indexes)
         yield from sample_indexes
@@ -708,7 +729,9 @@ class ChunkedSampler(Sampler):
             lo, hi = 0, len(dataset)
         else:
             lo, hi = num_samples
+        self._len = hi - lo
         self.ranges = [(i, min(i + chunksize, hi)) for i in range(lo, hi, chunksize)]
+        self.dataset_size = len(dataset)
         self.seed = seed
         self.shuffle = shuffle
         self.shufflefirst = shufflefirst
@@ -725,20 +748,24 @@ class ChunkedSampler(Sampler):
             self.rng,
             indexshuffle=self.shuffle,
             shardshuffle=(self.shuffle and shardshuffle),
+            total_size=self.dataset_size,
         )
         self.epoch += 1
+
+    def __len__(self):
+        return self._len
 
 
 def DistributedChunkedSampler(
     dataset: Dataset,
     *,
     num_replicas: Optional[int] = None,
-    num_samples: Optional[int] = None,
+    total_size: Optional[int] = None,
     rank: Optional[int] = None,
     shuffle: bool = True,
     shufflefirst: bool = False,
     seed: int = 0,
-    drop_last: bool = True,
+    drop_last: bool = False,
     chunksize: int = 1000000,
 ) -> ChunkedSampler:
     """Return a ChunkedSampler for the current worker in distributed training.
@@ -748,12 +775,22 @@ def DistributedChunkedSampler(
     Since the split among workers takes place before the chunk shuffle,
     workers end up with a fixed set of shards they need to download. The
     more workers, the fewer shards are used by each worker.
+
+    Args:
+        dataset: The dataset to sample from
+        num_replicas: The number of workers
+        total_size: The number of samples to use (len(dataset) by default, maybe smaller if given)
+        rank: The rank of the current worker
+        shuffle: Whether to shuffle the samples within each chunk
+        shufflefirst: Whether to shuffle the chunks before shuffling the samples
+        seed: The seed for the random number generator
+        drop_last: Whether to drop the last incomplete chunk
+        chunksize: The size of each chunk
+
     """
-    # if drop_last is not None:
-    #     warnings.warn("DistributedChunkedSampler does not support drop_last, thus it will be ignored")
-    if drop_last:
-        num_samples = len(dataset) // num_replicas * num_replicas
-        
+    if num_replicas is None:
+        num_replicas = get_world_size()
+
     if not dist.is_initialized():
         warnings.warn("DistributedChunkedSampler is called without distributed initialized; assuming single process")
         num_replicas = 1
@@ -763,10 +800,13 @@ def DistributedChunkedSampler(
         rank = rank or dist.get_rank()
     assert rank >= 0 and rank < num_replicas
 
-    num_samples = num_samples or len(dataset)
-    worker_chunk = (num_samples + num_replicas - 1) // num_replicas
+    total_size = total_size or len(dataset)
+
+    _offset = 0 if drop_last else (num_replicas - 1)
+    worker_chunk = (total_size + _offset) // num_replicas
+
     worker_start = rank * worker_chunk
-    worker_end = min(worker_start + worker_chunk, num_samples)
+    worker_end = worker_start + worker_chunk
     return ChunkedSampler(
         dataset,
         num_samples=(worker_start, worker_end),
@@ -810,6 +850,6 @@ class DistributedLocalSampler(DistributedSampler):
         stop_idx = chunk_size * (self.rank + 1)
         indices = indices[begin_idx:stop_idx]
 
-        # print("[SamplerIndices: ]", indices)
+        # logger.info("[SamplerIndices: ]", indices)
         assert len(indices) == self.num_samples
         return iter(indices)
