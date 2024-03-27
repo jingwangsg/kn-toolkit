@@ -8,13 +8,14 @@ from ...dist import DistributedSampler
 
 def build_dataloader(
     dataset,
+    # sampler
+    is_distributed=False,
+    drop_last=False,
     batch_size=None,
     total_size=None,
-    is_distributed=False,
     # dataloader
     num_workers=0,
     pin_memory=True,
-    drop_last=False,
     shuffle=False,
     generator=None,
 ):

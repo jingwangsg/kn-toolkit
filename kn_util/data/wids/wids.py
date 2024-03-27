@@ -23,7 +23,7 @@ from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
 from .wids_utils import get_file_lengths
-from ...dist import get_world_size
+from ...dist import get_world_size, is_main_process, all_gather_object
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -471,7 +471,14 @@ class ShardListDataset(Dataset[T]):
         """
         if isinstance(shards, List) and isinstance(shards[0], str):
             # only filenames are given, we need to compute the length
-            shards = get_file_lengths(shards)
+            _shards = {}
+            if is_main_process():
+                # only compute it once on the main process
+                logger.info("Shard lengths not provided, computing iteration needed for each shard...")
+                _shards = get_file_lengths(shards)
+            _shards_gathered = all_gather_object(_shards)
+            shards = _shards_gathered[0]  # broadcast the result to all processes
+
 
         if options is None:
             options = {}
@@ -534,7 +541,7 @@ class ShardListDataset(Dataset[T]):
             logger.info(
                 "\t".join(
                     [
-                        f"[WebShardedList]" f"shards: {self.shards}",
+                        f"[WebShardedList]" f"shards: {self.shards[:1]}...({len(self.shards)})",
                         f"base: {self.base}" f"name: {self.spec.get('name')}",
                         f"nfiles: {len(self.shards)}",
                         f"nbytes: {nbytes}",
