@@ -2,6 +2,11 @@
 
 from distutils.core import setup
 import os.path as osp
+import sys
+
+REQUIREMENT_FELE = "requirement.txt"
+if sys.platform == "darwin":
+    REQUIREMENT_FELE = "requirement-mac.txt"
 
 
 def _read_reqs(relpath):
@@ -12,7 +17,7 @@ def _read_reqs(relpath):
         ]
 
 
-REQUIREMENTS = _read_reqs("requirement.txt")
+REQUIREMENTS = _read_reqs(REQUIREMENT_FELE)
 
 setup(
     name="kn_util",
