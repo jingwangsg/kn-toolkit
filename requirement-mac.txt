@@ -1,3 +1,4 @@
+
 scipy
 scikit-learn
 numpy
@@ -16,8 +17,6 @@ rich
 dill
 pudb
 pyfzf
-matplotlib
-seaborn
 loguru
 cloudpickle
 aiofiles
@@ -34,11 +33,7 @@ nest_asyncio
 Pyarrow
 huggingface_hub
 h5py
-opencv-python
-decord
-imageio
-ffmpeg-python
 yt_dlp
+wandb
 braceexpand
-webvtt-py
 icecream

@@ -1,3 +1,4 @@
+import os, os.path as osp
 from PIL import Image
 from dataclasses import dataclass
 import cv2
@@ -6,8 +7,34 @@ import copy
 from enum import Enum
 import os.path as osp
 import ffmpeg
+import numpy as np
+from tempfile import NamedTemporaryFile
+import io
+
 from .text import draw_text, draw_text_line
 from .utils import color_val
+
+
+def plt_to_image(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf)
+    buf.seek(0)
+    return Image.open(buf)
+
+
+def draw_image(x, height=12):
+    def _draw_from_file(filename):
+        cmd = f"termvisage {filename} --query-timeout 1 -S iterm2 --force-style -H left --height {height}"
+        os.system(cmd)
+
+    if isinstance(x, str):
+        _draw_from_file(x)
+    elif isinstance(x, Image.Image):
+        with NamedTemporaryFile(suffix=".jpg") as f:
+            x.save(f.name)
+            _draw_from_file(f.name)
+    else:
+        raise NotImplementedError
 
 
 def merge_by_fid(bboxs_list, texts=None):

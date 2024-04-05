@@ -10,6 +10,7 @@ import logging
 import time
 from collections import defaultdict, deque
 import sys
+from termcolor import colored
 
 from collections import defaultdict
 from loguru import logger
@@ -141,27 +142,31 @@ class MetricLogger(object):
     def add_meter(self, name, meter):
         self.meters[name] = meter
 
-    def log_every(self, iterable, log_freq, header=None, wandb_kwargs=None):
+    def log_every(self, iterable, log_freq, title=None, desc=None, wandb_kwargs=None):
         if wandb_kwargs is not None:
             assert "prefix" in wandb_kwargs, "prefix is required in wandb_kwargs"
             assert "start_iter" in wandb_kwargs, "start_iter is required in wandb_kwargs"
 
         i = 0
-        if not header:
-            header = ""
+
         start_time = time.time()
         end = time.time()
         iter_time = SmoothedValue(fmt="{avg:.4f}")
         data_time = SmoothedValue(fmt="{avg:.4f}")
         space_fmt = ":" + str(len(str(len(iterable)))) + "d"
+
         log_template = [
-            header,
             "[{niter" + space_fmt + "}/{total_iter}]",
             "eta: {eta}",
             "{meters}",
             "time: {time}",
             "data: {data}",
         ]
+        if desc is not None:
+            log_template = [desc] + log_template
+        if title is not None:
+            log_template = [colored(f"[{title}]", "red")] + log_template
+
         if torch.cuda.is_available():
             log_template.append("max mem: {memory:.0f}")
         log_template = self.delimiter.join(log_template)
@@ -200,7 +205,10 @@ class MetricLogger(object):
             end = time.time()
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        self.logger.info("{} Total time: {} ({:.4f} s / it)".format(header, total_time_str, total_time / len(iterable)))
+        finish_str = "Total time: {} ({:.4f} s / it)".format(total_time_str, total_time / len(iterable))
+        if title is not None:
+            finish_str = f"{title} {finish_str}"
+        self.logger.info(finish_str)
 
 
 def setup_logger_logging():

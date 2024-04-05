@@ -769,7 +769,7 @@ def DistributedChunkedSampler(
     dataset: Dataset,
     *,
     num_replicas: Optional[int] = None,
-    total_size: Optional[int] = None,
+    dataset_size: Optional[int] = None,
     rank: Optional[int] = None,
     shuffle: bool = True,
     shufflefirst: bool = False,
@@ -809,10 +809,10 @@ def DistributedChunkedSampler(
         rank = rank or dist.get_rank()
     assert rank >= 0 and rank < num_replicas
 
-    total_size = total_size or len(dataset)
+    dataset_size = dataset_size or len(dataset)
 
     _offset = 0 if drop_last else (num_replicas - 1)
-    worker_chunk = (total_size + _offset) // num_replicas
+    worker_chunk = (dataset_size + _offset) // num_replicas
 
     worker_start = rank * worker_chunk
     worker_end = worker_start + worker_chunk

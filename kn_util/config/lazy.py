@@ -218,6 +218,16 @@ class LazyConfig:
     """
 
     @staticmethod
+    def load_from_args(file, opts=[], factory=[]):
+        cfg = LazyConfig.load(file)
+        cfg = LazyConfig.apply_overrides(cfg, factory)
+        instantiate_config(cfg)
+        cfg = LazyConfig.apply_overrides(cfg, opts)
+        OmegaConf.resolve(cfg)
+
+        return cfg
+
+    @staticmethod
     def load_rel(filename: str, keys: Union[None, str, Tuple[str, ...]] = None):
         """
         Similar to :meth:`load()`, but load path relative to the caller's

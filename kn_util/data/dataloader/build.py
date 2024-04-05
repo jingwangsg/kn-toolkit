@@ -12,7 +12,7 @@ def build_dataloader(
     is_distributed=False,
     drop_last=False,
     batch_size=None,
-    total_size=None,
+    dataset_size=None,
     # dataloader
     num_workers=0,
     pin_memory=True,
@@ -42,14 +42,14 @@ def build_dataloader(
                 dataset,
                 shuffle=shuffle,
                 shufflefirst=shuffle,
-                total_size=total_size,
+                dataset_size=dataset_size,
                 drop_last=drop_last,
             )
         else:
             sampler = DistributedSampler(
                 dataset,
                 shuffle=shuffle,
-                total_size=total_size,
+                dataset_size=dataset_size,
                 drop_last=drop_last,
             )
     else:

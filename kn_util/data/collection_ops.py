@@ -1,4 +1,4 @@
-from typing import Mapping, Sequence
+from typing import Mapping, Sequence, List
 
 try:
     import torch
@@ -31,6 +31,23 @@ def nested_to(batch, device, dtype=None, non_blocking=False):
             return x.to(device, dtype=dtype, non_blocking=non_blocking)
 
     return nested_apply_tensor(batch, _to_device)
+
+
+def groupby(data, key, agg="unique"):
+    assert isinstance(data, List)
+    ret_dict = {}
+    for d in data:
+        k = d.pop(key)
+        if agg == "unique":
+            ret_dict[k] = d
+        elif agg == "append":
+            if k not in ret_dict:
+                ret_dict[k] = []
+            ret_dict[k].append(d)
+        else:
+            raise NotImplementedError
+
+    return ret_dict
 
 
 def collection_get(batch, key, default=None):
@@ -84,7 +101,6 @@ def collection_extend_multikeys(batch, keys):
     Return:
         dict: {k: join(v[k] for v in batch)}
     """
-
 
     if isinstance(batch, list):
         if len(keys) == 0:

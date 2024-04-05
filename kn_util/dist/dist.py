@@ -129,10 +129,16 @@ def get_backend_device():
     return torch.device("cuda", torch.cuda.current_device())
 
 
-def all_gather(data, group=None):
+def all_gather(data, group=None, requires_grad=False):
     """
     Return a list of tensors
     """
+
+    if requires_grad:
+        _all_gather_func = dist.nn.functional.all_gather(data, group=group)
+    else:
+        _all_gather_func = dist.all_gather
+
     if group is None:
         group = _get_global_gloo_group()
 
@@ -142,11 +148,11 @@ def all_gather(data, group=None):
 
     device = get_backend_device()
     output = [torch.empty_like(data, device=device) for _ in range(world_size)]
-    dist.all_gather(output, data, group=group)
+    _all_gather_func(output, data, group=group)
     return output
 
 
-def all_gather_variable(data, lengths=None):
+def all_gather_variable(data, lengths=None, requires_grad=False, group=None):
     """
     Support variable length tensor (here length defined as the first dimension)
     This implementation supposedly supports grad backprop (not verified yet)
@@ -158,14 +164,13 @@ def all_gather_variable(data, lengths=None):
         lengths = [_.item() for _ in all_gather(_length)]
 
     max_length = max(lengths)
-    padded_list = [torch.empty(max_length, *data.shape[1:], dtype=data.dtype, device=data.device) for _ in range(len(lengths))]
 
     pad_length = max_length - data.shape[0]
     if pad_length > 0:
         data = torch.cat([data, torch.zeros(pad_length, *data.shape[1:], dtype=data.dtype, device=data.device)], dim=0)
-    dist.all_gather(padded_list, data)
-    padded_list = [padded[:length] for padded, length in zip(padded_list, lengths)]
-    return padded_list
+    padded_list = all_gather(data, requires_grad=requires_grad, group=group)
+    ret_list = [padded[:length] for padded, length in zip(padded_list, lengths)]
+    return ret_list
 
 
 def all_gather_object(data, group=None):
