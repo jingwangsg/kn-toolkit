@@ -19,11 +19,11 @@ import wandb
 
 try:
     import torch
+    from ..dist import is_main_process
+    import torch.distributed as torch_dist
+    torch_avail = True
 except:
-    pass
-
-from ..dist import is_main_process
-import torch.distributed as torch_dist
+    torch_avail = False
 
 
 class SmoothedValue(object):
@@ -243,7 +243,7 @@ def setup_logger_loguru(
     template += " \033[1m{message}\033[0m"
 
     logger.remove(0)
-    if master_only:
+    if torch_avail and master_only:
         if not torch_dist.is_initialized():
             print("[WARNING] torch distributed is not initialized before setting up logger")
             print("master_only will be ignored")
