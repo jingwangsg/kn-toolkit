@@ -42,3 +42,4 @@ yt_dlp
 braceexpand
 webvtt-py
 icecream
+googlesearch-python

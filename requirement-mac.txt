@@ -1,4 +1,3 @@
-
 scipy
 scikit-learn
 numpy
@@ -37,3 +36,4 @@ yt_dlp
 wandb
 braceexpand
 icecream
+googlesearch-python

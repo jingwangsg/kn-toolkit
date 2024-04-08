@@ -32,6 +32,7 @@ setup(
             "krsync = kn_util.tools.rsync:main",
             "kget = kn_util.tools.download:main",
             "kbrew = kn_util.tools.brew:main",
+            "paperdl = kn_util.tools.paperdl:main",
         ]
     },
     install_requires=REQUIREMENTS,

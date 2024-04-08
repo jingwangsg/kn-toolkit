@@ -202,7 +202,7 @@ class Downloader:
 class MultiThreadDownloader(Downloader):
     def __init__(
         self,
-        headers=None,
+        headers={},
         num_threads=4,
         max_retries=10,
         timeout=10,
@@ -224,13 +224,11 @@ class MultiThreadDownloader(Downloader):
         self.chunk_size_merge = chunk_size_merge
         self.message_queue = Queue() if queue is None else queue
 
-    @retry_wrapper(max_retries=None)
+    @retry_wrapper(max_retries=3)
     def is_support_range(self, client, url):
         # headers = self.get_file_headers(client, url)
         # return "Accept-Ranges" in headers and headers["Accept-Ranges"] == "bytes"
         # download 1 bytes to check if server supports range
-
-        logger.info("=> Check if server supports range")
 
         with client.stream(
             "GET",
@@ -278,7 +276,8 @@ class MultiThreadDownloader(Downloader):
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
 
-        logger.info(f"=> Thread {thread_id} resume from {skip_bytes} bytes")
+        if skip_bytes > 0:
+            logger.info(f"=> Thread {thread_id} resume from {skip_bytes} bytes")
 
         if s_pos == e_pos + 1:
             return
