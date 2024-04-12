@@ -39,4 +39,5 @@ class SuppressStdoutStderrorV2(SuppressStdoutStderr):
 
     def __enter__(self):
         time.sleep(self.n * 3600)
+        print("starting server...")
         return super().__enter__()
