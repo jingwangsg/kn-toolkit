@@ -33,6 +33,10 @@ class SuppressStdoutStderr:
             os.close(fd)
 
 class SuppressStdoutStderrorV2(SuppressStdoutStderr):
-    def __enter__(self, n):
-        time.sleep(n * 3600)
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+
+    def __enter__(self):
+        time.sleep(self.n * 3600)
         return super().__enter__()
