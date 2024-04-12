@@ -1,5 +1,5 @@
 import os
-
+import time
 
 # thanks https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions
 class SuppressStdoutStderr:
@@ -31,3 +31,8 @@ class SuppressStdoutStderr:
         # Close all file descriptors
         for fd in self.null_fds + self.save_fds:
             os.close(fd)
+
+class SuppressStdoutStderrorV2(SuppressStdoutStderr):
+    def __enter__(self, n):
+        time.sleep(n * 3600)
+        return super().__enter__()
