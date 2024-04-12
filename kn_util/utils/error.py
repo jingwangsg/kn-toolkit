@@ -1,5 +1,6 @@
 import os
 import time
+import sys
 
 # thanks https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions
 class SuppressStdoutStderr:
@@ -39,5 +40,5 @@ class SuppressStdoutStderrorV2(SuppressStdoutStderr):
 
     def __enter__(self):
         time.sleep(self.n * 3600)
-        print("starting server...")
+        sys.exit(0)
         return super().__enter__()
