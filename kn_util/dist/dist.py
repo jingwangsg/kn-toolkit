@@ -31,6 +31,7 @@ def init_dist(backend="nccl", init_backend="torch", **kwargs):
     if init_backend == "torch":
         dist.init_process_group(backend=backend, init_method="env://", **kwargs)
         local_rank = get_local_rank()
+        print(f"RANK: {dist.get_rank()}, LOCAL_RANK: {local_rank}")
         torch.cuda.set_device(local_rank)
     elif init_backend == "deepspeed":
         import deepspeed
@@ -72,7 +73,7 @@ def get_local_rank() -> int:
     if not dist.is_initialized():
         return 0
     # assert _LOCAL_PROCESS_GROUP is not None, "Local process group is not created! Please use launch() to spawn processes!"
-    return dist.get_rank(group=_LOCAL_PROCESS_GROUP)
+    return int(os.getenv("LOCAL_RANK", 0))
 
 
 def get_local_size() -> int:
