@@ -14,7 +14,6 @@ from termcolor import colored
 
 from collections import defaultdict
 from loguru import logger
-import wandb
 
 
 try:
@@ -193,6 +192,7 @@ class MetricLogger(object):
                     metric_dict["memory"] = torch.cuda.max_memory_reserved() / MB
 
                 if wandb_kwargs is not None:
+                    import wandb
                     prefix = wandb_kwargs["prefix"]
                     wandb_metric = {f"{prefix}/{k}": v for k, v in metric_dict.items()}
                     niter = i + wandb_kwargs["start_iter"]
