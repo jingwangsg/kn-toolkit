@@ -4,6 +4,10 @@ Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf
 
 import random
 import io
+try:
+    import torch
+except:
+    pass
 
 # import av
 import cv2

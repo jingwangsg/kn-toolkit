@@ -13,11 +13,11 @@ from ...utils.error import SuppressStdoutStderr
 from ...data.video.video_utils import validate_bytes
 from collections import defaultdict
 import requests
-import webvtt
 
 
 def sub_to_dict(sub, dedupe=True, single=False) -> list:
     """Convert WebVTT to JSON, optionally removing duplicate lines"""
+    import webvtt
 
     captions = webvtt.read_buffer(io.StringIO(sub))
     dicts = [{"start": c.start, "end": c.end, "lines": c.lines} for c in captions]
