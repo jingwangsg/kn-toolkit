@@ -36,10 +36,12 @@ def run_cmd(cmd, return_output=False):
         subprocess.run(cmd, shell=True, check=True)
 
 
-def lfs_list_files(include=None):
+def lfs_list_files(include=None, exclude=None):
     cmd = "git lfs ls-files"
     if include:
         cmd += ' --include="{}"'.format(include)
+    if exclude:
+        cmd += ' --exclude="{}"'.format(exclude)
     paths = run_cmd(cmd, return_output=True).splitlines()
     paths = [_.split(" ")[-1].strip() for _ in paths]
     return paths
@@ -106,11 +108,12 @@ def wait(not_done, timeout=0.5):
 def download_repo(
     url_template,
     include=None,
+    exclude=None,
     num_processes=1,
     **downloader_kwargs,
 ):
     # clone the repo
-    paths = lfs_list_files(include=include)
+    paths = lfs_list_files(include=include, exclude=exclude)
     print(f"=> Found {len(paths)} files to download")
 
     url = get_origin_url()
@@ -224,6 +227,7 @@ def download_repo(
     process_pool.close()
     manager.shutdown()
 
+
 def download_recursive(**download_kwargs):
     cwd = os.getcwd()
     repos = run_cmd("fd --no-ignore -H --glob '**/.git' --type d", return_output=True).splitlines()
@@ -256,42 +260,17 @@ def main():
         args = parser.parse_args()
         track(args)
     elif command == "download":
-        parser.add_argument(
-            "--include",
-            type=str,
-            help="The partial path to fetch, split by ,",
-            default=None,
-        )
-        parser.add_argument(
-            "--template",
-            type=str,
-            help="The chunk number to fetch",
-            default=HF_DOWNLOAD_TEMPLATE,
-        )
+        parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
+        parser.add_argument("--exclude", type=str, help="The partial path to exclude, split by ,", default=None)
+        parser.add_argument("--template", type=str, help="The chunk number to fetch", default=HF_DOWNLOAD_TEMPLATE)
         parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
         parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
-        parser.add_argument(
-            "--recursive",
-            action="store_true",
-            help="Whether to download recursively",
-            default=False,
-        )
+        parser.add_argument("--recursive", action="store_true", help="Whether to download recursively", default=False)
         parser.add_argument("--num-processes", type=int, help="The number of process to use", default=1)
         parser.add_argument("--max-retries", type=int, help="The number of retries to use", default=None)
-        parser.add_argument(
-            "-n",
-            "--num-threads",
-            type=int,
-            help="The number of threads to use",
-            default=4,
-        )
+        parser.add_argument("-n", "--num-threads", type=int, help="The number of threads to use", default=4)
         parser.add_argument("--timeout", type=int, help="The timeout", default=10)
-        parser.add_argument(
-            "--verbose",
-            type=int,
-            default=1,
-            help="Whether to print verbose information",
-        )
+        parser.add_argument("--verbose", type=int, default=1, help="Whether to print verbose information")
         parser.add_argument("--log-stdout", action="store_true", help="Whether to log to stdout")
         parser.add_argument("--log-file", type=str, help="The log file to use", default=None)
         parser.add_argument("--token", type=str, help="The token to use", default=None)

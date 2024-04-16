@@ -1,4 +1,4 @@
-class InitDisabled:
+class TorchInitDisabled:
     def __init__(self):
         self.bkp = dict()
 

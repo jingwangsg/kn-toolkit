@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import os
+from contextlib import contextmanager
 
 _LOCAL_PROCESS_GROUP = None
 """
@@ -31,7 +32,6 @@ def init_dist(backend="nccl", init_backend="torch", **kwargs):
     if init_backend == "torch":
         dist.init_process_group(backend=backend, init_method="env://", **kwargs)
         local_rank = get_local_rank()
-        print(f"RANK: {dist.get_rank()}, LOCAL_RANK: {local_rank}")
         torch.cuda.set_device(local_rank)
     elif init_backend == "deepspeed":
         import deepspeed

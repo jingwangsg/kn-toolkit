@@ -20,6 +20,7 @@ import torch
 import socket
 
 from ...system import run_cmd
+from ....dist import synchronize
 
 _red_print = lambda x: print(colored(x, "red"))
 
