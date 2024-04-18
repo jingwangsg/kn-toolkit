@@ -48,7 +48,7 @@ def lfs_list_files(include=None, exclude=None):
 
 
 def pull(args):
-    paths = lfs_list_files(include=args.include)
+    paths = lfs_list_files(include=args.include, exclude=args.exclude)
 
     print(f"=> Found {len(paths)} files to fetch")
 
@@ -293,6 +293,7 @@ def main():
             download_repo(
                 url_template=args.template,
                 include=args.include,
+                exclude=args.exclude,
                 num_threads=args.num_threads,
                 num_processes=args.num_processes,
                 max_retries=args.max_retries,

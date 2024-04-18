@@ -465,7 +465,7 @@ class MultiThreadDownloader(Downloader):
                     f"rm -rf {osp.join(dirname, f'.{filename}.*')}",
                 ]
             )
-            run_cmd(cmds, async_cmd=True)
+            run_cmd(cmds)
 
             # self.clear_cache(path)
 
