@@ -172,7 +172,7 @@ class RsyncTool:
 
                 def _apply(path_chunk):
                     cmd = construct_cmd(path_chunk)
-                    run_cmd(cmd, verbose=False)
+                    run_cmd(cmd, verbose=False, async_cmd=False)
 
                 map_async_with_thread(
                     func=_apply,
