@@ -110,9 +110,7 @@ def retry_wrapper(max_retries=10, detect_proxy=True):
 
 def get_hf_headers():
     user_agent_header = http_user_agent()
-    token = os.getenv("HF_TOKEN", None)
-    assert token is not None, "Please set HF_TOKEN in environment variable"
-    headers = build_hf_headers(user_agent=user_agent_header, token=token)
+    headers = build_hf_headers(user_agent=user_agent_header)
     headers["Accept-Encoding"] = "identity"
     return headers
 
@@ -375,7 +373,8 @@ class MultiThreadDownloader(Downloader):
         client = httpx.Client(
             headers=self.headers,
             timeout=self.timeout,
-            proxy=self.proxy,
+            # proxy=self.proxy,
+            proxies=self.proxy,  # for backward compatibility
             follow_redirects=True,
         )
 
