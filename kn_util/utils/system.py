@@ -6,7 +6,10 @@ from tqdm import tqdm
 from .multiproc import map_async_with_thread
 
 
-def run_cmd(cmd, verbose=False, async_cmd=False):
+def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None):
+    if conda_env is not None:
+        cmd = f"conda run -n {conda_env} {cmd}"
+
     if verbose:
         assert not async_cmd, "async_cmd is not supported when verbose=True"
         popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
