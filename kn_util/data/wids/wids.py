@@ -594,15 +594,17 @@ class ShardListDataset(Dataset[T]):
         # Get the shard and return the corresponding element.
         desc = self.shards[shard_idx]
         url = desc["url"]
-        if url.startswith(("https://", "http://", "gs://", "/", "~")):
-            # absolute path or url path
-            url = url
-        else:
-            # concat relative path
-            if self.base is None and "base_path" not in self.spec:
-                raise FileNotFoundError("passing a relative path in shardlist but no base found.")
-            base_path = self.spec["base_path"] if "base_path" in self.spec else self.base
-            url = osp.abspath(osp.join(osp.expanduser(base_path), url))
+
+        # ! Deprecated, I don't like this part
+        # if url.startswith(("https://", "http://", "gs://", "/", "~")):
+        #     # absolute path or url path
+        #     url = url
+        # else:
+        #     # concat relative path
+        #     if self.base is None and "base_path" not in self.spec:
+        #         raise FileNotFoundError("passing a relative path in shardlist but no base found.")
+        #     base_path = self.spec["base_path"] if "base_path" in self.spec else self.base
+        #     url = osp.abspath(osp.join(osp.expanduser(base_path), url))
 
         desc["url"] = url
         try:
