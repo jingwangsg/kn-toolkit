@@ -163,7 +163,6 @@ class RsyncTool:
                 return from_paths
 
             # construct as relative path for --relative rsync
-            import ipdb; ipdb.set_trace()
 
             print("=> using async dir")
 
