@@ -33,6 +33,7 @@ setup(
             "kget = kn_util.tools.download:main",
             "kbrew = kn_util.tools.brew:main",
             "paperdl = kn_util.tools.paperdl:main",
+            "email = kn_util.tools.email:main",
         ]
     },
     install_requires=REQUIREMENTS,
