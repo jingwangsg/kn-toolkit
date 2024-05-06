@@ -1,6 +1,7 @@
 import argparse
 from ..utils.system import run_cmd
 from ..utils.mail import send_email
+from datetime import datetime
 
 
 def main():
@@ -19,6 +20,10 @@ def main():
             "GPU Information:",
             nvidia_output.stdout,
         ]
+
+    DEFAULT_BODY += [
+        "Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    ]
 
     DEFAULT_BODY = ["---------------Meta Information----------------"] + DEFAULT_BODY
     DEFAULT_BODY += ["----------------------------------------------------"]
