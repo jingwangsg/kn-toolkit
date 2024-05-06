@@ -1,7 +1,7 @@
 import argparse
 from ..utils.system import run_cmd
 from ..utils.mail import send_email
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 
 def main():
@@ -21,8 +21,10 @@ def main():
             nvidia_output.stdout,
         ]
 
+    utc_dt = datetime.now(timezone.utc)  # UTC time
+    bj_dt = utc_dt.astimezone(timezone(timedelta(hours=8)))  # Beijing time
     DEFAULT_BODY += [
-        "Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Time: " + bj_dt.strftime("%Y-%m-%d %H:%M:%S"),
     ]
 
     DEFAULT_BODY = ["---------------Meta Information----------------"] + DEFAULT_BODY
