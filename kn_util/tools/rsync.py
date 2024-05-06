@@ -11,7 +11,7 @@ def split_path(path):
 
 
 def cmd_list_files(path, size="+1g"):
-    return f"$HOME/homebrew/bin/fd --type f --size {size} --base-directory {path}"
+    return f"$HOME/homebrew/bin/fd --type f --size {size} --base-directory {path} -H -I"
 
 
 def cmd_get_path(path):
@@ -163,6 +163,7 @@ class RsyncTool:
                 return from_paths
 
             # construct as relative path for --relative rsync
+            import ipdb; ipdb.set_trace()
 
             print("=> using async dir")
 
