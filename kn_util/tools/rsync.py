@@ -155,8 +155,8 @@ class RsyncTool:
 
         from_modified = get_last_modified(from_path, from_host)
         to_modified = get_last_modified(to_path, to_host)
-        if from_modified >= to_modified:
-            continue_flag = input(f"from_path ({from_modified}) is newer than to_path ({to_modified}), continue? (y/n)")
+        if from_modified < to_modified:
+            continue_flag = input(f"from_path ({from_modified}) is older than to_path ({to_modified}), continue? (y/n) ")
             if continue_flag != "y":
                 return
 
