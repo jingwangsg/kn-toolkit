@@ -130,6 +130,13 @@ def download_repo(
     paths = [path for path in paths if path not in downloaded]
     urls = [url_template.format(org=org, repo=repo, path=path) for path in paths]
 
+    # ======================== DEBUG ========================
+    # print("DEBUGGING!")
+    # downloader = MultiThreadDownloader(headers=headers, **downloader_kwargs)
+    # import ipdb; ipdb.set_trace()
+    # downloader.download(urls[-1], paths[-1])
+    # ======================================================
+
     # executor = ProcessPoolExecutor(max_workers=num_processes)
     process_pool = ProcessPool(num_processes)
     # FIXME: seems like ProcessPool is singleton

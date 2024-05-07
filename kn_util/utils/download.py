@@ -154,7 +154,7 @@ class Downloader:
 
     @lru_cache()
     def get_file_headers(self, client, url):
-        file_headers = client.head(url, follow_redirects=False).headers
+        file_headers = client.head(url, follow_redirects=True).headers
         return file_headers
 
     @retry_wrapper(max_retries=None)
