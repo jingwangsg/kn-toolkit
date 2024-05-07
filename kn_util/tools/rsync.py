@@ -143,8 +143,6 @@ class RsyncTool:
         if to_host is not None:
             assert check_hostname_available(to_host), f"hostname {to_host} not available"
         
-        import ipdb; ipdb.set_trace()
-
         if get_last_modified(from_path, from_host) >= get_last_modified(to_path, to_host):
             continue_flag = input("from_path is newer than to_path, continue? (y/n)")
             if continue_flag != "y":
