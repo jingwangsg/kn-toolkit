@@ -56,9 +56,11 @@ def prepare_path_for_rsync(hostname=None, path=None):
 
 def get_last_modified(path, hostname):
     # only support linux so far
-    last_modified = run_cmd_remote_maybe(
-        f'find {path} -type f -printf "%-.22T+ %M %n %-8u %-8g %8s %Tx %.8TX %p\n" | sort | tail -1' , hostname
-    ).stdout.strip().split(" ")[0]
+    last_modified = (
+        run_cmd_remote_maybe(f'find {path} -type f -printf "%-.22T+ %M %n %-8u %-8g %8s %Tx %.8TX %p\n" | sort | tail -1', hostname)
+        .stdout.strip()
+        .split(" ")[0]
+    )
     # example format 2024-05-06+18:42:28.58
     last_modified = datetime.strptime(last_modified, "%Y-%m-%d+%H:%M:%S.%f")
 
@@ -142,9 +144,11 @@ class RsyncTool:
             assert check_hostname_available(from_host), f"hostname {from_host} not available"
         if to_host is not None:
             assert check_hostname_available(to_host), f"hostname {to_host} not available"
-        
-        if get_last_modified(from_path, from_host) >= get_last_modified(to_path, to_host):
-            continue_flag = input("from_path is newer than to_path, continue? (y/n)")
+
+        from_modified = get_last_modified(from_path, from_host)
+        to_modified = get_last_modified(to_path, to_host)
+        if from_modified >= to_modified:
+            continue_flag = input(f"from_path({from_modified}) is newer than to_path ({to_modified}), continue? (y/n)")
             if continue_flag != "y":
                 return
 
