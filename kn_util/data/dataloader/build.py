@@ -15,6 +15,7 @@ def build_dataloader(
     dataset_size=None,
     # dataloader
     num_workers=0,
+    prefetch_factor=2,
     pin_memory=True,
     shuffle=False,
     generator=None,
@@ -55,7 +56,7 @@ def build_dataloader(
     else:
         kwargs["shuffle"] = shuffle
 
-    prefetch_factor = None if num_workers == 0 else 5
+    prefetch_factor = None if num_workers == 0 else prefetch_factor
 
     return DataLoader(
         dataset,

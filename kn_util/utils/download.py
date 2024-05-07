@@ -18,10 +18,12 @@ from functools import lru_cache
 from queue import Queue
 from queue import Empty as EmptyQueue
 import socket
+from io import BytesIO
 
 from ..utils.system import run_cmd, force_delete, clear_process
 from ..utils.io import save_json, load_json
 from ..utils.rich import get_rich_progress_download, add_tasks
+from ..utils.system import buffer_keep_open
 
 from rich.progress import Progress
 
@@ -132,18 +134,19 @@ class Downloader:
         timeout=10,
         verbose=True,
     ):
-        logger.info("=> Downloader Configuration:")
-        logger.info(
-            json.dumps(
-                {
-                    "headers": headers,
-                    "proxy": proxy,
-                    "timeout": timeout,
-                    "max_retries": max_retries,
-                },
-                indent=4,
+        if verbose:
+            logger.info("=> Downloader Configuration:")
+            logger.info(
+                json.dumps(
+                    {
+                        "headers": headers,
+                        "proxy": proxy,
+                        "timeout": timeout,
+                        "max_retries": max_retries,
+                    },
+                    indent=4,
+                )
             )
-        )
 
         self.chunk_size_download = chunk_size_download
         self.headers = headers
@@ -467,6 +470,68 @@ class MultiThreadDownloader(Downloader):
             run_cmd(cmds)
 
             # self.clear_cache(path)
+
+
+class MultiThreadDownloaderInMem(MultiThreadDownloader):
+    """Multi-threaded Downloader without resume, downloading files into memory"""
+
+    def range_download(self, client, url, s_pos, e_pos):
+        buffer = BytesIO()
+        with (
+            buffer_keep_open(buffer),
+            client.stream(
+                "GET",
+                url,
+                headers={
+                    **self.headers,
+                    "Range": f"bytes={s_pos}-{e_pos}",
+                },
+            ) as r,
+        ):
+            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                buffer.write(chunk)
+            byte_values = buffer.getvalue()
+
+        return byte_values
+
+    def download(self, url):
+        client = httpx.Client(
+            headers=self.headers,
+            timeout=self.timeout,
+            proxies=self.proxy,
+            follow_redirects=True,
+        )
+
+        filesize = self.get_filesize(client=client, url=url)
+
+        file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
+        ranges = [(i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1)) for i in range(self.num_threads)]
+
+        if not self.is_support_range(client=client, url=url):
+            print("=> Server does not support range, use single thread download")
+            buffer = BytesIO()
+            with buffer_keep_open(buffer), client.stream("GET", url) as r:
+                for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                    buffer.write(chunk)
+                byte_values = buffer.getvalue()
+
+            return byte_values
+
+        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
+            futures = []
+            for i, (s_pos, e_pos) in enumerate(ranges):
+                future = executor.submit(
+                    self.range_download,
+                    client=client,
+                    url=url,
+                    s_pos=s_pos,
+                    e_pos=e_pos,
+                )
+                futures.append(future)
+
+        byte_values = b"".join([future.result() for future in futures])
+
+        return byte_values
 
 
 class CommandDownloader(Downloader):

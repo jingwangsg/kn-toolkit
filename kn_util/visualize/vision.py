@@ -94,19 +94,7 @@ class VideoVisualizer:
             video.write(img)
         video.release()
 
-    @classmethod
-    def output_array_to_video_ffmpeg(cls, array, video_path, fps=2, vcodec="libx264", quiet=True):
-        n, height, width, channels = array.shape
-        process = (
-            ffmpeg.input("pipe:", format="rawvideo", pix_fmt="rgb24", s="{}x{}".format(width, height))
-            .output(video_path, pix_fmt="yuv420p", vcodec=vcodec, r=fps)
-            .overwrite_output()
-            .run_async(pipe_stdin=True, quiet=quiet)
-        )
-        for frame in array:
-            process.stdin.write(frame.astype(np.uint8).tobytes())
-        process.stdin.close()
-        process.wait()
+
 
     @classmethod
     def output_array_to_images(cls, array, image_dir):

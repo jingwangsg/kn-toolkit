@@ -3,7 +3,21 @@ import socket
 import os.path as osp
 import os
 from tqdm import tqdm
+from contextlib import contextmanager
+
 from .multiproc import map_async_with_thread
+
+
+@contextmanager
+def buffer_keep_open(buffer):
+    # ! hack workaround to prevent buffer from closing
+    # refer to https://github.com/yt-dlp/yt-dlp/issues/3298
+    old_buffer_close = buffer.close
+    buffer.close = lambda *_: ...
+
+    yield
+
+    old_buffer_close()
 
 
 def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None):
@@ -45,7 +59,7 @@ def force_delete(path):
 
 def force_delete_dir(directory, quiet=True):
     all_files = run_cmd(
-        f"find {directory} -type f", 
+        f"find {directory} -type f",
     ).stdout.splitlines()
     all_files = [_.strip() for _ in all_files if _.strip() != ""]
     return map_async_with_thread(iterable=all_files, func=force_delete, verbose=not quiet)
