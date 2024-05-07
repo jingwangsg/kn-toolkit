@@ -311,6 +311,8 @@ def main():
         else:
             print("=> Downloading recursively! only supports huggingface git repos for now")
             download_recursive(
+                include=args.include,
+                exclude=args.exclude,
                 num_processes=args.num_processes,
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
