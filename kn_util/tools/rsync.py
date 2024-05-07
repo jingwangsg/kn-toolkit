@@ -200,14 +200,14 @@ class RsyncTool:
             rsync_kwargs["to_path"] = to_path
             rsync_kwargs["from_host"] = from_host
 
-            file_small = list_files(from_path, min_size="512m")
+            file_small = list_files(from_path, max_size="512m")
             cls.rsync_in_chunk(file_small, chunk_size=chunk_size, num_thread=num_thread, desc="Rsync Small", **rsync_kwargs)
 
-            files_large = list_files(from_path, max_size="10g")
+            files_large = list_files(from_path, max_size="10g", min_size="511m")
             cls.rsync_in_chunk(files_large, chunk_size=1, num_thread=num_thread, desc="Rsync Large", **rsync_kwargs)
 
-            files_extreme_large = list_files(from_path, min_size="10g")
-            continue_large = input(f"Continue with extreme large files? (>=10g)\n{files_extreme_large}\n(y/n)")
+            files_extreme_large = list_files(from_path, min_size="9g")
+            continue_large = input(f"Continue with extreme large files? (>=9g)\n{files_extreme_large}\n(y/n)")
             if continue_large == "y":
                 cls.rsync_in_chunk(files_extreme_large, chunk_size=1, num_thread=num_thread, desc="Rsync Extreme Large", **rsync_kwargs)
 
