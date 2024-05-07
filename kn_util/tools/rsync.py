@@ -60,6 +60,9 @@ def prepare_path_for_rsync(hostname=None, path=None):
 
 
 def get_last_modified(path, hostname):
+    if run_cmd_remote_maybe(f"find {path}", hostname) != 0:
+        return datetime.fromtimestamp(0)
+
     # only support linux so far
     last_modified = (
         run_cmd_remote_maybe(f'find {path} -type f -printf "%-.22T+ %M %n %-8u %-8g %8s %Tx %.8TX %p\n" | sort | tail -1', hostname)
