@@ -21,8 +21,13 @@ def split_path(path):
     return os.path.split(path.rstrip(os.path.sep))
 
 
-def cmd_list_files(path, size="+1g"):
-    return f"$HOME/homebrew/bin/fd --type f --size {size} --base-directory {path} -H -I"
+def cmd_list_files(path, min_size=None, max_size=None):
+    cmd = f"$HOME/homebrew/bin/fd --type f --base-directory {path} -H -I"
+    if min_size is not None:
+        cmd += f" --size +{min_size}"
+    if max_size is not None:
+        cmd += f" --size -{max_size}"
+    return cmd
 
 
 def cmd_get_path(path):
@@ -173,8 +178,8 @@ class RsyncTool:
             subprocess.run(cmd, shell=True)
         else:
             # list all files recursively in from_path
-            def list_files(from_path, size="+1g"):
-                cmd = cmd_list_files(from_path, size=size)
+            def list_files(from_path, min_size=None, max_size=None):
+                cmd = cmd_list_files(from_path, min_size=min_size, max_size=max_size)
 
                 # out = run_cmd(cmd).stdout.strip()
                 out = run_cmd_remote_maybe(cmd, from_host).stdout.strip()
@@ -192,11 +197,16 @@ class RsyncTool:
             rsync_kwargs["to_path"] = to_path
             rsync_kwargs["from_host"] = from_host
 
-            file_small = list_files(from_path, size="-512m")
+            file_small = list_files(from_path, min_size="512m")
             cls.rsync_in_chunk(file_small, chunk_size=chunk_size, num_thread=num_thread, desc="Rsync Small", **rsync_kwargs)
 
-            files_large = list_files(from_path, size="+512m")
+            files_large = list_files(from_path, max_size="10g")
             cls.rsync_in_chunk(files_large, chunk_size=1, num_thread=num_thread, desc="Rsync Large", **rsync_kwargs)
+
+            files_extreme_large = list_files(from_path, min_size="10g")
+            continue_large = input(f"Continue with extreme large files? (>=10g)\n{files_extreme_large}\n(y/n)")
+            if continue_large == "y":
+                cls.rsync_in_chunk(files_extreme_large, chunk_size=1, num_thread=num_thread, desc="Rsync Extreme Large", **rsync_kwargs)
 
     @classmethod
     def rsync_in_chunk(cls, paths, chunk_size, num_thread=32, desc="Rsync", **rsync_kwargs):
