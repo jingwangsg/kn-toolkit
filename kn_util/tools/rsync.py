@@ -225,7 +225,6 @@ class RsyncTool:
             iterable=path_chunks,
             num_thread=num_thread,
             desc=desc,
-            test_flag=True,
         )
 
 
