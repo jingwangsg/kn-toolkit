@@ -60,7 +60,6 @@ def prepare_path_for_rsync(hostname=None, path=None):
 
 
 def get_last_modified(path, hostname):
-    import ipdb; ipdb.set_trace()
     if run_cmd_remote_maybe(f"find {path}", hostname).returncode != 0:
         return datetime.fromtimestamp(0)
 
