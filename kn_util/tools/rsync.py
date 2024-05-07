@@ -217,7 +217,7 @@ class RsyncTool:
         path_chunks = [paths[i : i + chunk_size] for i in range(0, len(paths), chunk_size)]
 
         def _apply(path_chunk):
-            cmd = cmd_rsync(from_path=path_chunk, **rsync_kwargs)
+            cmd = cmd_rsync(from_path=path_chunk, relative=True, **rsync_kwargs)
             run_cmd(cmd, verbose=False, async_cmd=False)
 
         map_async_with_thread(
@@ -225,6 +225,7 @@ class RsyncTool:
             iterable=path_chunks,
             num_thread=num_thread,
             desc=desc,
+            test_flag=True,
         )
 
 
