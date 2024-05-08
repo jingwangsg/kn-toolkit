@@ -155,6 +155,7 @@ def read_frames_decord(
     return_reader=False,
     return_meta=False,
 ):
+
     is_youtube_video = False
     is_online_video = False
 
@@ -189,14 +190,15 @@ def read_frames_decord(
     decord.bridge.set_bridge(bridge)
 
     # calculate frame size according to size and max_size, [-1, -1] by default
-    orig_size = VideoReader(video_path, num_threads=1)[0].shape[:2]
-    argmin_size_dim = 0 if orig_size[0] < orig_size[1] else 1
-    argmax_size_dim = 1 - argmin_size_dim
     frame_size = [-1, -1]
-    frame_size[argmin_size_dim] = size
-    frame_size[argmax_size_dim] = int(size * orig_size[argmax_size_dim] / orig_size[argmin_size_dim])
-    if max_size is not None:
-        frame_size[argmin_size_dim] = min(frame_size[argmin_size_dim], max_size)
+    if size is not None:
+        orig_size = VideoReader(video_path, num_threads=1)[0].shape[:2]
+        argmin_size_dim = 0 if orig_size[0] < orig_size[1] else 1
+        argmax_size_dim = 1 - argmin_size_dim
+        frame_size[argmin_size_dim] = size
+        frame_size[argmax_size_dim] = int(size * orig_size[argmax_size_dim] / orig_size[argmin_size_dim])
+        if max_size is not None:
+            frame_size[argmin_size_dim] = min(frame_size[argmin_size_dim], max_size)
 
     if is_online_video or is_youtube_video:
         video_path.seek(0)

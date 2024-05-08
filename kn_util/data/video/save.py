@@ -30,8 +30,13 @@ def save_video_ffmpeg(array, video_path, fps=2, vcodec="libx264", quiet=True):
     process.wait()
 
 
-def save_video_imageio(array, video_path, fps=2, quiet=True):
+def save_video_imageio(array, video_path, fps=2, input_format="thwc", quiet=True):
     # use imageio.mimsave to write video
+    if input_format != "thwc":
+        input_format = " ".join(input_format)
+        array = rearrange(array, f"{input_format} -> t h w c")
+    
+    assert array.shape[-1] == 3, "Last dim of array should be 3 (RGB)"
 
     # suppress all error from opencv and ffmpeg
     maybe_quiet = nullcontext
