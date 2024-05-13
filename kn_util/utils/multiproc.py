@@ -28,9 +28,7 @@ def map_async_with_coroutine(iterable, func, desc="", wrap_func=True):
     async def func_async(item):
         loop = asyncio.get_running_loop()
         if wrap_func:
-            result = await loop.run_in_executor(
-                None, func, item
-            )  # 在默认执行器中运行非异步函数
+            result = await loop.run_in_executor(None, func, item)  # 在默认执行器中运行非异步函数
         else:
             result = await func(item)
         pbar.update(1)
@@ -114,8 +112,8 @@ def map_async_with_thread(
 
         while len(not_done) > 0:
             done, not_done = wait(not_done)
+            progress.update(task_id, advance=len(done))
             for future in done:
-                progress.update(task_id, advance=len(done))
                 results[future.index] = future.result()
 
         progress.stop()
@@ -194,10 +192,7 @@ def map_async_with_shard(
 
         return failed_queue.qsize()
 
-    iterable_shards = [
-        iterable[i : i + shard_size]
-        for shard_idx, i in enumerate(range(0, len(iterable), shard_size))
-    ]
+    iterable_shards = [iterable[i : i + shard_size] for shard_idx, i in enumerate(range(0, len(iterable), shard_size))]
     if verbose:
         print(f"Total {len(iterable_shards)} shards")
 
@@ -207,6 +202,7 @@ def map_async_with_shard(
         num_process=num_process,
         verbose=verbose,
     )
+
 
 def pathos_wait(not_done, timeout=0.5):
     done = set()

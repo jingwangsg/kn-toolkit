@@ -149,21 +149,19 @@ def read_frames_decord(
     size=None,
     max_size=None,
     bridge="native",
+    # input format
+    is_online_video=False,
+    is_youtube_video=False,
+    is_bytes=False,
     # output format
     output_format="tchw",
     # return
     return_reader=False,
     return_meta=False,
 ):
-
-    is_youtube_video = False
-    is_online_video = False
-
-    if video_path.startswith("http"):
-        if video_path[-4:] in [".mp4", ".avi", ".mov", ".mkv", ".webm"]:
-            is_online_video = True
-        else:
-            is_youtube_video = True
+    assert (
+        int(is_online_video) + int(is_youtube_video) + int(is_bytes) <= 1
+    ), "Only one of is_online_video, is_youtube_video, is_bytes can be True"
 
     if is_youtube_video:
         download_format = "best"
@@ -186,6 +184,9 @@ def read_frames_decord(
     if is_online_video:
         downloader = MultiThreadDownloaderInMem(verbose=False)
         video_path = io.BytesIO(downloader.download(video_path))
+    
+    if is_bytes:
+        video_path = io.BytesIO(video_path)
 
     decord.bridge.set_bridge(bridge)
 
@@ -200,7 +201,7 @@ def read_frames_decord(
         if max_size is not None:
             frame_size[argmin_size_dim] = min(frame_size[argmin_size_dim], max_size)
 
-    if is_online_video or is_youtube_video:
+    if is_online_video or is_youtube_video or is_bytes:
         video_path.seek(0)
 
     video_reader = VideoReader(

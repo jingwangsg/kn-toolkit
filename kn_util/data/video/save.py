@@ -8,6 +8,7 @@ import os, os.path as osp
 from contextlib import nullcontext
 from io import BytesIO
 import av
+from fractions import Fraction
 
 from ...utils.error import SuppressStdoutStderr
 
@@ -35,7 +36,7 @@ def save_video_imageio(array, video_path, fps=2, input_format="thwc", quiet=True
     if input_format != "thwc":
         input_format = " ".join(input_format)
         array = rearrange(array, f"{input_format} -> t h w c")
-    
+
     assert array.shape[-1] == 3, "Last dim of array should be 3 (RGB)"
 
     # suppress all error from opencv and ffmpeg
@@ -78,7 +79,12 @@ def array_to_video_bytes(video: np.ndarray, fps: float = 24, format="mp4") -> by
     """
     f = BytesIO()
     container = av.open(f, mode="w", format=format)
-    stream = container.add_stream("h264", rate=fps)
+
+    # https://github.com/PyAV-Org/PyAV/issues/242
+    stream = container.add_stream(
+        "h264",
+        rate=Fraction(fps).limit_denominator(65535),
+    )
     stream.width = video.shape[-2]
     stream.height = video.shape[-3]
     stream.pix_fmt = "yuv420p"

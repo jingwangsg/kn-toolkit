@@ -475,9 +475,9 @@ class ShardListDataset(Dataset[T]):
             _shards = {}
             if is_main_process():
                 # only compute it once on the main process
-                logger.info("Shard lengths not provided, indexing shards...")
+                print("Shard lengths not provided, indexing shards...")
                 _shards, key2idx = file_indexing(shards, cache_file=index_cache)
-                logger.info("Indexing complete")
+                print("Indexing complete")
             _shards_gathered = all_gather_object(_shards)
             _key2idx_gathered = all_gather_object(key2idx)
             shards = _shards_gathered[0]  # broadcast the result to all processes
