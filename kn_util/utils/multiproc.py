@@ -4,7 +4,7 @@ from pathos.multiprocessing import Pool
 from tqdm import tqdm
 import time
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from threading import Semaphore
 from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
 from queue import Queue
@@ -103,21 +103,24 @@ def map_async_with_thread(
 
         results = []
 
-        futures = {executor.submit(func, x): x for x in iterable}
+        not_done = set()
 
-        for future in as_completed(futures):
-            progress.update(task_id, advance=1)
-            try:
-                result = future.result()  # Get the result from the future
-                results.append(result)  # Append the result to the results list
-            except Exception as e:
-                # If there is an exception, you can handle it here
-                # For now, we'll just print it
-                print(f"Exception in thread: {e}")
+        for i, x in enumerate(iterable):
+            future = executor.submit(func, x)
+            future.index = i
+            not_done.add(future)
+
+        results = {}
+
+        while len(not_done) > 0:
+            done, not_done = wait(not_done)
+            for future in done:
+                progress.update(task_id, advance=len(done))
+                results[future.index] = future.result()
 
         progress.stop()
 
-        return results
+        return [results[i] for i in range(len(iterable))]
 
 
 def map_async_with_shard(

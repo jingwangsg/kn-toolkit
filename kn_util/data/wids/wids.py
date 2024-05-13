@@ -22,7 +22,7 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import get_file_lengths
+from .wids_utils import file_indexing
 from ...dist import get_world_size, is_main_process, all_gather_object
 
 try:
@@ -447,6 +447,7 @@ class ShardListDataset(Dataset[T]):
         shards=None,
         dataset_name=None,
         # cache args
+        index_cache=None,
         cache_size=int(1e12),
         cache_dir=None,
         lru_size=10,
@@ -475,10 +476,12 @@ class ShardListDataset(Dataset[T]):
             if is_main_process():
                 # only compute it once on the main process
                 logger.info("Shard lengths not provided, indexing shards...")
-                _shards = get_file_lengths(shards)
+                _shards, key2idx = file_indexing(shards, cache_file=index_cache)
                 logger.info("Indexing complete")
             _shards_gathered = all_gather_object(_shards)
+            _key2idx_gathered = all_gather_object(key2idx)
             shards = _shards_gathered[0]  # broadcast the result to all processes
+            self.key2idx = _key2idx_gathered[0]
 
         if options is None:
             options = {}
@@ -512,7 +515,7 @@ class ShardListDataset(Dataset[T]):
             self.spec = options
             self.shards = shards
             self.dataset_name = dataset_name or hash_dataset_name(str(shards))
-
+        
         self.lengths = [shard["nsamples"] for shard in self.shards]
         self.cum_lengths = np.cumsum(self.lengths)
         self.total_length = self.cum_lengths[-1]
@@ -557,6 +560,10 @@ class ShardListDataset(Dataset[T]):
         if lru_size > 200:
             warnings.warn("LRU size is very large; consider reducing it to avoid running out of file descriptors")
         self.cache = LRUShards(lru_size, localname=self.localname, keep=keep)
+    
+    @property
+    def keys(self):
+        return self.key2idx.keys()
 
     def add_transform(self, transform):
         """Add a transformation to the dataset."""
@@ -613,6 +620,10 @@ class ShardListDataset(Dataset[T]):
             logger.error("UnicodeDecodeError:", desc)
             raise e
         return shard, inner_idx, desc
+
+    def get_by_key(self, key):
+        idx = self.key2idx[key]
+        return self[idx]
 
     def __getitem__(self, index):
         """Return the sample corresponding to the given index."""

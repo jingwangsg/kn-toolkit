@@ -12,4 +12,4 @@ from .wids import (
     ShardListDataset,
     DistributedLocalSampler,
 )
-from .wids_utils import get_file_lengths
+from .wids_utils import file_indexing
