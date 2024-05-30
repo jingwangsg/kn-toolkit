@@ -153,13 +153,6 @@ class RsyncTool:
         if to_host is not None:
             assert check_hostname_available(to_host), f"hostname {to_host} not available"
 
-        from_modified = get_last_modified(from_path, from_host)
-        to_modified = get_last_modified(to_path, to_host)
-        if from_modified < to_modified:
-            continue_flag = input(f"from_path ({from_modified}) is older than to_path ({to_modified}), continue? (y/n) ")
-            if continue_flag != "y":
-                return
-
         num_remotes = (from_host is not None) + (to_host is not None)
         if num_remotes == 2:
             raise NotImplementedError("remote to remote rsync not supported")

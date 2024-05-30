@@ -13,25 +13,31 @@ from fractions import Fraction
 from ...utils.error import SuppressStdoutStderr
 
 
-def save_video_ffmpeg(array, video_path, fps=2, vcodec="libx264", quiet=True):
+def save_video_ffmpeg(array, video_path, fps=2, vcodec="libx264", input_format="thwc", crf=7, quiet=True):
+
+    if input_format != "thwc":
+        input_format = " ".join(input_format)
+        array = rearrange(array, f"{input_format} -> t h w c")
+
     assert (
         array.ndim == 4 and array.shape[-1] == 3
     ), f"array should be 4D (T x H x W x C) and last dim should be 3 (RGB), but got {array.shape}"
 
     N, H, W, C = array.shape
     process = (
-        ffmpeg.input("pipe:", format="rawvideo", pix_fmt="rgb24", s=f"{H}x{W}")
-        .output(video_path, pix_fmt="yuv420p", vcodec=vcodec, r=fps)
+        ffmpeg.input("pipe:", format="rawvideo", pix_fmt="rgb24", s=f"{W}x{H}")
+        .output(video_path, vcodec=vcodec, r=fps, crf=crf)
         .overwrite_output()
         .run_async(pipe_stdin=True, quiet=quiet)
     )
     for frame in array:
         process.stdin.write(frame.astype(np.uint8).tobytes())
+
     process.stdin.close()
     process.wait()
 
 
-def save_video_imageio(array, video_path, fps=2, input_format="thwc", quiet=True):
+def save_video_imageio(array, video_path, fps=2, input_format="thwc", vcodec="libx264", quality=9, quiet=True):
     # use imageio.mimsave to write video
     if input_format != "thwc":
         input_format = " ".join(input_format)
@@ -45,7 +51,7 @@ def save_video_imageio(array, video_path, fps=2, input_format="thwc", quiet=True
         maybe_quiet = SuppressStdoutStderr()
 
     with maybe_quiet:
-        imageio.mimsave(video_path, array, fps=fps)
+        imageio.mimsave(video_path, array, fps=fps, quality=quality, codec=vcodec)
 
 
 def save_videos_grid(videos: torch.Tensor, path: str, rescale=False, n_rows=6, fps=8):

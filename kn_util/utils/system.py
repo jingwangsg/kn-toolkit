@@ -49,6 +49,13 @@ def clear_process(path):
 
     run_cmd(f"kill -9 {' '.join(map(str, processes))}")
 
+def clear_process_dir(directory):
+    all_files = run_cmd(
+        f"find {directory} -type f",
+    ).stdout.splitlines()
+    all_files = [_.strip() for _ in all_files if _.strip() != ""]
+    return map_async_with_thread(iterable=all_files, func=clear_process)
+
 
 def force_delete(path):
     path = osp.abspath(path)

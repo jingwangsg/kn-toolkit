@@ -2,6 +2,7 @@ import os
 import time
 import sys
 
+
 # thanks https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions
 class SuppressStdoutStderr:
     """
@@ -14,24 +15,28 @@ class SuppressStdoutStderr:
 
     """
 
-    def __init__(self):
+    def __init__(self, enable=True):
         # Open a pair of null files
         self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
         # Save the actual stdout (1) and stderr (2) file descriptors.
         self.save_fds = [os.dup(1), os.dup(2)]
+        self.enable = enable
 
     def __enter__(self):
-        # Assign the null pointers to stdout and stderr.
-        os.dup2(self.null_fds[0], 1)
-        os.dup2(self.null_fds[1], 2)
+        if self.enable:
+            # Assign the null pointers to stdout and stderr.
+            os.dup2(self.null_fds[0], 1)
+            os.dup2(self.null_fds[1], 2)
 
     def __exit__(self, *_):
-        # Re-assign the real stdout/stderr back to (1) and (2)
-        os.dup2(self.save_fds[0], 1)
-        os.dup2(self.save_fds[1], 2)
-        # Close all file descriptors
-        for fd in self.null_fds + self.save_fds:
-            os.close(fd)
+        if self.enable:
+            # Re-assign the real stdout/stderr back to (1) and (2)
+            os.dup2(self.save_fds[0], 1)
+            os.dup2(self.save_fds[1], 2)
+            # Close all file descriptors
+            for fd in self.null_fds + self.save_fds:
+                os.close(fd)
+
 
 class SuppressStdoutStderrorV2(SuppressStdoutStderr):
     def __init__(self, n):

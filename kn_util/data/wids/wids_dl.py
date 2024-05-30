@@ -7,6 +7,8 @@ from collections import deque
 from datetime import datetime
 from urllib.parse import urlparse
 
+from ...utils.download import MultiThreadDownloader
+
 recent_downloads = deque(maxlen=1000)
 
 open_objects = {}
@@ -135,7 +137,9 @@ def download_and_open(remote, local, mode="rb", handlers=default_cmds, verbose=F
             if not os.path.exists(local):
                 if verbose:
                     print("downloading", remote, "to", local, file=sys.stderr)
-                download_file(remote, local, handlers=handlers)
+                # download_file(remote, local, handlers=handlers)
+                downloader = MultiThreadDownloader(num_threads=8, verbose=False)
+                downloader.download(remote, local)
             else:
                 if verbose:
                     print("using cached", local, file=sys.stderr)

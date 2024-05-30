@@ -6,18 +6,21 @@ from kn_util.utils.logger import setup_logger_loguru
 import subprocess
 import argparse
 import os.path as osp
-from ..utils.git_utils import get_origin_url
-from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader
-from ..utils.rich import get_rich_progress_download
 from rich.console import Group
 from rich.live import Live
 from rich.progress import Progress
 import copy
 import time
 import multiprocessing as mp
+from loguru import logger
 
 # from concurrent.futures import ProcessPoolExecutor, wait
 from pathos.multiprocessing import ProcessPool
+
+from ..utils.git_utils import get_origin_url
+from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader
+from ..utils.rich import get_rich_progress_download
+from ..utils.multiproc import map_async_with_thread
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -105,6 +108,12 @@ def wait(not_done, timeout=0.5):
     return done, not_done
 
 
+def get_repo():
+    url = get_origin_url()
+    org, repo = _parse_repo_url(url)
+    return org, repo
+
+
 def download_repo(
     url_template,
     include=None,
@@ -116,8 +125,7 @@ def download_repo(
     paths = lfs_list_files(include=include, exclude=exclude)
     print(f"=> Found {len(paths)} files to download")
 
-    url = get_origin_url()
-    org, repo = _parse_repo_url(url)
+    org, repo = get_repo()
     if not osp.exists(".downloaded"):
         run_cmd("touch .downloaded")
 
@@ -249,6 +257,24 @@ def download_recursive(**download_kwargs):
         )
 
 
+def upload_files(files, batch_size=30):
+    file_chunks = [files[i : i + batch_size] for i in range(0, len(files), batch_size)]
+    for batch_idx, file_chunk in enumerate(file_chunks):
+        logger.info(f"=> Uploading batch {batch_idx + 1}/{len(file_chunks)}")
+        cur_files = " ".join(file_chunk)
+        os.system(f"git lfs track {cur_files}")
+        os.system(f"git add {cur_files}")
+        os.system("git commit -m 'add files'")
+        os.system("git push")
+        os.system("git lfs prune -f")
+
+
+def upload_files_all(batch_size=10):
+    all_files = run_cmd("fd", return_output=True)
+    all_files = all_files.splitlines()
+    upload_files(all_files, batch_size=batch_size)
+
+
 def main():
     parser = parse_args()
     command = parser.parse_known_args()[0].command
@@ -266,6 +292,12 @@ def main():
     elif command == "track":
         args = parser.parse_args()
         track(args)
+    elif command == "upload":
+        parser.add_argument("--batch_size", type=int, help="The batch size", default=30)
+        args = parser.parse_args()
+
+        upload_files(batch_size=args.batch_size)
+
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
         parser.add_argument("--exclude", type=str, help="The partial path to exclude, split by ,", default=None)
