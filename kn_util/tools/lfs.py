@@ -295,8 +295,7 @@ def main():
     elif command == "upload":
         parser.add_argument("--batch_size", type=int, help="The batch size", default=30)
         args = parser.parse_args()
-
-        upload_files(batch_size=args.batch_size)
+        upload_files_all(batch_size=args.batch_size)
 
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
