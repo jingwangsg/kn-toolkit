@@ -271,7 +271,7 @@ def upload_files(files, batch_size=30):
 
 def upload_files_all(batch_size=10):
     all_files = run_cmd("fd", return_output=True)
-    all_files = all_files.splitlines()
+    all_files = sorted(all_files.splitlines())
     upload_files(all_files, batch_size=batch_size)
 
 
