@@ -54,16 +54,32 @@ def save_video_imageio(array, video_path, fps=2, input_format="thwc", vcodec="li
         imageio.mimsave(video_path, array, fps=fps, quality=quality, codec=vcodec)
 
 
-def save_videos_grid(videos: torch.Tensor, path: str, rescale=False, n_rows=6, fps=8):
-    videos = rearrange(videos, "b c t h w -> t b c h w")
+def save_videos_grid(videos: torch.Tensor, path: str, rescale=False, n_rows=6, fps=8, input_format="btchw"):
+    assert input_format[0] == "b", "First dimension of input_format should be batch dimension"
+
+    def _to_tensor(video):
+        if not torch.is_tensor(video):
+            video = torch.tensor(video)
+        return video
+
+    if isinstance(videos, list):
+        videos = [_to_tensor(v) for v in videos]
+        videos = torch.stack(videos)
+
+    input_format = " ".join(input_format)
+    src = " ".join(input_format)
+    videos = rearrange(videos, f"{src} -> t b c h w")
+
     outputs = []
     for x in videos:
         x = torchvision.utils.make_grid(x, nrow=n_rows)
         x = x.transpose(0, 1).transpose(1, 2).squeeze(-1)
         if rescale:
             x = (x + 1.0) / 2.0  # -1,1 -> 0,1
-        x = (x * 255).numpy().astype(np.uint8)
+            x = (x * 255).numpy().astype(np.uint8)
         outputs.append(x)
+
+    outputs = np.stack(outputs)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     imageio.mimsave(path, outputs, fps=fps)

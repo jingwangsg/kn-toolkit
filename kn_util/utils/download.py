@@ -86,14 +86,18 @@ def retry_wrapper(max_retries=10, detect_proxy=True):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    logger.info(f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}")
+                    logger.info(
+                        f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}"
+                    )
 
                     client = kwargs.get("client", None)
                     if detect_proxy and client is not None:
 
                         # check if proxy is valid
                         if len(client._mounts) > 0:
-                            proxy_url = list(client._mounts.values())[0]._pool._proxy_url
+                            proxy_url = list(client._mounts.values())[
+                                0
+                            ]._pool._proxy_url
                             proxy = f"{proxy_url.scheme.decode('utf-8')}://{proxy_url.host.decode('utf-8')}:{proxy_url.port}"
                             if not is_proxy_valid(proxy):
                                 client._mounts = {}  # a hack to disable proxy
@@ -103,7 +107,9 @@ def retry_wrapper(max_retries=10, detect_proxy=True):
                     if max_retries is not None and retry_cnt >= max_retries:
                         break
 
-            raise Exception(f"=> Thread {thread_id} retry {max_retries} times, still failed")
+            raise Exception(
+                f"=> Thread {thread_id} retry {max_retries} times, still failed"
+            )
 
         return wrapper
 
@@ -160,12 +166,16 @@ class Downloader:
         file_headers = client.head(url, follow_redirects=True).headers
         return file_headers
 
-    @retry_wrapper(max_retries=None)
+    @retry_wrapper(max_retries=3)
     def get_filesize(self, client, url):
         file_headers = self.get_file_headers(client=client, url=url)
         if HUGGINGFACE_HEADER_X_LINKED_SIZE in file_headers:
             return int(file_headers[HUGGINGFACE_HEADER_X_LINKED_SIZE])
-        return int(file_headers["Content-Length"])
+
+        if "Content-Length" in file_headers:
+            return int(file_headers["Content-Length"])
+
+        return None
 
     def download(self, url, path):
 
@@ -190,7 +200,9 @@ class Downloader:
             with client.stream("GET", url) as r:
                 for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
                     if r.status_code != 200:
-                        raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
+                        raise Exception(
+                            f"r.status_code: {r.status_code} r.content: {r.content}"
+                        )
                     if chunk:
                         f.write(chunk)
                         progress.update(task_id, advance=len(chunk))
@@ -237,7 +249,9 @@ class MultiThreadDownloader(Downloader):
             headers={**self.headers, "Range": "bytes=0-0"},
         ) as r:
             if r.status_code in [503, 504]:
-                raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
+                raise Exception(
+                    f"r.status_code: {r.status_code} r.content: {r.content}"
+                )
 
             return r.status_code == 206
 
@@ -305,7 +319,9 @@ class MultiThreadDownloader(Downloader):
                     # when status_code != 206, chunk will contain the error message
                     # the GET request is spoiled, give up and retry
                     if r.status_code != 206:
-                        raise Exception(f"r.status_code: {r.status_code} r.content: {r.content}")
+                        raise Exception(
+                            f"r.status_code: {r.status_code} r.content: {r.content}"
+                        )
 
                     buffer.write(chunk)
                     message_byte_cnt += len(chunk)
@@ -321,7 +337,11 @@ class MultiThreadDownloader(Downloader):
     def get_cache_files(self, path):
         dirname, filename = osp.dirname(path), osp.basename(path)
         cache_pattern = osp.join(dirname, f".{filename}.*")
-        filenames = [_.strip() for _ in run_cmd(f"ls {cache_pattern}").stdout.split("\n") if _.strip() != ""]
+        filenames = [
+            _.strip()
+            for _ in run_cmd(f"ls {cache_pattern}").stdout.split("\n")
+            if _.strip() != ""
+        ]
         return filenames
 
     def clear_cache(self, path):
@@ -386,7 +406,10 @@ class MultiThreadDownloader(Downloader):
         self.message_queue.put_nowait(("filesize", filesize))
 
         file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
-        ranges = [(i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1)) for i in range(self.num_threads)]
+        ranges = [
+            (i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1))
+            for i in range(self.num_threads)
+        ]
         if not self.is_support_range(client=client, url=url):
             print("=> Server does not support range, use single thread download")
             super().download(url, path)
@@ -395,7 +418,9 @@ class MultiThreadDownloader(Downloader):
         # enter this step only when decided to use multi-thread download
         self.resolve_download_meta(url, path, filesize)
 
-        progress: Progress = get_rich_progress_download() if self.verbose > 0 else nullcontext()
+        progress: Progress = (
+            get_rich_progress_download() if self.verbose > 0 else nullcontext()
+        )
         if self.verbose >= 1:
             progress.add_task("Total", total=filesize)
         if self.verbose == 2:
@@ -459,7 +484,10 @@ class MultiThreadDownloader(Downloader):
                 if self.verbose > 0:
                     progress.refresh()
 
-            shard_paths = [self.get_shard_path(path, i, s_pos, e_pos) for i, (s_pos, e_pos) in enumerate(ranges)]
+            shard_paths = [
+                self.get_shard_path(path, i, s_pos, e_pos)
+                for i, (s_pos, e_pos) in enumerate(ranges)
+            ]
             dirname, filename = osp.dirname(path), osp.basename(path)
             cmds = "&&".join(
                 [
@@ -494,6 +522,16 @@ class MultiThreadDownloaderInMem(MultiThreadDownloader):
 
         return byte_values
 
+    def _direct_download(self, client, url):
+        print("=> Server does not support range, use single thread download")
+        buffer = BytesIO()
+        with buffer_keep_open(buffer), client.stream("GET", url) as r:
+            for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
+                buffer.write(chunk)
+            byte_values = buffer.getvalue()
+
+        return byte_values
+
     def download(self, url):
         client = httpx.Client(
             headers=self.headers,
@@ -503,19 +541,18 @@ class MultiThreadDownloaderInMem(MultiThreadDownloader):
         )
 
         filesize = self.get_filesize(client=client, url=url)
+        if filesize is None:
+            # head is not allowed or Content Length not available
+            return self._direct_download(client, url)
 
         file_chunk_size = (filesize + self.num_threads - 1) // self.num_threads
-        ranges = [(i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1)) for i in range(self.num_threads)]
+        ranges = [
+            (i * file_chunk_size, min((i + 1) * file_chunk_size - 1, filesize - 1))
+            for i in range(self.num_threads)
+        ]
 
         if not self.is_support_range(client=client, url=url):
-            print("=> Server does not support range, use single thread download")
-            buffer = BytesIO()
-            with buffer_keep_open(buffer), client.stream("GET", url) as r:
-                for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
-                    buffer.write(chunk)
-                byte_values = buffer.getvalue()
-
-            return byte_values
+            return self._direct_download(client, url)
 
         with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             futures = []
@@ -577,7 +614,9 @@ class CommandDownloader(Downloader):
             return buffer
 
     @classmethod
-    def download_wget(cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True):
+    def download_wget(
+        cls, url, out=None, headers=None, proxy=None, timeout=5, retries=3, verbose=True
+    ):
         if out == "auto":
             out = cls.get_output_path(url)
 
@@ -588,7 +627,9 @@ class CommandDownloader(Downloader):
         if proxy:
             wget_args += f" --proxy=on --proxy http://{proxy}"
 
-        wget_args += f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
+        wget_args += (
+            f" --tries {retries} --timeout {timeout} --no-check-certificate --continue"
+        )
 
         if headers:
             for k, v in headers.items():

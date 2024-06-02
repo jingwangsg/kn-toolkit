@@ -473,6 +473,7 @@ class ShardListDataset(Dataset[T]):
         if isinstance(shards, List) and isinstance(shards[0], str):
             # only filenames are given, we need to compute the length
             _shards = {}
+            key2idx = None
             if is_main_process():
                 # only compute it once on the main process
                 print("Shard lengths not provided, indexing shards...")

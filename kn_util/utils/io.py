@@ -76,15 +76,16 @@ def load_csv(fn, delimiter=",", has_header=True):
 
 def save_csv(obj, fn, delimiter=",", has_header=True):
     fn = open(fn, "w")
+    writer = csv.writer(fn, delimiter=delimiter, escapechar='\\')
     if has_header:
         assert isinstance(obj[0], dict), "obj should be a list of dict"
         keys = list(obj[0].keys())
-        fn.write(delimiter.join(keys) + "\n")
+        writer.writerow(keys)
 
     for row in obj:
         if isinstance(row, dict):
             row = [row[k] for k in keys]
-        fn.write(delimiter.join(row) + "\n")
+        writer.writerow(row)
 
     fn.close()
 
