@@ -6,9 +6,12 @@ from pathlib import Path
 import yt_dlp
 import requests
 from contextlib import nullcontext
+import tempfile
+from yt_dlp.utils import parse_duration
+import os.path as osp
 
 from ...utils.error import SuppressStdoutStderr
-from ...utils.system import buffer_keep_open
+from ...utils.system import buffer_keep_open, run_cmd
 
 
 class FakeLogger(object):
@@ -77,6 +80,7 @@ def download_youtube(
     video_format="worst[ext=mp4][height>=224]",
     quiet=True,
     logger=None,
+    timestamp=None,
 ):
     # scale should be conditon like "<=224" or ">=224"
     youtube_id = _maybe_youtube_id(youtube_id)
@@ -88,6 +92,12 @@ def download_youtube(
         "noprogress": quiet,
         "logger": logger,
     }
+
+    if timestamp is not None:
+        st, ed = timestamp.split("-")
+
+        parse_timestamp = lambda x: float("inf") if x in ("inf", "infinite") else parse_duration(x)
+        ydl_opts["download_ranges"] = lambda _, __: [{"start_time": parse_timestamp(st), "end_time": parse_timestamp(ed)}]
 
     maybe_quiet = nullcontext()
     if quiet and logger is None:
@@ -102,29 +112,22 @@ def download_youtube(
     return error_code
 
 
-def download_youtube_as_bytes(
-    youtube_id,
-    video_format="worst[ext=mp4][height>=224]",
-    quiet=True,
-    logger=StorageLogger(),
-):
+def download_youtube_as_bytes(youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True, logger=StorageLogger(), timestamp=None):
     youtube_id = _maybe_youtube_id(youtube_id)
 
-    buffer = io.BytesIO()
+    video_format_str = video_format.replace("*", "-").replace(":", "-").replace("/", "-")
+    temp_path = osp.join(tempfile.gettempdir(), f"{youtube_id}.{video_format_str}.mp4")
+    error_code = download_youtube(
+        youtube_id=youtube_id,
+        video_path=temp_path,
+        video_format=video_format,
+        quiet=quiet,
+        logger=logger,
+        timestamp=timestamp,
+    )
+    m = open(temp_path, "rb").read()
+    run_cmd(f"rm -rf {temp_path}")
 
-    with buffer_keep_open(buffer), redirect_stdout(buffer):
-        error_code = download_youtube(
-            youtube_id=youtube_id,
-            video_path="-",
-            video_format=video_format,
-            quiet=quiet,
-            logger=logger,
-        )
-
-        m = buffer.getvalue()
-
-    # write out the buffer for demonstration purposes
-    # Path(f"{youtube_id}.mp4").write_bytes(buffer.getvalue())
     return m, error_code
 
 

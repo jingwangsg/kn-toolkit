@@ -219,6 +219,7 @@ class MultiThreadDownloader(Downloader):
         num_threads=4,
         max_retries=10,
         timeout=10,
+        disable_multithread=False,
         proxy=None,
         verbose=1,
         chunk_size_download=1024 * 10,
@@ -236,6 +237,7 @@ class MultiThreadDownloader(Downloader):
         self.num_threads = num_threads
         self.chunk_size_merge = chunk_size_merge
         self.message_queue = Queue() if queue is None else queue
+        self.disable_multithread = disable_multithread
 
     @retry_wrapper(max_retries=3)
     def is_support_range(self, client, url):
@@ -401,6 +403,11 @@ class MultiThreadDownloader(Downloader):
             follow_redirects=True,
         )
 
+        if self.disable_multithread:
+            print("=> Multi-thread download disabled")
+            super().download(url, path)
+            return
+
         filesize = self.get_filesize(client=client, url=url)
 
         self.message_queue.put_nowait(("filesize", filesize))
@@ -523,7 +530,6 @@ class MultiThreadDownloaderInMem(MultiThreadDownloader):
         return byte_values
 
     def _direct_download(self, client, url):
-        print("=> Server does not support range, use single thread download")
         buffer = BytesIO()
         with buffer_keep_open(buffer), client.stream("GET", url) as r:
             for chunk in r.iter_bytes(chunk_size=self.chunk_size_download):
@@ -539,6 +545,9 @@ class MultiThreadDownloaderInMem(MultiThreadDownloader):
             proxies=self.proxy,
             follow_redirects=True,
         )
+        if self.disable_multithread:
+            return self._direct_download(client, url)
+
 
         filesize = self.get_filesize(client=client, url=url)
         if filesize is None:
