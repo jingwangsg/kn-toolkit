@@ -137,9 +137,9 @@ def download_and_open(remote, local, mode="rb", handlers=default_cmds, verbose=F
             if not os.path.exists(local):
                 if verbose:
                     print("downloading", remote, "to", local, file=sys.stderr)
-                # download_file(remote, local, handlers=handlers)
-                downloader = MultiThreadDownloader(num_threads=8, verbose=False)
-                downloader.download(remote, local)
+                download_file(remote, local, handlers=handlers)
+                # downloader = MultiThreadDownloader(num_threads=8, verbose=False)
+                # downloader.download(remote, local)
             else:
                 if verbose:
                     print("using cached", local, file=sys.stderr)

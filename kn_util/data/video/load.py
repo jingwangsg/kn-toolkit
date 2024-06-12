@@ -163,6 +163,7 @@ def read_frames_decord(
         int(is_online_video) + int(is_youtube_video) + int(is_bytes) <= 1
     ), "Only one of is_online_video, is_youtube_video, is_bytes can be True"
 
+    # 1. read from youtube, online video, or bytes
     if is_youtube_video:
         download_format = "best"
         download_suffix = ""
@@ -190,6 +191,7 @@ def read_frames_decord(
 
     decord.bridge.set_bridge(bridge)
 
+    # 2. maybe resize video
     # calculate frame size according to size and max_size, [-1, -1] by default
     frame_size = [-1, -1]
     if size is not None:

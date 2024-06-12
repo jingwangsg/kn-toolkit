@@ -14,6 +14,7 @@ def build_dataloader(
     batch_size=None,
     dataset_size=None,
     # dataloader
+    collate_fn=None,
     num_workers=0,
     prefetch_factor=2,
     pin_memory=True,
@@ -57,6 +58,8 @@ def build_dataloader(
         kwargs["shuffle"] = shuffle
 
     prefetch_factor = None if num_workers == 0 else prefetch_factor
+    if collate_fn is None:
+        collate_fn=getattr(dataset, "collate_fn", default_collate)
 
     return DataLoader(
         dataset,
@@ -65,7 +68,7 @@ def build_dataloader(
         prefetch_factor=prefetch_factor,
         pin_memory=pin_memory,
         sampler=sampler,
-        collate_fn=getattr(dataset, "collate_fn", default_collate),
+        collate_fn=collate_fn,
         generator=generator,
         **kwargs,
     )

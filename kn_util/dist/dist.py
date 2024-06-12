@@ -199,6 +199,20 @@ def all_gather_object(data, group=None):
     return output
 
 
+def gather_object(data, dst=0, group=None):
+    if get_world_size() == 1:
+        return [data]
+    if group is None:
+        group = _get_global_gloo_group()  # use CPU group by default, to reduce GPU RAM usage.
+    world_size = dist.get_world_size(group)
+    if world_size == 1:
+        return [data]
+
+    output = [None for _ in range(world_size)] if get_rank() == dst else None
+    dist.gather_object(data, output, dst=dst, group=group)
+    return output
+
+
 def gather(data, dst=0, group=None):
     """
     Run gather on arbitrary picklable data (not necessarily tensors).

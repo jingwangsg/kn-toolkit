@@ -86,9 +86,9 @@ def retry_wrapper(max_retries=10, detect_proxy=True):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    logger.info(
-                        f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}"
-                    )
+                    # logger.info(
+                    #     f"=> Thread {thread_id} retry {retry_cnt+1}/{max_retries} failed: {e}"
+                    # )
 
                     client = kwargs.get("client", None)
                     if detect_proxy and client is not None:
@@ -293,8 +293,8 @@ class MultiThreadDownloader(Downloader):
         skip_bytes = buffer.tell()
         s_pos += skip_bytes
 
-        if skip_bytes > 0:
-            logger.info(f"=> Thread {thread_id} resume from {skip_bytes} bytes")
+        # if skip_bytes > 0:
+        #     logger.info(f"=> Thread {thread_id} resume from {skip_bytes} bytes")
 
         if s_pos == e_pos + 1:
             return
@@ -398,7 +398,6 @@ class MultiThreadDownloader(Downloader):
         client = httpx.Client(
             headers=self.headers,
             timeout=self.timeout,
-            # proxy=self.proxy,
             proxies=self.proxy,  # for backward compatibility
             follow_redirects=True,
         )
@@ -407,7 +406,7 @@ class MultiThreadDownloader(Downloader):
             print("=> Multi-thread download disabled")
             super().download(url, path)
             return
-
+        
         filesize = self.get_filesize(client=client, url=url)
 
         self.message_queue.put_nowait(("filesize", filesize))
