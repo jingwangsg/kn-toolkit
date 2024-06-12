@@ -7,8 +7,9 @@ import yt_dlp
 import requests
 from contextlib import nullcontext
 import tempfile
-from yt_dlp.utils import parse_duration
+from yt_dlp.utils import parse_duration, download_range_func
 import os.path as osp
+from hashlib import sha256
 
 from ...utils.error import SuppressStdoutStderr
 from ...utils.system import buffer_keep_open, run_cmd
@@ -97,7 +98,7 @@ def download_youtube(
         st, ed = timestamp.split("-")
 
         parse_timestamp = lambda x: float("inf") if x in ("inf", "infinite") else parse_duration(x)
-        ydl_opts["download_ranges"] = lambda _, __: [{"start_time": parse_timestamp(st), "end_time": parse_timestamp(ed)}]
+        ydl_opts["download_ranges"] = download_range_func(None, [(parse_timestamp(st), parse_timestamp(ed))])
 
     maybe_quiet = nullcontext()
     if quiet and logger is None:
@@ -115,7 +116,7 @@ def download_youtube(
 def download_youtube_as_bytes(youtube_id, video_format="worst[ext=mp4][height>=224]", quiet=True, logger=StorageLogger(), timestamp=None):
     youtube_id = _maybe_youtube_id(youtube_id)
 
-    video_format_str = video_format.replace("*", "-").replace(":", "-").replace("/", "-")
+    video_format_str = sha256(video_format.encode()).hexdigest()[:8]
     temp_path = osp.join(tempfile.gettempdir(), f"{youtube_id}.{video_format_str}.mp4")
     error_code = download_youtube(
         youtube_id=youtube_id,
