@@ -4,7 +4,11 @@ import os.path as osp
 import os
 from tqdm import tqdm
 from contextlib import contextmanager
+import psutil
+import io
+import traceback
 
+from .mail import send_email
 from .multiproc import map_async_with_thread
 
 
@@ -49,6 +53,7 @@ def clear_process(path):
 
     run_cmd(f"kill -9 {' '.join(map(str, processes))}")
 
+
 def clear_process_dir(directory):
     all_files = run_cmd(
         f"find {directory} -type f",
@@ -76,3 +81,44 @@ def get_available_port():
     sock = socket.socket()
     sock.bind(("", 0))
     return sock.getsockname()[1]
+
+
+def get_current_command():
+    current_process_pid = os.getpid()
+    current_process = psutil.Process(current_process_pid)
+    command_line = current_process.cmdline()
+
+    return " ".join(command_line)
+
+
+def get_hostname():
+    return socket.gethostname()
+
+
+def get_pid():
+    return os.getpid()
+
+
+def get_exception_handler(to_email=False, to_file=None):
+    def exception_handler(exc_type, exc_value, exc_traceback):
+        nonlocal to_file, to_email
+        handler = io.StringIO()
+        traceback.print_exception(exc_type, exc_value, exc_traceback, file=handler)
+        hostname = get_hostname()
+        cmd = get_current_command()
+        text = "\n".join(
+            [
+                cmd,
+                "=" * 30,
+                handler.getvalue(),
+            ]
+        )
+        if to_email:
+            send_email(to_addr="kningtg@gmail.com", subject=f"Error on {hostname}", text=text)
+        if to_file is not None:
+            nm, ext = to_file.rsplit(".", 1)
+            to_file = f"{nm}.pid{get_pid()}.{ext}"
+            with open(to_file, "w") as f:
+                f.write(text)
+
+    return exception_handler
