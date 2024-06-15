@@ -23,7 +23,112 @@ from einops import rearrange
 from .download import download_youtube_as_bytes
 
 from ...utils.download import MultiThreadDownloaderInMem
-from ...utils.system import buffer_keep_open
+from ...utils.system import buffer_keep_open, run_cmd
+
+# ======================== FFMPEG ========================
+
+try:
+    from ffmpy import FFprobe, FFmpeg
+except ImportError:
+    print("ffmpy not installed, some functionalities will not work")
+
+
+def probe_meta_ffprobe(video_path):
+    _NULL = {
+        "width": None,
+        "height": None,
+        "fps": None,
+        "duration": None,
+        "num_frames": None,
+    }
+
+    ffprobe = FFprobe(
+        inputs={video_path: None},
+        global_options=" ".join(
+            [
+                "-v error",
+                "-select_streams v:0",
+                "-show_entries",
+                "stream=r_frame_rate,width,height,nb_frames,duration",
+                "-of csv=p=0",
+            ]
+        ),
+    )
+
+    ret = run_cmd(ffprobe.cmd)
+
+    if ret.returncode != 0:
+        logger.error(f"Error probing video: {video_path}")
+        return _NULL
+
+    probe_strs = ret.stdout.strip("\n").strip().split(",")
+    try:
+        width, height, fps, duration, num_frames = probe_strs
+    except Exception as e:
+        print(f"Error parsing probe_strs: {probe_strs}")
+        return _NULL
+
+    def _fail_safe_convert(val, klass):
+        try:
+            return klass(val)
+        except:
+            return None
+
+    width, height = _fail_safe_convert(width, int), _fail_safe_convert(height, int)
+    fps = _fail_safe_convert(fps, eval)
+    duration = _fail_safe_convert(duration, float)
+    num_frames = _fail_safe_convert(num_frames, int)
+
+    meta = {
+        "width": width,
+        "height": height,
+        "fps": fps,
+        "duration": duration,
+        "num_frames": num_frames,
+    }
+
+    return meta
+
+
+def probe_meta_decord(video_path):
+    try:
+        vr = VideoReader(video_path)
+    except:
+        return {
+            "width": None,
+            "height": None,
+            "fps": None,
+            "duration": None,
+            "num_frames": None,
+        }
+    try:
+        wh = vr[0].shape[:2]
+    except:
+        print(f"Error probing video on hw: {video_path}")
+        wh = (None, None)
+
+    try:
+        length = len(vr)
+    except:
+        print(f"Error probing video on length: {video_path}")
+        length = None
+
+    try:
+        fps = vr.get_avg_fps()
+    except:
+        print(f"Error probing video on fps: {video_path}")
+        fps = None
+
+    return {
+        "width": wh[0],
+        "height": wh[1],
+        "fps": fps,
+        "duration": length / fps,
+        "num_frames": length,
+    }
+
+
+# ======================================================
 
 
 def pts_to_secs(pts: int, time_base: float, start_pts: int) -> float:
@@ -185,7 +290,7 @@ def read_frames_decord(
     if is_online_video:
         downloader = MultiThreadDownloaderInMem(verbose=False)
         video_path = io.BytesIO(downloader.download(video_path))
-    
+
     if is_bytes:
         video_path = io.BytesIO(video_path)
 

@@ -10,6 +10,7 @@ import tempfile
 from yt_dlp.utils import parse_duration, download_range_func
 import os.path as osp
 from hashlib import sha256
+import os
 
 from ...utils.error import SuppressStdoutStderr
 from ...utils.system import buffer_keep_open, run_cmd
@@ -94,6 +95,11 @@ def download_youtube(
         "logger": logger,
     }
 
+    if os.getenv("YT_DLP_OAUTH2", None):
+        # refer to https://github.com/coletdjnz/yt-dlp-youtube-oauth2
+        ydl_opts["username"] = "oauth2"
+        ydl_opts["password"] = ""
+
     if timestamp is not None:
         st, ed = timestamp.split("-")
 
@@ -101,6 +107,7 @@ def download_youtube(
         ydl_opts["download_ranges"] = download_range_func(None, [(parse_timestamp(st), parse_timestamp(ed))])
 
     maybe_quiet = nullcontext()
+
     if quiet and logger is None:
         # completely suppress yt-dlp output
         ydl_opts["logger"] = FakeLogger()
@@ -196,3 +203,12 @@ def download_yt_meta(
     yt_meta_dict = {"info": info_dict, "subtitles": full_sub_dict}
 
     return yt_meta_dict
+
+
+if __name__ == "__main__":
+    download_youtube(
+        "https://www.youtube.com/watch?v=----meyKR48",
+        video_format="wv*[height>=360][ext=mp4]/w[height>=360][ext=mp4]/bv/b[ext=mp4]",
+        video_path="example.mp4",
+        quiet=False,
+    )
