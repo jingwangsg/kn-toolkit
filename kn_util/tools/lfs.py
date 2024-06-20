@@ -18,7 +18,7 @@ from loguru import logger
 from pathos.multiprocessing import ProcessPool
 
 from ..utils.git_utils import get_origin_url
-from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader
+from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader, CoroutineDownloader
 from ..utils.rich import get_rich_progress_download
 from ..utils.multiproc import map_async_with_thread
 
@@ -332,6 +332,7 @@ def main():
                 url_template=args.template,
                 include=args.include,
                 exclude=args.exclude,
+                # num_threads=args.num_threads, #! deprecated, using coroutine downloader
                 num_threads=args.num_threads,
                 num_processes=args.num_processes,
                 max_retries=args.max_retries,
@@ -345,6 +346,7 @@ def main():
                 include=args.include,
                 exclude=args.exclude,
                 num_processes=args.num_processes,
+                # num_threads=args.num_threads, #! deprecated, using coroutine downloader
                 num_threads=args.num_threads,
                 max_retries=args.max_retries,
                 timeout=args.timeout,

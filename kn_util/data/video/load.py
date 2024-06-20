@@ -34,13 +34,6 @@ except ImportError:
 
 
 def probe_meta_ffprobe(video_path):
-    _NULL = {
-        "width": None,
-        "height": None,
-        "fps": None,
-        "duration": None,
-        "num_frames": None,
-    }
 
     ffprobe = FFprobe(
         inputs={video_path: None},
@@ -59,14 +52,14 @@ def probe_meta_ffprobe(video_path):
 
     if ret.returncode != 0:
         logger.error(f"Error probing video: {video_path}")
-        return _NULL
+        return None
 
     probe_strs = ret.stdout.strip("\n").strip().split(",")
     try:
         width, height, fps, duration, num_frames = probe_strs
     except Exception as e:
         print(f"Error parsing probe_strs: {probe_strs}")
-        return _NULL
+        return None
 
     def _fail_safe_convert(val, klass):
         try:
@@ -91,33 +84,12 @@ def probe_meta_ffprobe(video_path):
 
 
 def probe_meta_decord(video_path):
-    try:
-        vr = VideoReader(video_path)
-    except:
-        return {
-            "width": None,
-            "height": None,
-            "fps": None,
-            "duration": None,
-            "num_frames": None,
-        }
-    try:
-        wh = vr[0].shape[:2]
-    except:
-        print(f"Error probing video on hw: {video_path}")
-        wh = (None, None)
+    vr = VideoReader(video_path)
+    wh = vr[0].shape[:2]
 
-    try:
-        length = len(vr)
-    except:
-        print(f"Error probing video on length: {video_path}")
-        length = None
+    length = len(vr)
 
-    try:
-        fps = vr.get_avg_fps()
-    except:
-        print(f"Error probing video on fps: {video_path}")
-        fps = None
+    fps = vr.get_avg_fps()
 
     return {
         "width": wh[0],
@@ -126,6 +98,13 @@ def probe_meta_decord(video_path):
         "duration": length / fps,
         "num_frames": length,
     }
+
+
+def probe_meta(video_path):
+    try:
+        return probe_meta_decord(video_path)
+    except:
+        return probe_meta_ffprobe(video_path)
 
 
 # ======================================================
