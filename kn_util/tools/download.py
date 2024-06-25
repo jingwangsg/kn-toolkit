@@ -14,7 +14,7 @@ def add_basic_parser(parser):
     parser.add_argument("--max-retries", type=int, help="The max retries", default=None)
     parser.add_argument("--proxy", type=str, help="The proxy to use", default=None)
     parser.add_argument("--proxy-port", type=int, help="The proxy port to use", default=None)
-    parser.add_argument("--mode", type=str, help="The mode to use", default="coroutine")
+    parser.add_argument("--mode", type=str, help="The mode to use", default="thread")
     parser.add_argument("--token", type=str, help="The token to use", default=None)
     parser.add_argument("--log-file", type=str, help="The log file to use", default=None)
     parser.add_argument("--log-stdout", action="store_true", help="Whether to log to stdout", default=False)

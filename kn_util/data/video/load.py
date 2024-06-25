@@ -90,6 +90,7 @@ def probe_meta_decord(video_path):
     length = len(vr)
 
     fps = vr.get_avg_fps()
+    # key_indices = vr.get_key_indices()
 
     return {
         "width": wh[0],

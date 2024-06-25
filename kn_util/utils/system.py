@@ -24,7 +24,7 @@ def buffer_keep_open(buffer):
     old_buffer_close()
 
 
-def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None):
+def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None, fault_tolerance=False):
     if conda_env is not None:
         cmd = f"conda run -n {conda_env} {cmd}"
 
@@ -34,10 +34,14 @@ def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None):
         for line in popen.stdout:
             print(line.rstrip().decode("utf-8"))
         popen.wait()
+        if popen.returncode != 0 and not fault_tolerance:
+            raise RuntimeError(f"Failed to run command: {cmd}\nERROR {popen.stderr}\nSTDOUT{popen.stdout}")
         return popen.returncode
     else:
         if not async_cmd:
             ret = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            if ret.returncode != 0 and not fault_tolerance:
+                raise RuntimeError(f"Failed to run command: {cmd}\nERROR {ret.stderr}\nSTDOUT{ret.stdout}")
             return ret
         else:
             popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
