@@ -2,11 +2,17 @@ import os, os.path as osp
 import webdataset as wds
 import tarfile
 import numpy as np
+from hashlib import sha256
+
 from ...utils.io import load_pickle, load_jsonl
 from ...utils.multiproc import map_async_with_thread
 
 
-def file_indexing(files, cache_file=None):
+def get_filehash(files):
+    return sha256(";".join(sorted(files)).encode()).hexdigest()[:16]
+
+
+def file_indexing(files):
     """
     get the number of keys in each tar file, each key corresponds to a sample in WebDataset
     """
@@ -27,20 +33,12 @@ def file_indexing(files, cache_file=None):
 
         return unique_keys
 
-    if cache_file is not None and osp.exists(cache_file):
-        jsonl_cache = load_jsonl(cache_file)
-        keys_groupby_file = {}
-        for item in jsonl_cache:
-            keys_groupby_file[item["file"]] = item["keys"]
-
-        keys_by_file = [keys_groupby_file[file] for file in files]
-    else:
-        keys_by_file = map_async_with_thread(
-            iterable=files,
-            func=_get_keys,
-            verbose=True,
-            desc="Gathering keys from tar files",
-        )
+    keys_by_file = map_async_with_thread(
+        iterable=files,
+        func=_get_keys,
+        verbose=True,
+        desc="Gathering keys from tar files",
+    )
 
     lengths = [len(keys) for keys in keys_by_file]
 
@@ -53,4 +51,4 @@ def file_indexing(files, cache_file=None):
 
     shards = [(file, length) for file, length in zip(files, lengths)]
 
-    return shards, key2idx
+    return key2idx, shards

@@ -10,9 +10,11 @@ import ffmpeg
 import numpy as np
 from tempfile import NamedTemporaryFile
 import io
+import torch
 
 from .text import draw_text, draw_text_line
 from .utils import color_val
+from ..data.video import read_frames_decord
 
 
 def plt_to_image(fig):
@@ -93,8 +95,6 @@ class VideoVisualizer:
         for img in array:
             video.write(img)
         video.release()
-
-
 
     @classmethod
     def output_array_to_images(cls, array, image_dir):
@@ -209,7 +209,7 @@ def save_frames_grid(img_array, out_path):
     else:
         raise NotImplementedError("Supports only (b,t,c,h,w)-shaped inputs. First two dimensions can be ignored.")
 
-    assert img_array.shape[1] == 3, "Exepcting input shape of (H, W, 3), i.e. RGB-only."
+    assert img_array.shape[1] == 3, "Expecting input shape of (H, W, 3), i.e. RGB-only."
 
     grid = make_grid(img_array)
     ndarr = grid.permute(1, 2, 0).to("cpu", torch.uint8).numpy()
@@ -217,3 +217,31 @@ def save_frames_grid(img_array, out_path):
     img = Image.fromarray(ndarr)
 
     img.save(out_path)
+
+
+def _vis_image_tensors(image_tensors):
+    image_grid = make_grid(image_tensors)
+
+    with NamedTemporaryFile(suffix=".jpg") as f:
+        Image.fromarray(image_grid.permute(1, 2, 0).numpy()).save(f.name)
+        os.system(f"termvisage {f.name} -H left -S iterm2 --height 30 --force-style")
+
+
+def vis_images(image_files):
+    from torchvision.utils import make_grid
+
+    if len(image_files) == 1:
+        image = image_files[0]
+        os.system(f"termvisage --query-timeout 1 {image} -H left --height 12")
+
+    else:
+        images = [Image.open(image).convert("RGB") for image in image_files]
+        image_tensors = [torch.from_numpy(np.array(image)) for image in images]
+        image_tensors = torch.stack(image_tensors)
+        _vis_image_tensors(image_tensors)
+
+
+def vis_video(video_file, num_frames=8):
+    frames = read_frames_decord(video_file, num_frames=num_frames, output_format="bthwc")
+    frames = torch.from_numpy(frames)
+    _vis_image_tensors(frames)

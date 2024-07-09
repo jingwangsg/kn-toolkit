@@ -22,8 +22,10 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import file_indexing
+from .wids_utils import file_indexing, get_filehash
 from ...dist import get_world_size, is_main_process, all_gather_object
+
+from kn_util.utils.io import save_pickle, load_pickle, load_json
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -477,28 +479,46 @@ class ShardListDataset(Dataset[T]):
             if is_main_process():
                 # only compute it once on the main process
                 print("Shard lengths not provided, indexing shards...")
-                _shards, key2idx = file_indexing(shards, cache_file=index_cache)
+
+                # rule for cache file path
+                if index_cache is None:
+                    cache_filepath = "/tmp/" + get_filehash(shards) + ".pkl"
+                elif index_cache.endswith(".pkl"):
+                    cache_filepath = index_cache
+                else:
+                    os.makedirs(index_cache, exist_ok=True)
+                    cache_filepath = osp.join(index_cache, get_filehash(shards) + ".pkl")
+
+                if not osp.exists(cache_filepath):
+                    key2idx, _shards = file_indexing(shards)
+                    save_pickle({"key2idx": key2idx, "shards": shards}, cache_filepath)
+                else:
+                    ret = load_pickle(cache_filepath)
+                    key2idx, _shards = ret["key2idx"], ret["shards"]
+
                 print("Indexing complete")
+
             _shards_gathered = all_gather_object(_shards)
             _key2idx_gathered = all_gather_object(key2idx)
             shards = _shards_gathered[0]  # broadcast the result to all processes
             self.key2idx = _key2idx_gathered[0]
 
-        if options is None:
-            options = {}
+        # if options is None:
+        #     options = {}
+
         super(ShardListDataset, self).__init__()
         # shards is a list of (filename, length) pairs. We'll need to
         # keep track of the lengths and cumulative lengths to know how
         # to map indices to shards and indices within shards.
-        if isinstance(shards, (str, io.IOBase)):
-            if base is None and isinstance(shards, str):
-                shards = osp.expanduser(shards)
-                base = urldir(shards)
-            self.base = base
-            self.spec = load_dsdesc_and_resolve(shards, options=options, base=base)
-            self.shards = self.spec.get("shardlist", [])
-            self.dataset_name = self.spec.get("name") or hash_dataset_name(str(shards))
-        elif isinstance(shards, List):
+        # if isinstance(shards, (str, io.IOBase)):
+        #     if base is None and isinstance(shards, str):
+        #         shards = osp.expanduser(shards)
+        #         base = urldir(shards)
+        #     self.base = base
+        #     self.spec = load_dsdesc_and_resolve(shards, options=options, base=base)
+        #     self.shards = self.spec.get("shardlist", [])
+        #     self.dataset_name = self.spec.get("name") or hash_dataset_name(str(shards))
+        if isinstance(shards, List):
             if base is None and isinstance(shards, str):
                 shards = osp.abspath(osp.expanduser(shards[0][0]))
                 base = urldir(shards)
@@ -516,7 +536,7 @@ class ShardListDataset(Dataset[T]):
             self.spec = options
             self.shards = shards
             self.dataset_name = dataset_name or hash_dataset_name(str(shards))
-        
+
         self.lengths = [shard["nsamples"] for shard in self.shards]
         self.cum_lengths = np.cumsum(self.lengths)
         self.total_length = self.cum_lengths[-1]
@@ -561,7 +581,7 @@ class ShardListDataset(Dataset[T]):
         if lru_size > 200:
             warnings.warn("LRU size is very large; consider reducing it to avoid running out of file descriptors")
         self.cache = LRUShards(lru_size, localname=self.localname, keep=keep)
-    
+
     @property
     def keys(self):
         return self.key2idx.keys()
@@ -648,6 +668,39 @@ class ShardListDataset(Dataset[T]):
     def close(self):
         """Close the dataset."""
         self.cache.clear()
+
+
+class ShardListDatasetWithAnnotations(ShardListDataset):
+    """ShardListDataset that also loads annotations from a JSON file.
+    the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
+    the index order will be the same as the original ShardListDataset.
+    """
+
+    def __init__(self, json_files, tar_root, *args, **kwargs):
+        keys = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
+        tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
+        super().__init__(shards=tar_files, *args, **kwargs)
+        self.json_files = json_files
+        self.json_cache = LRUCache(capacity=10)
+
+    def get_json(self, shard_key):
+        if shard_key not in self.json_cache:
+            json_dir = osp.dirname(self.json_files[0])
+            json_filename = osp.join(json_dir, shard_key + ".json")
+            self.json_cache[shard_key] = load_json(json_filename)
+        return self.json_cache[shard_key]
+
+    def get_annotation(self, sample):
+        shard_key = osp.basename(sample["__shard__"]).rsplit(".", 1)[0]
+        key = sample["__key__"]
+        json_data = self.get_json(shard_key)
+        return json_data.get(key, None)
+
+    def __getitem__(self, index):
+        sample = super().__getitem__(index)
+        annotation = self.get_annotation(sample)
+
+        return sample, annotation
 
 
 def lengths_to_ranges(lengths):

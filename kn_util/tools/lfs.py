@@ -332,7 +332,6 @@ def main():
                 url_template=args.template,
                 include=args.include,
                 exclude=args.exclude,
-                # num_threads=args.num_threads, #! deprecated, using coroutine downloader
                 num_threads=args.num_threads,
                 num_processes=args.num_processes,
                 max_retries=args.max_retries,
