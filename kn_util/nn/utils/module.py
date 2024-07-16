@@ -1,10 +1,17 @@
 import torch.nn as nn
 from termcolor import colored
+from loguru import logger
+from termcolor import colored
+import torch
+import torch.nn as nn
+import torch.distributed as torch_dist
+
 
 def unwrap_model(model):
     if isinstance(model, nn.parallel.DistributedDataParallel):
         return model.module
     return model
+
 
 def _find_module_by_keys(model, keys):
     lora_modules = set()
@@ -70,3 +77,66 @@ def module2tree(rt_module: nn.Module, list_limit=None):
 
     main_str += "  )"
     return main_str
+
+
+def set_requires_grad(model, keys=None, requires_grad=True):
+    param_cnt = 0
+    if keys is None:
+        for p in model.parameters():
+            p.requires_grad = requires_grad
+            param_cnt += p.numel()
+    else:
+        for k in keys:
+            for n, p in model.named_parameters():
+                if n.startswith(k):
+                    p.requires_grad = requires_grad
+                    param_cnt += p.numel()
+    return param_cnt
+
+
+def unfreeze(model, keys=None, verbose=True):
+    param_cnt = set_requires_grad(model, keys, requires_grad=True)
+    if verbose:
+        logger.info(f"Unfreezing {param_cnt:,} parameters from {keys}")
+
+
+def freeze(model, keys=None, verbose=True):
+    param_cnt = set_requires_grad(model, keys, requires_grad=False)
+    if verbose:
+        logger.info(f"Freezing {param_cnt:,} parameters from {keys}")
+
+
+def get_device(model):
+    return next(model.parameters()).device
+
+
+def get_dtype(model):
+    return next(model.parameters()).dtype
+
+
+def get_named_parameters(model):
+    return {n: p for n, p in model.named_parameters() if p.requires_grad}
+
+
+def get_num_params_trainable(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def get_num_params(model):
+    return sum(p.numel() for p in model.parameters())
+
+
+def convert_to_half(model):
+    for p in model.parameters():
+        p.data = p.data.half()
+    return model
+
+
+def convert_to(model, *args, **kwargs):
+    for p in model.parameters():
+        p.data = p.data.to(*args, **kwargs)
+    return model
+
+
+def pretty_format(model, list_limit=1):
+    return module2tree(model, list_limit=list_limit)

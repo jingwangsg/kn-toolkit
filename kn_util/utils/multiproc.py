@@ -9,8 +9,10 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from threading import Semaphore
 from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
 from queue import Queue
-from .rich import get_rich_progress_mofn
 import copy
+import os, os.path as osp
+
+from .rich import get_rich_progress_mofn
 
 
 def _run_sequential(iterable, func, desc="", verbose=True):
@@ -216,3 +218,4 @@ def pathos_wait(not_done, timeout=0.5):
             done.add(future)
             continue
     return done, not_done
+

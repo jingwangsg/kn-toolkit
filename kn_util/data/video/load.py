@@ -19,6 +19,7 @@ import numpy as np
 import math
 from loguru import logger
 from einops import rearrange
+import json
 
 from .download import download_youtube_as_bytes
 
@@ -43,7 +44,7 @@ def probe_meta_ffprobe(video_path):
                 "-select_streams v:0",
                 "-show_entries",
                 "stream=r_frame_rate,width,height,nb_frames,duration",
-                "-of csv=p=0",
+                "-of json",
             ]
         ),
     )
@@ -54,11 +55,17 @@ def probe_meta_ffprobe(video_path):
         logger.error(f"Error probing video: {video_path}")
         return None
 
-    probe_strs = ret.stdout.strip("\n").strip().split(",")
+    probe_str = ret.stdout.strip("\n").strip()
+    probe_dict = json.loads(probe_str)
+
     try:
-        width, height, fps, duration, num_frames = probe_strs
+        width = probe_dict["streams"][0]["width"]
+        height = probe_dict["streams"][0]["height"]
+        fps = probe_dict["streams"][0]["r_frame_rate"]
+        duration = probe_dict["streams"][0]["duration"]
+        num_frames = probe_dict["streams"][0]["nb_frames"]
     except Exception as e:
-        print(f"Error parsing probe_strs: {probe_strs}")
+        print(f"Error parsing probe_strs: {probe_str}")
         return None
 
     def _fail_safe_convert(val, klass):

@@ -33,7 +33,7 @@ def nested_to(batch, device, dtype=None, non_blocking=False):
     return nested_apply_tensor(batch, _to_device)
 
 
-def groupby(data, key, agg="unique"):
+def groupby(data, key=None, agg="unique"):
     assert isinstance(data, List)
     ret_dict = {}
     for d in data:
@@ -70,7 +70,7 @@ def collection_get_multikeys(batch, keys, default=None):
     if isinstance(batch, list):
         ret = {}
         for k in keys:
-            seq = collection_get(batch, key, default=default)
+            seq = collection_get(batch, k, default=default)
             ret[k] = seq
         return ret
     else:

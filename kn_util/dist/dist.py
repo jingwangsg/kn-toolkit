@@ -105,12 +105,14 @@ def synchronize():
     world_size = dist.get_world_size()
     if world_size == 1:
         return
-    if dist.get_backend() == dist.Backend.NCCL:
-        # This argument is needed to avoid warnings.
-        # It's valid only for NCCL backend.
-        dist.barrier(device_ids=[torch.cuda.current_device()])
-    else:
-        dist.barrier()
+
+    # if dist.get_backend() == dist.Backend.NCCL:
+    #     # This argument is needed to avoid warnings.
+    #     # It's valid only for NCCL backend.
+    #     dist.barrier(device_ids=[torch.cuda.current_device()])
+    # else:
+    #     dist.barrier()
+    dist.barrier()
 
 
 @functools.lru_cache()

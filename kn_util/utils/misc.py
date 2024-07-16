@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-import os
+import os, os.path as osp
 import random
 
 import numpy as np
@@ -83,3 +83,9 @@ def eval_env(name, default=False):
 
 def default(val, default_val):
     return val if val is not None else default_val
+
+def create_parent_dir_if_not_exists(path):
+    if not osp.exists(osp.dirname(path)):
+        os.makedirs(osp.dirname(path))
+    
+    return path

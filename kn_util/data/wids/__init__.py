@@ -6,10 +6,14 @@
 import torch
 
 from .wids import (
-    ChunkedSampler,
-    DistributedChunkedSampler,
-    ShardedSampler,
     ShardListDataset,
-    DistributedLocalSampler,
+    ShardListDatasetWithAnnotations,
 )
+
+from .wids_sampler import (
+    DistributedChunkedSampler,
+    ChunkedSamplerV2,
+    ChunkedSampler,
+)
+
 from .wids_utils import file_indexing

@@ -55,7 +55,8 @@ def clear_process(path):
     processes = [int(_.strip()) for _ in processes.split("\n") if _.strip() != ""]
     processes = list(set([pid for pid in processes if pid != cur_pid]))
 
-    run_cmd(f"kill -9 {' '.join(map(str, processes))}")
+    if len(processes) > 0:
+        run_cmd(f"kill -9 {' '.join(map(str, processes))}")
 
 
 def clear_process_dir(directory):
