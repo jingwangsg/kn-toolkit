@@ -39,7 +39,8 @@ def run_cmd(cmd, verbose=False, async_cmd=False, conda_env=None, fault_tolerance
         return popen.returncode
     else:
         if not async_cmd:
-            ret = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            # decode bug fix: https://stackoverflow.com/questions/73545218/utf-8-encoding-exception-with-subprocess-run
+            ret = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="cp437")
             if ret.returncode != 0 and not fault_tolerance:
                 raise RuntimeError(f"Failed to run command: {cmd}\nERROR {ret.stderr}\nSTDOUT{ret.stdout}")
             return ret

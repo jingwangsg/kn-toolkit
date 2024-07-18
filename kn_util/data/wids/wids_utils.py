@@ -12,7 +12,7 @@ def get_filehash(files):
     return sha256(";".join(sorted(files)).encode()).hexdigest()[:16]
 
 
-def file_indexing(files):
+def get_file_keys(files):
     """
     get the number of keys in each tar file, each key corresponds to a sample in WebDataset
     """
@@ -21,7 +21,6 @@ def file_indexing(files):
 
     def _get_keys(file):
         with tarfile.open(file, "r") as tar:
-            # import ipdb; ipdb.set_trace()
             keys = [_.name.split(".")[0] for _ in tar.getmembers()]
 
         repeated = set()
@@ -40,15 +39,33 @@ def file_indexing(files):
         desc="Gathering keys from tar files",
     )
 
-    lengths = [len(keys) for keys in keys_by_file]
+    keys_by_file = {file: keys for file, keys in zip(files, keys_by_file)}
 
-    cnt = 0
-    key2idx = {}
-    for sublist in keys_by_file:
-        for key in sublist:
-            key2idx[key] = cnt
-            cnt += 1
+    return keys_by_file
 
-    shards = [(file, length) for file, length in zip(files, lengths)]
 
-    return key2idx, shards
+def get_file_meta(files, keys_by_file, filter_keys=None):
+    """
+    Filtering keys by filter_ids, build mapping from index to index in shard
+    The i-th element now corresponds to the "key_mapping_by_shard[shard_name][i]"-th element in shard
+    """
+    key_mapping_by_shard = dict()
+
+    for file, keys in keys_by_file.items():
+        if filter_keys is not None:
+            cur_filter_ids = filter_keys[file]
+        else:
+            cur_filter_ids = set(keys)
+
+        key_mapping_by_shard[file] = []
+
+        # i-th element in shard -> "key_mapping_by_shard[shard_name][i]"-th element in shard
+        for idx_in_shard, key in enumerate(keys):
+            if key not in cur_filter_ids:
+                continue
+
+            key_mapping_by_shard[file] += [idx_in_shard]
+
+    shards = [(file, len(key_mapping_by_shard[file])) for file in files]
+
+    return key_mapping_by_shard, shards

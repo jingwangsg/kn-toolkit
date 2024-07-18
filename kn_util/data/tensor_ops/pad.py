@@ -3,11 +3,12 @@ import numpy as np
 import torch
 
 
-def general_pad_pt_tensor(arr, axis, to_length, fill_value=None, return_mask=False):
+def general_pad_pt_tensor(arr, axis, to_length=None, fill_value=None, return_mask=False):
     to_shape = list(arr.shape)
     to_shape[axis] = to_length
     shape_dim = len(to_shape)
     meta = dict(device=arr.device, dtype=arr.dtype)
+
 
     # create full array
     if fill_value == "last":

@@ -1,9 +1,9 @@
 import numpy as np
+import torch
 
 
 def generate_sample_indices(tot_len, max_len=None, stride=None):
-    """helper function to generate indices for sampling a sequence
-    """
+    """helper function to generate indices for sampling a sequence"""
     assert (max_len is not None) ^ (stride is not None)
     if max_len is not None:
         stride = int(np.ceil((tot_len - 1) / (max_len - 1)))
@@ -13,15 +13,14 @@ def generate_sample_indices(tot_len, max_len=None, stride=None):
 
 
 def slice_by_axis(data, _slice, axis):
-    """ slice a tensor by axis
-    """
+    """slice a tensor by axis"""
     num_axes = len(data.shape)
     slices = tuple([_slice if _ == axis else slice(0, data.shape[_]) for _ in range(num_axes)])
     return data[slices]
 
 
 def reduce_segment(data, st_idx, ed_idx, axis=0, mode="avgpool"):
-    """ reduce a segment of frames into a single frame feature
+    """reduce a segment of frames into a single frame feature
     now we support 5 modes:
     a) maxpool: max pooling
     b) avgpool: average pooling
@@ -55,7 +54,7 @@ def reduce_segment(data, st_idx, ed_idx, axis=0, mode="avgpool"):
 
 def sample_sequence_general(data, axis=0, stride="round", seq_len=None, mode="avgpool"):
     """sample a sequence into fixed length segments
-    
+
     Constant Stride Mode:
     1) when stride is an integer, we will sample the sequence with a constant stride
     2) when stride is "constant" and seq_len is given, we will sample the sequence with a calculated stride
@@ -101,3 +100,56 @@ def sample_sequence_general(data, axis=0, stride="round", seq_len=None, mode="av
         ret_frames.append(sampled_frame)
     ret_frames = np.concatenate(ret_frames, axis=axis)
     return ret_frames
+
+
+def pad_sequence(
+    arr_list,
+    axis=0,
+    to_length=None,
+    backend="np",
+    fill_value=0.0,
+    padding_direction="right",
+    return_mask=False,
+):
+    max_length = max([arr.shape[axis] for arr in arr_list]) if to_length is None else to_length
+
+    def full(shape, fill_value=0.0):
+        if backend == "np":
+            return np.full(shape, fill_value=fill_value)
+        elif backend == "pt":
+            return torch.full(shape, fill_value=fill_value)
+    
+    def bool_like(arr, fill_value=True):
+        if backend == "np":
+            return np.full_like(arr, fill_value=fill_value, dtype=bool)
+        elif backend == "pt":
+            return torch.full_like(arr, fill_value=fill_value, dtype=bool)
+
+    ret_arrs = []
+    ret_masks = []
+
+    for arr in arr_list:
+        to_shape = list(arr.shape)
+        orig_length = arr.shape[axis]
+
+        if orig_length == max_length:
+            ret_arrs += [arr]
+            ret_masks += [bool_like(arr, True)]
+            continue
+
+        to_shape[axis] = max_length
+
+        full_arr = full(to_shape, fill_value=fill_value)
+        full_mask = full(to_shape, fill_value=False)
+
+        seq_slice = slice(0, orig_length) if padding_direction == "right" else slice(max_length - orig_length, max_length)
+        arr_slice = [seq_slice if _ == axis else slice(None) for _ in range(len(arr.shape))]
+        full_arr[arr_slice] = arr
+        full_mask[arr_slice] = True
+
+        ret_arrs += [full_arr]
+        ret_masks += [full_mask]
+    if return_mask:
+        return ret_arrs, ret_masks
+    else:
+        return ret_arrs

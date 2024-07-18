@@ -16,4 +16,3 @@ from .wids_sampler import (
     ChunkedSampler,
 )
 
-from .wids_utils import file_indexing

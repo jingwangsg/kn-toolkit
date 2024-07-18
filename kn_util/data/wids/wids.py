@@ -22,10 +22,11 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import file_indexing, get_filehash
-from ...dist import get_world_size, is_main_process, all_gather_object
+from .wids_utils import get_filehash, get_file_keys, get_file_meta
+from ...dist import get_world_size, is_main_process, broadcast_object_list
 
 from kn_util.utils.io import save_pickle, load_pickle, load_json
+from kn_util.utils.multiproc import map_async_with_thread
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -460,12 +461,12 @@ class ShardListDataset(Dataset[T]):
         base=None,
         options=None,
         verbose=False,
+        filter_keys: Dict[str, set[str]] = None,
     ):
         """Create a ShardListDataset.
 
         Args:
-            shards: a list of (filename, length) pairs or a URL pointing to a JSON descriptor file,
-                    or you can input filenames directly, dataset will generate the length automatically.
+            shards: a list of tar files
             cache_size: the number of shards to keep in the cache
             lru_size: the number of shards to keep in the LRU cache
             localname: a function that maps URLs to local filenames
@@ -474,8 +475,9 @@ class ShardListDataset(Dataset[T]):
         """
         if isinstance(shards, List) and isinstance(shards[0], str):
             # only filenames are given, we need to compute the length
-            _shards = {}
-            key2idx = None
+            _shards = None
+            key_mapping_by_shard = None
+
             if is_main_process():
                 # rule for cache file path
                 if index_cache is None:
@@ -486,22 +488,20 @@ class ShardListDataset(Dataset[T]):
                     os.makedirs(index_cache, exist_ok=True)
                     cache_filepath = osp.join(index_cache, get_filehash(shards) + ".pkl")
 
+                # load/create file index
                 if not osp.exists(cache_filepath):
                     print("Shard lengths not provided, indexing shards...")
-                    key2idx, _shards = file_indexing(shards)
-                    save_pickle({"key2idx": key2idx, "shards": _shards}, cache_filepath)
+                    keys_by_file = get_file_keys(shards)
+                    save_pickle(keys_by_file, cache_filepath)
                 else:
-                    ret = load_pickle(cache_filepath)
-                    key2idx, _shards = ret["key2idx"], ret["shards"]
-                    _shards = {k: v for k, v in _shards}
-                    _shards = [(k, _shards[k]) for k in shards] # keep order in filenames
+                    keys_by_file = load_pickle(cache_filepath)
 
                 print("Indexing complete")
 
-            _shards_gathered = all_gather_object(_shards)
-            _key2idx_gathered = all_gather_object(key2idx)
-            shards = _shards_gathered[0]  # broadcast the result to all processes
-            self.key2idx = _key2idx_gathered[0]
+                key_mapping_by_shard, _shards = get_file_meta(shards, keys_by_file=keys_by_file, filter_keys=filter_keys)
+
+            key_mapping_by_shard, shards = broadcast_object_list([key_mapping_by_shard, _shards])
+            self.key_mapping_by_shard = key_mapping_by_shard
 
         # if options is None:
         #     options = {}
@@ -649,6 +649,8 @@ class ShardListDataset(Dataset[T]):
     def __getitem__(self, index):
         """Return the sample corresponding to the given index."""
         shard, inner_idx, desc = self.get_shard(index)
+
+        inner_idx = self.key_mapping_by_shard[desc["url"]][inner_idx]
         sample = shard[inner_idx]
 
         # Check if we're missing the cache too often.
@@ -670,6 +672,10 @@ class ShardListDataset(Dataset[T]):
         self.cache.clear()
 
 
+def _load_keys_by_json(json_file):
+    return set(load_json(json_file).keys())
+
+
 class ShardListDatasetWithAnnotations(ShardListDataset):
 
     def __init__(self, json_files, tar_root, *args, **kwargs):
@@ -679,7 +685,15 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         """
         keys = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
-        super().__init__(shards=tar_files, *args, **kwargs)
+        keys_by_json = map_async_with_thread(
+            iterable=json_files,
+            func=_load_keys_by_json,
+            verbose=True,
+            desc="Gathering keys from json files",
+            num_thread=16,
+        )
+        filter_keys = {tar_file: keys for tar_file, keys in zip(tar_files, keys_by_json)}
+        super().__init__(shards=tar_files, filter_keys=filter_keys, *args, **kwargs)
         self.json_files = json_files
         self.json_cache = LRUCache(capacity=self.cache.lru.capacity)
 

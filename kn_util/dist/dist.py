@@ -201,6 +201,19 @@ def all_gather_object(data, group=None):
     return output
 
 
+def broadcast_object_list(data, src=0, group=None):
+    if get_world_size() == 1:
+        return data
+    if group is None:
+        group = _get_global_gloo_group()  # use CPU group by default, to reduce GPU RAM usage.
+    world_size = dist.get_world_size(group)
+    if world_size == 1:
+        return data
+
+    dist.broadcast_object_list(data, src=src, group=group)
+    return data
+
+
 def gather_object(data, dst=0, group=None):
     if get_world_size() == 1:
         return [data]
