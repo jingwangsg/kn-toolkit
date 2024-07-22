@@ -5,7 +5,7 @@ from termcolor import colored
 import torch
 import torch.nn as nn
 import torch.distributed as torch_dist
-
+import pandas as pd
 
 def unwrap_model(model):
     if isinstance(model, nn.parallel.DistributedDataParallel):
@@ -97,13 +97,13 @@ def set_requires_grad(model, keys=None, requires_grad=True):
 def unfreeze(model, keys=None, verbose=True):
     param_cnt = set_requires_grad(model, keys, requires_grad=True)
     if verbose:
-        logger.info(f"Unfreezing {param_cnt:,} parameters from {keys}")
+        logger.info(f"Unfreezing {param_cnt:,} parameters from {keys} in {model.__class__.__name__}")
 
 
 def freeze(model, keys=None, verbose=True):
     param_cnt = set_requires_grad(model, keys, requires_grad=False)
     if verbose:
-        logger.info(f"Freezing {param_cnt:,} parameters from {keys}")
+        logger.info(f"Freezing {param_cnt:,} parameters from {keys} in {model.__class__.__name__}")
 
 
 def get_device(model):
@@ -124,6 +124,26 @@ def get_num_params_trainable(model):
 
 def get_num_params(model):
     return sum(p.numel() for p in model.parameters())
+
+
+def get_params_meta(model):
+    params_meta = {}
+    for n, p in model.named_parameters():
+        norm = p.norm().item()
+        grad = p.grad
+        requires_grad = p.requires_grad
+        shape = list(p.shape)
+        grad_norm = grad.norm().item() if grad is not None else None
+        nparam = p.numel()
+        params_meta[n] = dict(norm=norm, grad_norm=grad_norm, requires_grad=requires_grad, shape=shape, nparam=nparam)
+    return params_meta
+
+def print_params_meta(model, trainable_only=False, sorted_by=None):
+    params_meta = get_params_meta(model)
+    df = pd.DataFrame(params_meta, index=["nparam", "shape", "requires_grad", "norm", "grad_norm"]).T
+    df = df[df.requires_grad] if trainable_only else df
+    df = df.sort_values(by=sorted_by) if sorted_by is not None else df
+    print(df.to_markdown())
 
 
 def convert_to_half(model):

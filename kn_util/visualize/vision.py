@@ -11,6 +11,7 @@ import numpy as np
 from tempfile import NamedTemporaryFile
 import io
 import torch
+from torchvision.utils import make_grid
 
 from .text import draw_text, draw_text_line
 from .utils import color_val
@@ -220,7 +221,6 @@ def save_frames_grid(img_array, out_path):
 
 
 def _vis_image_tensors(image_tensors):
-    image_grid = make_grid(image_tensors)
 
     with NamedTemporaryFile(suffix=".jpg") as f:
         Image.fromarray(image_grid.permute(1, 2, 0).numpy()).save(f.name)
@@ -240,8 +240,18 @@ def vis_images(image_files):
         image_tensors = torch.stack(image_tensors)
         _vis_image_tensors(image_tensors)
 
+def read_video_as_grid(video_file, num_frames=8):
+    """
+    @return: numpy array (c, h, w)
+    """
+    frames = read_frames_decord(video_file, num_frames=num_frames, output_format="tchw")
+    frames = torch.from_numpy(frames)
+    frames_grid = make_grid(frames)
+    return frames_grid.numpy()
 
 def vis_video(video_file, num_frames=8):
-    frames = read_frames_decord(video_file, num_frames=num_frames, output_format="bthwc")
-    frames = torch.from_numpy(frames)
-    _vis_image_tensors(frames)
+    frames_grid = read_video_as_grid(video_file, num_frames=num_frames)
+
+    with NamedTemporaryFile(suffix=".jpg") as f:
+        Image.fromarray(frames_grid.permute(1, 2, 0).numpy()).save(f.name)
+        vis_images([f.name])

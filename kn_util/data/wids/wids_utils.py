@@ -4,15 +4,17 @@ import tarfile
 import numpy as np
 from hashlib import sha256
 
-from ...utils.io import load_pickle, load_jsonl
+from ...utils.io import load_pickle, load_jsonl, save_pickle
 from ...utils.multiproc import map_async_with_thread
 
 
-def get_filehash(files):
-    return sha256(";".join(sorted(files)).encode()).hexdigest()[:16]
+def get_filehash(file):
+    return sha256(file.encode()).hexdigest()[:16]
 
+def is_valid_file(file):
+    return osp.exists(file) and osp.getsize(file) > 0
 
-def get_file_keys(files):
+def get_file_keys(files, cache_dir=None):
     """
     get the number of keys in each tar file, each key corresponds to a sample in WebDataset
     """
@@ -20,6 +22,12 @@ def get_file_keys(files):
     keys_by_file = {}
 
     def _get_keys(file):
+        filehash = get_filehash(file)
+        file_index_cache = None if cache_dir is None else osp.join(cache_dir, f"{filehash}.pkl")
+
+        if is_valid_file(file_index_cache):
+            return load_pickle(file_index_cache)
+            
         with tarfile.open(file, "r") as tar:
             keys = [_.name.split(".")[0] for _ in tar.getmembers()]
 
@@ -29,6 +37,10 @@ def get_file_keys(files):
             if key not in repeated:
                 repeated.add(key)
                 unique_keys.append(key)
+
+        if file_index_cache is not None:
+            os.makedirs(osp.dirname(file_index_cache), exist_ok=True)
+            save_pickle(unique_keys, file_index_cache)
 
         return unique_keys
 

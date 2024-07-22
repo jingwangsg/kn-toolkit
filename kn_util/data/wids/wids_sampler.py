@@ -180,7 +180,7 @@ class ChunkedSamplerV2(Sampler):
 
 def estimate_chunksize(dataset):
     shard_capacity = dataset.cache.lru.capacity
-    min_shard_size = np.min(dataset.lengths)
+    min_shard_size = np.mean(dataset.lengths)
     estimated_chunksize = int(shard_capacity * min_shard_size)
 
     return estimated_chunksize

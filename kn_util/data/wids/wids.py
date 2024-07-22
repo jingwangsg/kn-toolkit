@@ -13,6 +13,7 @@ from functools import partial
 from typing import Any, BinaryIO, Dict, Optional, TypeVar, Union, List
 from urllib.parse import quote, urlparse
 from loguru import logger
+from hashlib import sha256
 
 import numpy as np
 import torch.distributed as dist
@@ -22,7 +23,7 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import get_filehash, get_file_keys, get_file_meta
+from .wids_utils import get_filehash, get_file_keys, get_file_meta, is_valid_file
 from ...dist import get_world_size, is_main_process, broadcast_object_list
 
 from kn_util.utils.io import save_pickle, load_pickle, load_json
@@ -450,7 +451,7 @@ class ShardListDataset(Dataset[T]):
         shards=None,
         dataset_name=None,
         # cache args
-        index_cache=None,
+        index_cache="/tmp/tar_index/",
         cache_size=int(1e12),
         cache_dir=None,
         lru_size=10,
@@ -473,28 +474,16 @@ class ShardListDataset(Dataset[T]):
 
         Note that there are two caches: an on-disk directory, and an in-memory LRU cache.
         """
+        os.makedirs(index_cache, exist_ok=True)
         if isinstance(shards, List) and isinstance(shards[0], str):
             # only filenames are given, we need to compute the length
             _shards = None
             key_mapping_by_shard = None
 
             if is_main_process():
-                # rule for cache file path
-                if index_cache is None:
-                    cache_filepath = "/tmp/" + get_filehash(shards) + ".pkl"
-                elif index_cache.endswith(".pkl"):
-                    cache_filepath = index_cache
-                else:
-                    os.makedirs(index_cache, exist_ok=True)
-                    cache_filepath = osp.join(index_cache, get_filehash(shards) + ".pkl")
 
                 # load/create file index
-                if not osp.exists(cache_filepath):
-                    print("Shard lengths not provided, indexing shards...")
-                    keys_by_file = get_file_keys(shards)
-                    save_pickle(keys_by_file, cache_filepath)
-                else:
-                    keys_by_file = load_pickle(cache_filepath)
+                keys_by_file = get_file_keys(shards, cache_dir=index_cache)
 
                 print("Indexing complete")
 
@@ -672,13 +661,22 @@ class ShardListDataset(Dataset[T]):
         self.cache.clear()
 
 
-def _load_keys_by_json(json_file):
-    return set(load_json(json_file).keys())
+def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/"):
+    os.makedirs(cache_dir, exist_ok=True)
+    filehash = get_filehash(json_file)
+    cache_file = osp.join(cache_dir, filehash + ".pkl")
+    if is_valid_file(cache_file):
+        return load_pickle(cache_file)
+
+    json_index = set(load_json(json_file).keys())
+    save_pickle(json_index, cache_file)
+
+    return json_index
 
 
 class ShardListDatasetWithAnnotations(ShardListDataset):
 
-    def __init__(self, json_files, tar_root, *args, **kwargs):
+    def __init__(self, json_files, tar_root, json_index_cache="/tmp/json_index/", *args, **kwargs):
         """ShardListDataset that also loads annotations from a JSON file.
         the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
         the index order will be the same as the original ShardListDataset.
@@ -687,7 +685,7 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
         keys_by_json = map_async_with_thread(
             iterable=json_files,
-            func=_load_keys_by_json,
+            func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache),
             verbose=True,
             desc="Gathering keys from json files",
             num_thread=16,
