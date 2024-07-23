@@ -683,13 +683,18 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         """
         keys = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
-        keys_by_json = map_async_with_thread(
-            iterable=json_files,
-            func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache),
-            verbose=True,
-            desc="Gathering keys from json files",
-            num_thread=16,
-        )
+        keys_by_json = None
+        if is_main_process():
+            keys_by_json = map_async_with_thread(
+                iterable=json_files,
+                func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache),
+                verbose=True,
+                desc="Gathering keys from json files",
+                num_thread=16,
+            )
+        
+        keys_by_json = broadcast_object_list(keys_by_json, src=0)
+        
         filter_keys = {tar_file: keys for tar_file, keys in zip(tar_files, keys_by_json)}
         super().__init__(shards=tar_files, filter_keys=filter_keys, *args, **kwargs)
         self.json_files = json_files
