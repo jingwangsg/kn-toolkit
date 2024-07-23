@@ -7,6 +7,9 @@ import torch.nn as nn
 import torch.distributed as torch_dist
 import pandas as pd
 
+from kn_util.dist import get_rank
+
+
 def unwrap_model(model):
     if isinstance(model, nn.parallel.DistributedDataParallel):
         return model.module
@@ -113,6 +116,12 @@ def get_device(model):
 def get_dtype(model):
     return next(model.parameters()).dtype
 
+def cast_according_to(model, tensor):
+    dtype = get_dtype(model)
+    if isinstance(tensor, torch.Tensor):
+        tensor = tensor.to(dtype) if tensor.dtype in (torch.float32, torch.float64) else tensor
+    return tensor
+
 
 def get_named_parameters(model):
     return {n: p for n, p in model.named_parameters() if p.requires_grad}
@@ -126,24 +135,33 @@ def get_num_params(model):
     return sum(p.numel() for p in model.parameters())
 
 
-def get_params_meta(model):
+from deepspeed.utils import safe_get_full_grad
+
+
+def get_params_meta(model, with_gradient=True):
     params_meta = {}
     for n, p in model.named_parameters():
         norm = p.norm().item()
-        grad = p.grad
         requires_grad = p.requires_grad
         shape = list(p.shape)
-        grad_norm = grad.norm().item() if grad is not None else None
         nparam = p.numel()
-        params_meta[n] = dict(norm=norm, grad_norm=grad_norm, requires_grad=requires_grad, shape=shape, nparam=nparam)
+        params_meta[n] = dict(norm=norm, requires_grad=requires_grad, shape=shape, nparam=nparam)
+        grad = safe_get_full_grad(p)
+        grad_norm = grad.norm().item() if grad is not None else None
+        params_meta[n]["grad_norm"] = grad_norm
     return params_meta
 
-def print_params_meta(model, trainable_only=False, sorted_by=None):
+
+def print_params_meta(model, trainable_only=False, sorted_by=None, with_gradient=False):
     params_meta = get_params_meta(model)
-    df = pd.DataFrame(params_meta, index=["nparam", "shape", "requires_grad", "norm", "grad_norm"]).T
+    columns = ["nparam", "shape", "requires_grad", "norm"]
+    if with_gradient:
+        columns += ["grad_norm"]
+    df = pd.DataFrame(params_meta, index=columns).T
     df = df[df.requires_grad] if trainable_only else df
     df = df.sort_values(by=sorted_by) if sorted_by is not None else df
-    print(df.to_markdown())
+    if get_rank() == 0:
+        print(df.to_markdown())
 
 
 def convert_to_half(model):
