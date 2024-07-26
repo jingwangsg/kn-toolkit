@@ -131,7 +131,7 @@ class ChunkedSampler(Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-    def load_state(self, state_dict):
+    def load_state_dict(self, state_dict, strict=True):
         def _safe_overwrite(variable_name, ignore_diff=False):
             if variable_name in state_dict:
                 if not ignore_diff:
@@ -142,7 +142,7 @@ class ChunkedSampler(Sampler):
         _safe_overwrite("gen_pnt", ignore_diff=True)
         _safe_overwrite("seed", ignore_diff=True)
         for variable_name in state_dict.keys():
-            _safe_overwrite(variable_name, ignore_diff=False)
+            _safe_overwrite(variable_name, ignore_diff=not strict)
 
     def state_dict(self):
         return {
