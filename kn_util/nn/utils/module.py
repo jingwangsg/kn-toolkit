@@ -146,14 +146,15 @@ def get_params_meta(model, with_gradient=True):
         shape = list(p.shape)
         nparam = p.numel()
         params_meta[n] = dict(norm=norm, requires_grad=requires_grad, shape=shape, nparam=nparam)
-        grad = safe_get_full_grad(p)
-        grad_norm = grad.norm().item() if grad is not None else None
-        params_meta[n]["grad_norm"] = grad_norm
+        if with_gradient:
+            grad = safe_get_full_grad(p)
+            grad_norm = grad.norm().item() if grad is not None else None
+            params_meta[n]["grad_norm"] = grad_norm
     return params_meta
 
 
 def print_params_meta(model, trainable_only=False, sorted_by=None, with_gradient=False):
-    params_meta = get_params_meta(model)
+    params_meta = get_params_meta(model, with_gradient=with_gradient)
     columns = ["nparam", "shape", "requires_grad", "norm"]
     if with_gradient:
         columns += ["grad_norm"]

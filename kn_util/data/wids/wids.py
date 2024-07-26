@@ -14,6 +14,7 @@ from typing import Any, BinaryIO, Dict, Optional, TypeVar, Union, List
 from urllib.parse import quote, urlparse
 from loguru import logger
 from hashlib import sha256
+import dill
 
 import numpy as np
 import torch.distributed as dist
@@ -661,14 +662,27 @@ class ShardListDataset(Dataset[T]):
         self.cache.clear()
 
 
-def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/"):
+def get_funchash(func):
+    # serialize and hash a function in python
+    if func is None:
+        return ""
+    func_str = dill.dumps(func)
+    return sha256(func_str).hexdigest()[:16]
+
+
+def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None):
     os.makedirs(cache_dir, exist_ok=True)
     filehash = get_filehash(json_file)
-    cache_file = osp.join(cache_dir, filehash + ".pkl")
+    keys_filter_hash = get_funchash(keys_filter)
+    cache_file = osp.join(cache_dir, filehash + keys_filter_hash + ".pkl")
     if is_valid_file(cache_file):
         return load_pickle(cache_file)
 
-    json_index = set(load_json(json_file).keys())
+    json_dict = load_json(json_file)
+    if keys_filter is None:
+        json_index = set(json_dict.keys())
+    else:
+        json_index = keys_filter(json_dict)
     save_pickle(json_index, cache_file)
 
     return json_index
@@ -676,7 +690,7 @@ def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/"):
 
 class ShardListDatasetWithAnnotations(ShardListDataset):
 
-    def __init__(self, json_files, tar_root, json_index_cache="/tmp/json_index/", *args, **kwargs):
+    def __init__(self, json_files, tar_root, json_index_cache="/tmp/json_index/", keys_filter=None, *args, **kwargs):
         """ShardListDataset that also loads annotations from a JSON file.
         the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
         the index order will be the same as the original ShardListDataset.
@@ -687,14 +701,14 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         if is_main_process():
             keys_by_json = map_async_with_thread(
                 iterable=json_files,
-                func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache),
+                func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache, keys_filter=keys_filter),
                 verbose=True,
                 desc="Gathering keys from json files",
                 num_thread=16,
             )
-        
+
         keys_by_json = broadcast_object_list([keys_by_json], src=0)[0]
-        
+
         filter_keys = {tar_file: keys for tar_file, keys in zip(tar_files, keys_by_json)}
         super().__init__(shards=tar_files, filter_keys=filter_keys, *args, **kwargs)
         self.json_files = json_files

@@ -3,10 +3,11 @@ import time
 
 class IterLoader:
 
-    def __init__(self, dataloader):
+    def __init__(self, dataloader, num_iters=None):
         self._dataloader = dataloader
         self.iter_loader = iter(self._dataloader)
         self._epoch = 0
+        self.num_iters = num_iters
 
     @property
     def epoch(self):
@@ -24,6 +25,12 @@ class IterLoader:
             data = next(self.iter_loader)
 
         return data
+    
+    def __iter__(self):
+        cnt = 0
+        while cnt < self.num_iters:
+            yield self.__next__()
+            cnt += 1
 
     def __len__(self):
-        return len(self._dataloader)
+        return self.num_iters
