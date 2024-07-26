@@ -13,6 +13,12 @@ class IterLoader:
     def epoch(self):
         return self._epoch
 
+    def __getattr__(self, name: str):
+        try:
+            return self.__getattribute__(name)
+        except AttributeError:
+            return getattr(self._dataloader, name)
+
     def __next__(self):
         try:
             data = next(self.iter_loader)
@@ -25,7 +31,7 @@ class IterLoader:
             data = next(self.iter_loader)
 
         return data
-    
+
     def __iter__(self):
         cnt = 0
         while cnt < self.num_iters:

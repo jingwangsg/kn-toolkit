@@ -8,10 +8,10 @@ import warnings
 from ...dist import get_world_size
 
 
-def lengths_to_ranges(lengths):
+def lengths_to_ranges(lengths, start_offset=0):
     """Convert a list of lengths to a list of ranges."""
     ranges = []
-    start = 0
+    start = start_offset
     for length in lengths:
         ranges.append((start, start + length))
         start += length
@@ -36,9 +36,9 @@ def intersect_ranges(rangelist, r):
     return result
 
 
-def iterate_lengths(lengths, rng, indexshuffle=True, shardshuffle=True, total_size=None):
+def iterate_lengths(lengths, rng, start_offset=0, indexshuffle=True, shardshuffle=True, total_size=None):
     """Iterate over the ranges in a random order."""
-    ranges = lengths_to_ranges(lengths)
+    ranges = lengths_to_ranges(lengths, start_offset=start_offset)
 
     if shardshuffle:
         ranges = rng.sample(ranges, len(ranges))
@@ -117,29 +117,64 @@ class ChunkedSampler(Sampler):
             lo, hi = 0, len(dataset)
         else:
             lo, hi = num_samples
-        self._len = hi - lo
+        self.span = (lo, hi)
         # self.ranges = [(i, min(i + chunksize, hi)) for i in range(lo, hi, chunksize)]
         self.lengths = [min(chunksize, hi - i) for i in range(lo, hi, chunksize)]
+        self._len = hi - lo
         self.dataset_size = len(dataset)
         self.seed = seed
         self.shuffle = shuffle
         self.shufflefirst = shufflefirst
         self.epoch = 0
+        self.gen_pnt = -1
 
     def set_epoch(self, epoch):
         self.epoch = epoch
 
+    def load_state(self, state_dict):
+        def _safe_overwrite(variable_name, ignore_diff=False):
+            if variable_name in state_dict:
+                if not ignore_diff:
+                    assert getattr(self, variable_name) == state_dict[variable_name]
+                setattr(self, variable_name, state_dict[variable_name])
+
+        _safe_overwrite("epoch", ignore_diff=True)
+        _safe_overwrite("gen_pnt", ignore_diff=True)
+        _safe_overwrite("seed", ignore_diff=True)
+        for variable_name in state_dict.keys():
+            _safe_overwrite(variable_name, ignore_diff=False)
+
+    def state_dict(self):
+        return {
+            "epoch": self.epoch,
+            "gen_pnt": self.gen_pnt,
+            "seed": self.seed,
+            "shuffle": self.shuffle,
+            "shufflefirst": self.shufflefirst,
+            "span": self.span,
+            "lengths": self.lengths,
+        }
+
     def __iter__(self):
         self.rng = random.Random(self.seed + 1289738273 * self.epoch)
         shardshuffle = self.shufflefirst or self.epoch > 0
-        yield from iterate_lengths(
-            self.lengths,
-            self.rng,
-            indexshuffle=self.shuffle,
-            shardshuffle=(self.shuffle and shardshuffle),
-            total_size=self.dataset_size,
+        indices = list(
+            iterate_lengths(
+                self.lengths,
+                self.rng,
+                indexshuffle=self.shuffle,
+                shardshuffle=(self.shuffle and shardshuffle),
+                total_size=self.dataset_size,
+                start_offset=self.span[0],
+            )
         )
+
+        for i in range(self.gen_pnt + 1, len(indices)):
+            self.gen_pnt = i
+            yield indices[i]
+
         self.epoch += 1
+        self.gen_pnt = -1
 
     def __len__(self):
         return self._len
@@ -241,7 +276,7 @@ def DistributedChunkedSampler(
 
     worker_start = rank * worker_chunk
     worker_end = worker_start + worker_chunk
-    return ChunkedSampler(
+    sampler = ChunkedSampler(
         dataset,
         num_samples=(worker_start, worker_end),
         chunksize=chunksize,
@@ -249,6 +284,8 @@ def DistributedChunkedSampler(
         shuffle=shuffle,
         shufflefirst=shuffle,
     )
+
+    return sampler
 
 
 import torch, math
