@@ -228,7 +228,7 @@ def read_frames_gif(
 
 
 def read_frames_decord(
-    video_path,
+    video_path=None,
     # frame sampling
     num_frames=None,
     fps=None,
@@ -237,6 +237,7 @@ def read_frames_decord(
     offset_from_start=None,
     truncate_secs=None,
     # ----------------
+    video_reader=None,
     # decord kwargs
     size=None,
     max_size=None,
@@ -255,55 +256,59 @@ def read_frames_decord(
         int(is_online_video) + int(is_youtube_video) + int(is_bytes) <= 1
     ), "Only one of is_online_video, is_youtube_video, is_bytes can be True"
 
-    # 1. read from youtube, online video, or bytes
-    if is_youtube_video:
-        download_format = "best"
-        download_suffix = ""
-        if size is not None:
-            download_format = "worst"
-            download_suffix += f"[height>={size}][width>={size}]"
-
-        if max_size is not None:
-            download_format = "worst"
-            download_suffix += f"[height>={max_size}][width>={max_size}]"
-        download_format += download_suffix
-
-        video_bytes, error_code = download_youtube_as_bytes(video_path, video_format=download_format)
-        if error_code != 0:
-            logger.error(f"Error downloading youtube video: {video_path}")
-            return None
-        video_path = io.BytesIO(video_bytes)
-
-    if is_online_video:
-        downloader = MultiThreadDownloaderInMem(verbose=False)
-        video_path = io.BytesIO(downloader.download(video_path))
-
-    if is_bytes:
-        video_path = io.BytesIO(video_path)
-
     decord.bridge.set_bridge(bridge)
+    # 1. read from youtube, online video, or bytes
+    def _prepare_vr(video_path):
+        if is_youtube_video:
+            download_format = "best"
+            download_suffix = ""
+            if size is not None:
+                download_format = "worst"
+                download_suffix += f"[height>={size}][width>={size}]"
 
-    # 2. maybe resize video
-    # calculate frame size according to size and max_size, [-1, -1] by default
-    frame_size = [-1, -1]
-    if size is not None:
-        orig_size = VideoReader(video_path, num_threads=1)[0].shape[:2]
-        argmin_size_dim = 0 if orig_size[0] < orig_size[1] else 1
-        argmax_size_dim = 1 - argmin_size_dim
-        frame_size[argmin_size_dim] = size
-        frame_size[argmax_size_dim] = int(size * orig_size[argmax_size_dim] / orig_size[argmin_size_dim])
-        if max_size is not None:
-            frame_size[argmin_size_dim] = min(frame_size[argmin_size_dim], max_size)
+            if max_size is not None:
+                download_format = "worst"
+                download_suffix += f"[height>={max_size}][width>={max_size}]"
+            download_format += download_suffix
 
-    if is_online_video or is_youtube_video or is_bytes:
-        video_path.seek(0)
+            video_bytes, error_code = download_youtube_as_bytes(video_path, video_format=download_format)
+            if error_code != 0:
+                logger.error(f"Error downloading youtube video: {video_path}")
+                return None
+            video_path = io.BytesIO(video_bytes)
 
-    video_reader = VideoReader(
-        video_path,
-        num_threads=1,
-        width=frame_size[1],
-        height=frame_size[0],
-    )
+        if is_online_video:
+            downloader = MultiThreadDownloaderInMem(verbose=False)
+            video_path = io.BytesIO(downloader.download(video_path))
+
+        if is_bytes:
+            video_path = io.BytesIO(video_path)
+
+
+        # 2. maybe resize video
+        # calculate frame size according to size and max_size, [-1, -1] by default
+        frame_size = [-1, -1]
+        if size is not None:
+            orig_size = VideoReader(video_path, num_threads=1)[0].shape[:2]
+            argmin_size_dim = 0 if orig_size[0] < orig_size[1] else 1
+            argmax_size_dim = 1 - argmin_size_dim
+            frame_size[argmin_size_dim] = size
+            frame_size[argmax_size_dim] = int(size * orig_size[argmax_size_dim] / orig_size[argmin_size_dim])
+            if max_size is not None:
+                frame_size[argmin_size_dim] = min(frame_size[argmin_size_dim], max_size)
+
+        if is_online_video or is_youtube_video or is_bytes:
+            video_path.seek(0)
+
+        video_reader = VideoReader(
+            video_path,
+            num_threads=1,
+            height=frame_size[0],
+            width=frame_size[1],
+        )
+        return video_reader
+    
+    video_reader = _prepare_vr(video_path) if video_reader is None else video_reader
 
     # setup params
     vlen = len(video_reader)

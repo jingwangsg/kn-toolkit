@@ -464,6 +464,7 @@ class ShardListDataset(Dataset[T]):
         options=None,
         verbose=False,
         filter_keys: Dict[str, set[str]] = None,
+        tar_indexing_on_master=True,
     ):
         """Create a ShardListDataset.
 
@@ -481,7 +482,7 @@ class ShardListDataset(Dataset[T]):
             _shards = None
             key_mapping_by_shard = None
 
-            if is_main_process():
+            if not tar_indexing_on_master or is_main_process():
 
                 # load/create file index
                 keys_by_file = get_file_keys(shards, cache_dir=index_cache)
@@ -490,7 +491,8 @@ class ShardListDataset(Dataset[T]):
 
                 key_mapping_by_shard, _shards = get_file_meta(shards, keys_by_file=keys_by_file, filter_keys=filter_keys)
 
-            key_mapping_by_shard, shards = broadcast_object_list([key_mapping_by_shard, _shards])
+            if tar_indexing_on_master:
+                key_mapping_by_shard, shards = broadcast_object_list([key_mapping_by_shard, _shards])
             self.key_mapping_by_shard = key_mapping_by_shard
 
         # if options is None:
@@ -690,7 +692,16 @@ def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None
 
 class ShardListDatasetWithAnnotations(ShardListDataset):
 
-    def __init__(self, json_files, tar_root, json_index_cache="/tmp/json_index/", keys_filter=None, *args, **kwargs):
+    def __init__(
+        self,
+        json_files,
+        tar_root,
+        json_index_cache="/tmp/json_index/",
+        keys_filter=None,
+        json_indexing_on_master=True,
+        *args,
+        **kwargs,
+    ):
         """ShardListDataset that also loads annotations from a JSON file.
         the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
         the index order will be the same as the original ShardListDataset.
@@ -698,7 +709,7 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         keys = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
         keys_by_json = None
-        if is_main_process():
+        if not json_indexing_on_master or is_main_process():
             keys_by_json = map_async_with_thread(
                 iterable=json_files,
                 func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache, keys_filter=keys_filter),
@@ -707,7 +718,8 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
                 num_thread=16,
             )
 
-        keys_by_json = broadcast_object_list([keys_by_json], src=0)[0]
+        if json_indexing_on_master:
+            keys_by_json = broadcast_object_list([keys_by_json], src=0)[0]
 
         filter_keys = {tar_file: keys for tar_file, keys in zip(tar_files, keys_by_json)}
         super().__init__(shards=tar_files, filter_keys=filter_keys, *args, **kwargs)

@@ -56,27 +56,47 @@ def save_pickle(obj, fn):
         dill.dump(obj, f, protocol=dill.HIGHEST_PROTOCOL)
 
 
+import polars as pl
+
+
 def load_csv(fn, delimiter=",", has_header=True):
     fr = open(fn, "r")
-    read_csv = csv.reader(fr, delimiter=delimiter)
+    encodings = ["ISO-8859-1", "cp1252", "utf-8"]
 
-    ret_list = []
+    # Try using different encoding formats
+    def _load_csv_with_encoding(encoding):
+        read_csv = pl.read_csv(fn, separator=delimiter, encoding=encoding, infer_schema_length=int(1e7), has_header=has_header)
 
-    for idx, x in enumerate(read_csv):
-        if has_header and idx == 0:
-            header = x
-            continue
         if has_header:
-            ret_list += [{k: v for k, v in zip(header, x)}]
+            return read_csv.to_dicts()
         else:
-            ret_list += [x]
+            ret_list = []
+            dict_list = read_csv.to_dicts()
+            num_columns = len(dict_list[0].keys())
 
-    return ret_list
+            for dict_row in dict_list:
+                row_list = []
+                for col_idx in range(1, num_columns + 1):
+                    column_name = f"column_{col_idx}"
+                    row_list += [dict_row[column_name]]
+                ret_list += [row_list]
+
+            return ret_list
+
+    for encoding in encodings:
+        try:
+            df = _load_csv_with_encoding(encoding)
+            return df
+
+        except UnicodeDecodeError:
+            print(f"Error: {encoding} decoding failed, trying the next encoding format")
+
+    raise ValueError(f"Failed to load csv file {fn}")
 
 
 def save_csv(obj, fn, delimiter=",", has_header=True):
     fn = open(fn, "w")
-    writer = csv.writer(fn, delimiter=delimiter, escapechar='\\')
+    writer = csv.writer(fn, delimiter=delimiter, escapechar="\\")
     if has_header:
         assert isinstance(obj[0], dict), "obj should be a list of dict"
         keys = list(obj[0].keys())

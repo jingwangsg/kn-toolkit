@@ -191,13 +191,6 @@ class MetricLogger(object):
                 if torch.cuda.is_available():
                     metric_dict["memory"] = torch.cuda.max_memory_reserved() / MB
 
-                if wandb_kwargs is not None:
-                    import wandb
-                    prefix = wandb_kwargs["prefix"]
-                    wandb_metric = {f"{prefix}/{k}": v for k, v in metric_dict.items()}
-                    niter = i + wandb_kwargs["start_iter"]
-                    wandb.log(**wandb_metric, step=niter)
-
                 log_str = log_template.format(**metric_dict)
                 self.logger.info(log_str)
 

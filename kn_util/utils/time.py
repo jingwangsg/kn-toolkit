@@ -18,8 +18,14 @@ class Timer:
         logger.info(f"{key}: {self.records[key]}")
 
 
+disable_timer = False
+
 @contextmanager
 def timer_ctx(desc=None):
+    global disable_timer
+    if disable_timer:
+        yield
+        return
     torch.cuda.synchronize()
     st = time.time()
     yield
