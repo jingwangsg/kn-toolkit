@@ -116,6 +116,7 @@ def get_device(model):
 def get_dtype(model):
     return next(model.parameters()).dtype
 
+
 def cast_according_to(model, tensor):
     dtype = get_dtype(model)
     if isinstance(tensor, torch.Tensor):
@@ -145,22 +146,41 @@ def get_params_meta(model, with_gradient=True):
         requires_grad = p.requires_grad
         shape = list(p.shape)
         nparam = p.numel()
-        params_meta[n] = dict(norm=norm, requires_grad=requires_grad, shape=shape, nparam=nparam)
+        params_meta[n] = dict(
+            norm=norm,
+            norm_avg=norm / nparam,
+            requires_grad=requires_grad,
+            shape=shape,
+            nparam=nparam,
+        )
         if with_gradient:
             grad = safe_get_full_grad(p)
-            grad_norm = grad.norm().item() if grad is not None else None
+            grad_available = grad is not None
+            grad_norm = grad.norm().item() if grad_available else None
             params_meta[n]["grad_norm"] = grad_norm
+            params_meta[n]["grad_norm_avg"] = grad_norm / nparam if grad_available else None
+            params_meta[n]["grad_norm_rel_elemwise"] = (grad / p).norm().item() if grad_available else None
     return params_meta
 
 
-def print_params_meta(model, trainable_only=False, sorted_by=None, with_gradient=False):
+def get_params_meta_df(model, with_gradient=True, trainable_only=False, sorted_by=None):
     params_meta = get_params_meta(model, with_gradient=with_gradient)
-    columns = ["nparam", "shape", "requires_grad", "norm"]
+    columns = ["nparam", "shape", "requires_grad", "norm", "norm_avg"]
     if with_gradient:
-        columns += ["grad_norm"]
+        columns += ["grad_norm", "grad_norm_rel_elemwise", "grad_norm_avg"]
     df = pd.DataFrame(params_meta, index=columns).T
     df = df[df.requires_grad] if trainable_only else df
-    df = df.sort_values(by=sorted_by) if sorted_by is not None else df
+    df = df.sort_values(by=sorted_by, ascending=False) if sorted_by is not None else df
+    return df
+
+
+def print_params_meta(model, trainable_only=False, sorted_by=None, with_gradient=False):
+    df = get_params_meta_df(
+        model,
+        trainable_only=trainable_only,
+        sorted_by=sorted_by,
+        with_gradient=with_gradient,
+    )
     if get_rank() == 0:
         print(df.to_markdown())
 

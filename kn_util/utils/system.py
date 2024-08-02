@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import psutil
 import io
 import traceback
+from hashlib import sha256
 
 from .mail import send_email
 from .multiproc import map_async_with_thread
@@ -128,3 +129,11 @@ def get_exception_handler(to_email=False, to_file=None):
                 f.write(text)
 
     return exception_handler
+
+
+def get_strhash(s):
+    return sha256(s.encode()).hexdigest()[:16]
+
+
+def is_valid_file(file):
+    return osp.exists(file) and osp.getsize(file) > 0

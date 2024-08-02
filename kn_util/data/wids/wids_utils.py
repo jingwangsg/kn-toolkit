@@ -7,12 +7,8 @@ from hashlib import sha256
 from ...utils.io import load_pickle, load_jsonl, save_pickle
 from ...utils.multiproc import map_async_with_thread
 
+from ...utils.system import get_strhash, is_valid_file
 
-def get_filehash(file):
-    return sha256(file.encode()).hexdigest()[:16]
-
-def is_valid_file(file):
-    return osp.exists(file) and osp.getsize(file) > 0
 
 def get_file_keys(files, cache_dir=None):
     """
@@ -22,7 +18,7 @@ def get_file_keys(files, cache_dir=None):
     keys_by_file = {}
 
     def _get_keys(file):
-        filehash = get_filehash(file)
+        filehash = get_strhash(file)
         file_index_cache = None if cache_dir is None else osp.join(cache_dir, f"{filehash}.pkl")
 
         if is_valid_file(file_index_cache):

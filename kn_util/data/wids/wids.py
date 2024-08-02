@@ -24,11 +24,12 @@ from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
 from .wids_specs import load_dsdesc_and_resolve, urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import get_filehash, get_file_keys, get_file_meta, is_valid_file
+from .wids_utils import get_file_keys, get_file_meta
 from ...dist import get_world_size, is_main_process, broadcast_object_list
 
 from kn_util.utils.io import save_pickle, load_pickle, load_json
 from kn_util.utils.multiproc import map_async_with_thread
+from kn_util.utils.system import get_strhash, is_valid_file
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -674,7 +675,7 @@ def get_funchash(func):
 
 def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None):
     os.makedirs(cache_dir, exist_ok=True)
-    filehash = get_filehash(json_file)
+    filehash = get_strhash(json_file)
     keys_filter_hash = get_funchash(keys_filter)
     cache_file = osp.join(cache_dir, filehash + keys_filter_hash + ".pkl")
     if is_valid_file(cache_file):
