@@ -21,6 +21,7 @@ from ..utils.git_utils import get_origin_url
 from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader, CoroutineDownloader
 from ..utils.rich import get_rich_progress_download
 from ..utils.multiproc import map_async_with_thread
+from ..utils.system import is_valid_file
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
 
@@ -131,6 +132,7 @@ def download_repo(
 
     meta_handler = open(".downloaded", "r+")
     downloaded = set([_.strip() for _ in meta_handler.readlines()])
+    downloaded = set([_ for _ in downloaded if is_valid_file(_)])
     print(f"=> Found {len(downloaded)} files already downloaded")
 
     headers = get_hf_headers()

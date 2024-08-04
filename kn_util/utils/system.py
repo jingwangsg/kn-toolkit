@@ -135,5 +135,20 @@ def get_strhash(s):
     return sha256(s.encode()).hexdigest()[:16]
 
 
+def get_filehash(file, first_n_bytes=4096 * 10):
+    import hashlib
+
+    hash_md5 = hashlib.md5()
+    byte_cnt = 0
+    with open(file, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+            byte_cnt += 4096
+            if byte_cnt >= first_n_bytes:
+                break
+    
+    return hash_md5.hexdigest()
+
+
 def is_valid_file(file):
     return osp.exists(file) and osp.getsize(file) > 0
