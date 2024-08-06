@@ -56,7 +56,7 @@ def map_async(
     verbose=True,
 ):
     """while test_flag=True, run sequentially"""
-    if test_flag:
+    if test_flag or os.getenv("DISABLE_PARALLEL", False):
         return _run_sequential(iterable, func, desc=desc, verbose=verbose)
     else:
         p = Pool(num_process)
@@ -94,7 +94,7 @@ def map_async_with_thread(
     verbose=True,
     test_flag=False,
 ):
-    if test_flag:
+    if test_flag or os.getenv("DISABLE_PARALLEL", False):
         return _run_sequential(iterable, func, desc=desc)
 
     with ThreadPoolExecutor(num_thread) as executor:

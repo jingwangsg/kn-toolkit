@@ -15,6 +15,7 @@ from urllib.parse import quote, urlparse
 from loguru import logger
 from hashlib import sha256
 import dill
+from glob import glob
 
 import numpy as np
 import torch.distributed as dist
@@ -681,7 +682,12 @@ def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None
     if is_valid_file(cache_file):
         return load_pickle(cache_file)
 
-    json_dict = load_json(json_file)
+    try:
+        json_dict = load_json(json_file)
+    except:
+        import debugpy
+
+        debugpy.breakpoint()
     if keys_filter is None:
         json_index = set(json_dict.keys())
     else:
@@ -707,8 +713,17 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
         the index order will be the same as the original ShardListDataset.
         """
-        keys = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
+        keys_in_json = set(osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files)
+        keys_in_tar = set(osp.basename(tar_file).rsplit(".", 1)[0] for tar_file in glob(osp.join(tar_root, "*.tar")))
+        keys = keys_in_json & keys_in_tar
+        print(f"Found {len(keys)} paris in both json and tar files.")
+
+        json_mapping = {osp.basename(json_file).rsplit(".", 1)[0]: json_file for json_file in json_files}
+
+        # Note: the order of json_files and tar_files should be the same
+        json_files = [json_mapping[key] for key in keys]
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
+
         keys_by_json = None
         if not json_indexing_on_master or is_main_process():
             keys_by_json = map_async_with_thread(
