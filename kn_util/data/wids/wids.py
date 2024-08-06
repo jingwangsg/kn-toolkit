@@ -713,9 +713,9 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
         the index order will be the same as the original ShardListDataset.
         """
-        keys_in_json = set(osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files)
+        keys_in_json = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
         keys_in_tar = set(osp.basename(tar_file).rsplit(".", 1)[0] for tar_file in glob(osp.join(tar_root, "*.tar")))
-        keys = keys_in_json & keys_in_tar
+        keys = [key for key in keys_in_json if key in keys_in_tar]
         print(f"Found {len(keys)} paris in both json and tar files.")
 
         json_mapping = {osp.basename(json_file).rsplit(".", 1)[0]: json_file for json_file in json_files}
