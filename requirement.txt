@@ -43,3 +43,5 @@ braceexpand
 webvtt-py
 icecream
 googlesearch-python
+av
+polars

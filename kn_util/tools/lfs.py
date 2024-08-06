@@ -16,6 +16,8 @@ from loguru import logger
 
 # from concurrent.futures import ProcessPoolExecutor, wait
 from pathos.multiprocessing import ProcessPool
+from huggingface_hub import HfApi
+from huggingface_hub.utils import RepositoryNotFoundError
 
 from ..utils.git_utils import get_origin_url
 from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader, CoroutineDownloader
@@ -271,6 +273,56 @@ def upload_files(files, batch_size=30):
         os.system("git lfs prune -f")
 
 
+def upload_files_until_success(
+    repo_id,
+    repo_type="dataset",
+    output_dir=".",
+    allow_patterns="*",
+    ignore_patterns=None,
+    batch_size=20,
+):
+    batch_cnt = 0
+    while True:
+        # failproof to multiple uploads
+        try:
+            hf_api = HfApi()
+
+            # test whether the repo exists
+            try:
+                hf_api.repo_info(repo_id=repo_id, repo_type=repo_type)
+            except RepositoryNotFoundError:
+                hf_api.create_repo(
+                    repo_id=repo_id,
+                    private=True,
+                    repo_type="dataset",
+                )
+                print(f"Created repo {upload_args.repo_id}")
+
+            print(f"Uploading to {repo_id}")
+            from glob import glob
+
+            filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
+
+            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames))]
+
+            while batch_cnt < len(filename_batches):
+                hf_api.upload_folder(
+                    repo_id=repo_id,
+                    folder_path=output_dir,
+                    allow_patterns=filename_batches[batch_cnt],
+                    ignore_patterns=ignore_patterns,
+                    revision="main",
+                    repo_type=repo_type,
+                )
+                batch_cnt += 1
+
+            break
+
+        except Exception as e:
+            logger.error(e)
+            time.sleep(10)
+
+
 def upload_files_all(batch_size=10):
     all_files = run_cmd("fd", return_output=True)
     all_files = sorted(all_files.splitlines())
@@ -297,7 +349,17 @@ def main():
     elif command == "upload":
         parser.add_argument("--batch_size", type=int, help="The batch size", default=30)
         args = parser.parse_args()
-        upload_files_all(batch_size=args.batch_size)
+        org, repo_name = get_repo()
+        repo_type = "model"
+        if org.startswith("datasets/"):
+            org = org.replace("datasets/", "")
+            repo_type = "dataset"
+        repo_id = f"{org}/{repo_name}"
+        upload_files_until_success(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            batch_size=args.batch_size,
+        )
 
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)

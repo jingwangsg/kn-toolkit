@@ -94,20 +94,9 @@ def load_csv(fn, delimiter=",", has_header=True):
     raise ValueError(f"Failed to load csv file {fn}")
 
 
-def save_csv(obj, fn, delimiter=",", has_header=True):
-    fn = open(fn, "w")
-    writer = csv.writer(fn, delimiter=delimiter, escapechar="\\")
-    if has_header:
-        assert isinstance(obj[0], dict), "obj should be a list of dict"
-        keys = list(obj[0].keys())
-        writer.writerow(keys)
-
-    for row in obj:
-        if isinstance(row, dict):
-            row = ['"' + str(row[k]) + '"' if isinstance(row[k], str) else str(row[k]) for k in keys]
-        writer.writerow(row)
-
-    fn.close()
+def save_csv(obj, fn, delimiter=","):
+    df = pl.DataFrame(obj)
+    df.write_csv(fn, separator=delimiter)
 
 
 def save_hdf5(obj, fn, **kwargs):
