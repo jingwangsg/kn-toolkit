@@ -45,3 +45,5 @@ icecream
 googlesearch-python
 av
 polars
+ffmpy
+webdataset
