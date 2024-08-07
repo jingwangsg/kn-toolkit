@@ -680,11 +680,19 @@ def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None
     keys_filter_hash = get_funchash(keys_filter)
     cache_file = osp.join(cache_dir, filehash + keys_filter_hash + ".pkl")
     if is_valid_file(cache_file):
-        return load_pickle(cache_file)
+        try:
+            return load_pickle(cache_file)
+        except:
+            from kn_util.utils.system import run_cmd
+
+            run_cmd(f"rm -rf {cache_file}")
 
     try:
         json_dict = load_json(json_file)
     except:
+        from kn_util.utils.system import run_cmd
+
+        run_cmd(f"rm -rf {json_file}")
         import debugpy
 
         debugpy.breakpoint()
@@ -716,13 +724,14 @@ class ShardListDatasetWithAnnotations(ShardListDataset):
         keys_in_json = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
         keys_in_tar = set(osp.basename(tar_file).rsplit(".", 1)[0] for tar_file in glob(osp.join(tar_root, "*.tar")))
         keys = [key for key in keys_in_json if key in keys_in_tar]
-        print(f"Found {len(keys)} paris in both json and tar files.")
+        print(f"Found {len(keys)} pairs in both json and tar files.")
 
         json_mapping = {osp.basename(json_file).rsplit(".", 1)[0]: json_file for json_file in json_files}
 
         # Note: the order of json_files and tar_files should be the same
         json_files = [json_mapping[key] for key in keys]
         tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
+        dist.barrier()
 
         keys_by_json = None
         if not json_indexing_on_master or is_main_process():

@@ -5,7 +5,7 @@ import numpy as np
 from hashlib import sha256
 
 from ...utils.io import load_pickle, load_jsonl, save_pickle
-from ...utils.multiproc import map_async_with_thread
+from ...utils.multiproc import map_async_with_thread, map_async
 
 from ...utils.system import get_strhash, is_valid_file
 
@@ -45,6 +45,7 @@ def get_file_keys(files, cache_dir=None):
         func=_get_keys,
         verbose=True,
         desc="Gathering keys from tar files",
+        num_thread=32,
     )
 
     keys_by_file = {file: keys for file, keys in zip(files, keys_by_file)}

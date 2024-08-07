@@ -84,8 +84,21 @@ def eval_env(name, default=False):
 def default(val, default_val):
     return val if val is not None else default_val
 
+
 def create_parent_dir_if_not_exists(path):
     if not osp.exists(osp.dirname(path)):
         os.makedirs(osp.dirname(path))
-    
+
     return path
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def only_with_env(env_name):
+    has_env_val = env_name in os.environ
+    if has_env_val:
+        yield
+    else:
+        pass
