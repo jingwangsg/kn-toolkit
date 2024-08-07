@@ -2,6 +2,7 @@ import torch
 import time
 from loguru import logger
 from contextlib import contextmanager
+from kn_util.dist import dist
 
 
 class Timer:
@@ -21,7 +22,7 @@ class Timer:
 disable_timer = False
 
 @contextmanager
-def timer_ctx(desc=None):
+def timer_ctx(desc=None, master_only=True):
     global disable_timer
     if disable_timer:
         yield
@@ -30,4 +31,8 @@ def timer_ctx(desc=None):
     st = time.time()
     yield
     torch.cuda.synchronize()
-    logger.info(f"{desc}: {time.time() - st:.3f} sec")
+    if master_only and dist.get_rank() == 0:
+        print(f"{desc}: {time.time() - st:.3f} sec")
+    else:
+        RANK = dist.get_rank()
+        print(f"RANK#{RANK} {desc}: {time.time() - st:.3f} sec")
