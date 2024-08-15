@@ -267,7 +267,7 @@ def upload_files(files, batch_size=30):
         logger.info(f"=> Uploading batch {batch_idx + 1}/{len(file_chunks)}")
         cur_files = " ".join(file_chunk)
         os.system(f"git lfs track {cur_files}")
-        os.system(f"git add {cur_files}")
+        os.system(f"git add --verbose {cur_files}")
         os.system("git commit -m 'add files'")
         os.system("git push")
         os.system("git lfs prune -f")
