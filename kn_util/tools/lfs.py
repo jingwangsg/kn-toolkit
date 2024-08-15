@@ -299,22 +299,20 @@ def upload_files_until_success(
                 print(f"Created repo {repo_id}")
 
             print(f"Uploading to {repo_id}")
-            from glob import glob
+            # from glob import glob
 
-            filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
+            # filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
 
-            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames))]
+            # filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames))]
 
-            while batch_cnt < len(filename_batches):
-                hf_api.upload_folder(
-                    repo_id=repo_id,
-                    folder_path=output_dir,
-                    allow_patterns=filename_batches[batch_cnt],
-                    ignore_patterns=ignore_patterns,
-                    revision="main",
-                    repo_type=repo_type,
-                )
-                batch_cnt += 1
+            hf_api.upload_folder(
+                repo_id=repo_id,
+                folder_path=output_dir,
+                ignore_patterns=ignore_patterns,
+                revision="main",
+                repo_type=repo_type,
+                multi_commits=True,
+            )
 
             break
 
