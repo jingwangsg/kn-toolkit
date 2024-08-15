@@ -355,12 +355,11 @@ def main():
             org = org.replace("datasets/", "")
             repo_type = "dataset"
         repo_id = f"{org}/{repo_name}"
-        # upload_files_until_success(
-        #     repo_id=repo_id,
-        #     repo_type=repo_type,
-        #     batch_size=args.batch_size,
-        # )
-        upload_files_all(batch_size=args.batch_size)
+        upload_files_until_success(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            batch_size=args.batch_size,
+        )
 
     elif command == "download":
         parser.add_argument("--include", type=str, help="The partial path to fetch, split by ,", default=None)
