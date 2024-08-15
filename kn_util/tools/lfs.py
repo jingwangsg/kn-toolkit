@@ -303,7 +303,7 @@ def upload_files_until_success(
 
             filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
 
-            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames))]
+            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames), batch_size)]
 
             while batch_cnt < len(filename_batches):
                 hf_api.upload_folder(
