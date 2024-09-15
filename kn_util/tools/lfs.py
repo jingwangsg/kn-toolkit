@@ -268,7 +268,7 @@ def upload_files(files, batch_size=30):
         logger.info(f"=> Uploading batch {batch_idx + 1}/{len(file_chunks)}")
         cur_files = " ".join(file_chunk)
         os.system(f"git lfs track {cur_files}")
-        os.system(f"git add {cur_files}")
+        os.system(f"git add --verbose {cur_files}")
         os.system("git commit -m 'add files'")
         os.system("git push")
         os.system("git lfs prune -f")
@@ -283,6 +283,7 @@ def upload_files_until_success(
     batch_size=20,
 ):
     batch_cnt = 0
+    os.makedirs(".uploaded", exist_ok=True)
     while True:
         # failproof to multiple uploads
         try:
@@ -297,24 +298,41 @@ def upload_files_until_success(
                     private=True,
                     repo_type="dataset",
                 )
-                print(f"Created repo {upload_args.repo_id}")
+                print(f"Created repo {repo_id}")
 
             print(f"Uploading to {repo_id}")
 
             filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
 
-            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames))]
+            filename_batches = [filenames[i : i + batch_size] for i in range(0, len(filenames), batch_size)]
 
-            while batch_cnt < len(filename_batches):
+            for batch_cnt in range(len(filename_batches)):
+                print(f"Uploading batch #{batch_cnt}")
+
+                def upload_flag(filename):
+                    return osp.join(".uploaded", osp.basename(filename))
+
+                def is_uploaded(filename):
+                    return osp.exists(upload_flag(filename))
+
+                def mark_uploaded(filename):
+                    run_cmd(f"touch {upload_flag(filename)}")
+
+                filename_batch = [filename for filename in filename_batches[batch_cnt] if not is_uploaded(filename)]
+                if len(filename_batch) == 0:
+                    continue
+
                 hf_api.upload_folder(
                     repo_id=repo_id,
                     folder_path=output_dir,
-                    allow_patterns=filename_batches[batch_cnt],
+                    allow_patterns=filename_batch,
                     ignore_patterns=ignore_patterns,
                     revision="main",
                     repo_type=repo_type,
                 )
-                batch_cnt += 1
+
+                for filename in filename_batch:
+                    mark_uploaded(filename)
 
             break
 
