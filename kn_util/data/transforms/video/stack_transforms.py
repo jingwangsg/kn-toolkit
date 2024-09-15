@@ -1,8 +1,6 @@
 import numpy as np
 import PIL
-import torch
 
-from .utils import images as imageutils
 
 
 class ToStackedArray(object):

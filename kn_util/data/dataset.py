@@ -1,4 +1,4 @@
-from typing import Any
+
 import torch.utils.data as torch_data
 
 

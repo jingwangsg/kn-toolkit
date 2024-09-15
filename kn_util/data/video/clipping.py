@@ -1,9 +1,11 @@
-import os, os.path as osp
-from ffmpy import FFmpeg
+import os
+import os.path as osp
 import tempfile
 
-from kn_util.utils.system import run_cmd
+from ffmpy import FFmpeg
+
 from kn_util.data.video.load import probe_meta
+from kn_util.utils.system import run_cmd
 
 
 def cut_video_clips_ffselect(video_path, timestamps, output_dir, suffix_format="_{:02d}.mp4", with_audio=False, filter_kwargs=None):

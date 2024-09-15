@@ -1,6 +1,7 @@
-import os, os.path as osp
-from .system import run_cmd
+import os.path as osp
+
 from .multiproc import map_async_with_thread
+from .system import run_cmd
 
 
 # https://www.zhihu.com/question/269707221/answer/2677167861
@@ -13,7 +14,7 @@ def commit(content):
         g.add("--all")
         res = g.commit("-m " + content)
         print(res)
-    except Exception as e:
+    except Exception:
         print("no need to commit")
 
 

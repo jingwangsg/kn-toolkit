@@ -9,7 +9,7 @@ This is useful when doing distributed training.
 import functools
 import numpy as np
 import torch
-import torch.distributed as dist
+import torch.distributed as torch_dist
 import os
 from contextlib import contextmanager
 
@@ -30,36 +30,37 @@ def init_dist(backend="nccl", init_backend="torch", **kwargs):
     init_backend: "torch" or "deepspeed"
     """
     if init_backend == "torch":
-        dist.init_process_group(backend=backend, init_method="env://", **kwargs)
+        torch_dist.init_process_group(backend=backend, init_method="env://", **kwargs)
     elif init_backend == "deepspeed":
         import deepspeed
-        deepspeed.init_distributed(dist_backend=backend, **kwargs)
+        deepspeed.init_distributed(dist_backend=backend, auto_mpi_discovery=False, **kwargs)
     local_rank = get_local_rank()
+    print(f"Initialized rank {get_rank()} with local rank {local_rank}")
     torch.cuda.set_device(local_rank)
 
 
 def get_dist_info():
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return 0, 1
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return 0, 1
-    return dist.get_rank(), dist.get_world_size()
+    return torch_dist.get_rank(), torch_dist.get_world_size()
 
 
 def get_world_size() -> int:
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return 1
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return 1
-    return dist.get_world_size()
+    return torch_dist.get_world_size()
 
 
 def get_rank() -> int:
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return 0
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return 0
-    return dist.get_rank()
+    return torch_dist.get_rank()
 
 
 def get_local_rank() -> int:
@@ -67,9 +68,9 @@ def get_local_rank() -> int:
     Returns:
         The rank of the current process within the local (per-machine) process group.
     """
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return 0
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return 0
     # assert _LOCAL_PROCESS_GROUP is not None, "Local process group is not created! Please use launch() to spawn processes!"
     return int(os.getenv("LOCAL_RANK", 0))
@@ -81,11 +82,11 @@ def get_local_size() -> int:
         The size of the per-machine process group,
         i.e. the number of processes per machine.
     """
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return 1
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return 1
-    return dist.get_world_size(group=_LOCAL_PROCESS_GROUP)
+    return torch_dist.get_world_size(group=_LOCAL_PROCESS_GROUP)
 
 
 def is_main_process() -> bool:
@@ -97,21 +98,21 @@ def synchronize():
     Helper function to synchronize (barrier) among all processes when
     using distributed training
     """
-    if not dist.is_available():
+    if not torch_dist.is_available():
         return
-    if not dist.is_initialized():
+    if not torch_dist.is_initialized():
         return
-    world_size = dist.get_world_size()
+    world_size = torch_dist.get_world_size()
     if world_size == 1:
         return
 
-    # if dist.get_backend() == dist.Backend.NCCL:
+    # if torch_dist.get_backend() == torch_dist.Backend.NCCL:
     #     # This argument is needed to avoid warnings.
     #     # It's valid only for NCCL backend.
-    #     dist.barrier(device_ids=[torch.cuda.current_device()])
+    #     torch_dist.barrier(device_ids=[torch.cuda.current_device()])
     # else:
-    #     dist.barrier()
-    dist.barrier()
+    #     torch_dist.barrier()
+    torch_dist.barrier()
 
 
 @functools.lru_cache()
@@ -120,10 +121,10 @@ def _get_global_gloo_group():
     Return a process group based on gloo backend, containing all the ranks
     The result is cached.
     """
-    if dist.get_backend() == "nccl":
-        return dist.new_group(backend="gloo")
+    if torch_dist.get_backend() == "nccl":
+        return torch_dist.new_group(backend="gloo")
     else:
-        return dist.group.WORLD
+        return torch_dist.group.WORLD
 
 
 def get_backend_device():
@@ -137,14 +138,14 @@ def all_gather(data, group=None, requires_grad=False):
     """
 
     if requires_grad:
-        _all_gather_func = dist.nn.functional.all_gather(data, group=group)
+        _all_gather_func = torch_dist.nn.functional.all_gather(data, group=group)
     else:
-        _all_gather_func = dist.all_gather
+        _all_gather_func = torch_dist.all_gather
 
     if group is None:
         group = _get_global_gloo_group()
 
-    world_size = dist.get_world_size(group)
+    world_size = torch_dist.get_world_size(group)
     if world_size == 1:
         return [data]
 
@@ -191,12 +192,12 @@ def all_gather_object(data, group=None):
         return [data]
     # if group is None:
     #     group = _get_global_gloo_group()  # use CPU group by default, to reduce GPU RAM usage.
-    world_size = dist.get_world_size(group)
+    world_size = torch_dist.get_world_size(group)
     if world_size == 1:
         return [data]
 
     output = [None for _ in range(world_size)]
-    dist.all_gather_object(output, data, group=group)
+    torch_dist.all_gather_object(output, data, group=group)
     return output
 
 
@@ -205,23 +206,23 @@ def broadcast_object_list(data, src=0, group=None):
         return data
     # if group is None:
     #     group = _get_global_gloo_group()  # use CPU group by default, to reduce GPU RAM usage.
-    world_size = dist.get_world_size(group)
+    world_size = torch_dist.get_world_size(group)
     if world_size == 1:
         return data
 
-    dist.broadcast_object_list(data, src=src, group=group)
+    torch_dist.broadcast_object_list(data, src=src, group=group)
     return data
 
 
 def gather_object(data, dst=0, group=None):
     if get_world_size() == 1:
         return [data]
-    world_size = dist.get_world_size(group)
+    world_size = torch_dist.get_world_size(group)
     if world_size == 1:
         return [data]
 
     output = [None for _ in range(world_size)] if get_rank() == dst else None
-    dist.gather_object(data, output, dst=dst, group=group)
+    torch_dist.gather_object(data, output, dst=dst, group=group)
     return output
 
 
@@ -243,17 +244,17 @@ def gather(data, dst=0, group=None):
         return [data]
     if group is None:
         group = _get_global_gloo_group()
-    world_size = dist.get_world_size(group=group)
+    world_size = torch_dist.get_world_size(group=group)
     if world_size == 1:
         return [data]
-    rank = dist.get_rank(group=group)
+    rank = torch_dist.get_rank(group=group)
 
     if rank == dst:
         output = [None for _ in range(world_size)]
-        dist.gather_object(data, output, dst=dst, group=group)
+        torch_dist.gather_object(data, output, dst=dst, group=group)
         return output
     else:
-        dist.gather_object(data, None, dst=dst, group=group)
+        torch_dist.gather_object(data, None, dst=dst, group=group)
         return []
 
 
@@ -294,8 +295,8 @@ def reduce_dict(input_dict, average=True):
             names.append(k)
             values.append(input_dict[k])
         values = torch.stack(values, dim=0)
-        dist.reduce(values, dst=0)
-        if dist.get_rank() == 0 and average:
+        torch_dist.reduce(values, dst=0)
+        if torch_dist.get_rank() == 0 and average:
             # only main process gets accumulated, so only divide by
             # world_size in this case
             values /= world_size

@@ -1,6 +1,7 @@
-import torch
+from typing import Mapping, Sequence
+
 import numpy as np
-from typing import Sequence, Mapping
+import torch
 
 
 def explore_content(

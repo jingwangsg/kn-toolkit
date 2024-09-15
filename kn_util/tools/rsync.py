@@ -1,10 +1,11 @@
 import argparse
+import os
+import os.path as osp
 import subprocess
-import os, os.path as osp
 from datetime import datetime
 
+from ..utils.multiproc import map_async_with_thread
 from ..utils.system import run_cmd
-from ..utils.multiproc import map_async, map_async_with_thread
 
 
 def run_cmd_remote_maybe(cmd, hostname=None):

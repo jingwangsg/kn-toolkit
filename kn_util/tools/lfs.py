@@ -1,28 +1,29 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.getcwd())
-from kn_util.utils.logger import setup_logger_loguru
-import subprocess
 import argparse
-import os.path as osp
-from rich.console import Group
-from rich.live import Live
-from rich.progress import Progress
 import copy
-import time
 import multiprocessing as mp
+import os.path as osp
+import subprocess
+import time
+
+from huggingface_hub import HfApi
+from huggingface_hub.utils import RepositoryNotFoundError
 from loguru import logger
 
 # from concurrent.futures import ProcessPoolExecutor, wait
 from pathos.multiprocessing import ProcessPool
-from huggingface_hub import HfApi
-from huggingface_hub.utils import RepositoryNotFoundError
 
+from kn_util.utils.logger import setup_logger_loguru
+
+from ..utils.download import (
+    MultiThreadDownloader,
+    get_hf_headers,
+)
 from ..utils.git_utils import get_origin_url
-from ..utils.download import MultiThreadDownloader, get_hf_headers, Downloader, CoroutineDownloader
 from ..utils.rich import get_rich_progress_download
-from ..utils.multiproc import map_async_with_thread
 from ..utils.system import is_valid_file
 
 HF_DOWNLOAD_TEMPLATE = "https://huggingface.co/{org}/{repo}/resolve/main/{path}"
@@ -299,7 +300,6 @@ def upload_files_until_success(
                 print(f"Created repo {upload_args.repo_id}")
 
             print(f"Uploading to {repo_id}")
-            from glob import glob
 
             filenames = sorted(run_cmd("fd --glob '**/*' --type f", return_output=True).splitlines())
 

@@ -1,16 +1,14 @@
-import time
-from pathos.multiprocessing import Pool
-import pathos.multiprocessing as mp
-
-from tqdm import tqdm
-import time
 import asyncio
+import copy
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from threading import Semaphore
 from multiprocessing.pool import ThreadPool as ThreadPoolVanilla
 from queue import Queue
-import copy
-import os, os.path as osp
+from threading import Semaphore
+
+from pathos.multiprocessing import Pool
+from tqdm import tqdm
 
 from .rich import get_rich_progress_mofn
 
@@ -163,7 +161,7 @@ def map_async_with_shard(
         def wrapped_loader(*args, **kwargs):
             try:
                 return True, item, loader(*args, **kwargs)
-            except Exception as e:
+            except Exception:
                 return False, item, None
 
         def deal_with_error(retry_cnt):

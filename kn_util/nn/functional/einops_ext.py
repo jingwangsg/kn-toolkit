@@ -1,8 +1,6 @@
-import re
-from torch import nn
-from functools import wraps, partial
+from functools import wraps
 
-from einops import rearrange, reduce, repeat, einsum
+from einops import rearrange, reduce, repeat
 
 # adapted from https://github.com/lucidrains/einops-exts
 

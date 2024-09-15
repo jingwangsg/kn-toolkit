@@ -1,10 +1,10 @@
-import requests
+import os.path as osp
 import random
-import time
-from loguru import logger
-import os, os.path as osp
-from kn_util.utils.multiproc import map_async_with_thread
 
+import requests
+from loguru import logger
+
+from kn_util.utils.multiproc import map_async_with_thread
 
 HTTPS_PROXY_URLS = [
     "https://raw.githubusercontent.com/zloi-user/hideip.me/main/https.txt",
@@ -78,7 +78,7 @@ class ProxyPool:
             if response.status_code == 200:
                 print(f"Validated proxy: {proxy}")
                 return True
-        except Exception as e:
+        except Exception:
             # print(f"Failed to validate proxy: {proxy}")
             self.failed_proxies.add(proxy)
 

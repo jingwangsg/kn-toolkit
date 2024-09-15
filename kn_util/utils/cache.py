@@ -1,5 +1,6 @@
-from .io import save_pickle, load_pickle
 import os
+
+from .io import load_pickle, save_pickle
 
 
 def cached_func(cache_path, verbose=False):

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import ast
+import inspect
 import json
-import os
 import os.path as osp
 import re
 import shutil
@@ -11,8 +10,6 @@ import sys
 import tempfile
 from copy import deepcopy
 from importlib import import_module
-import copy
-import inspect
 
 import yaml
 

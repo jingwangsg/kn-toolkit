@@ -1,11 +1,10 @@
-from termcolor import colored
-import sys
 import os
 
-from kn_util.dist import is_main_process, synchronize, get_rank
-from kn_util.utils.system import run_cmd
-
 import debugpy
+from termcolor import colored
+
+from kn_util.dist import get_rank, synchronize
+from kn_util.utils.system import run_cmd
 
 
 def setup_debugpy(endpoint="localhost", port=5678, rank=0, force=False):
@@ -20,8 +19,8 @@ def setup_debugpy(endpoint="localhost", port=5678, rank=0, force=False):
 
     # print(colored(f"rank: {get_rank()}, is_main_process: {is_main_process()}", "red"))
     if force:
-        run_cmd("ps aux | grep debugpy | awk '{print $2}' | xargs kill -9", fault_tolerance=True)
-        print(colored(f"Force killed debugpy", "red"))
+        run_cmd("ps aux | grep /debugpy/adapter | awk '{print $2}' | xargs kill -9", fault_tolerance=True)
+        print(colored("Force killed debugpy", "red"))
     try:
         debugpy.listen((endpoint, port))
         print(colored(f"Waiting for debugger attach on {endpoint}:{port}", "red"))

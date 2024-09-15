@@ -1,19 +1,18 @@
-import re
 import io
-from collections import defaultdict
-from contextlib import redirect_stdout
-from pathlib import Path
-import yt_dlp
-import requests
-from contextlib import nullcontext
-import tempfile
-from yt_dlp.utils import parse_duration, download_range_func
-import os.path as osp
-from hashlib import sha256
 import os
+import os.path as osp
+import re
+import tempfile
+from collections import defaultdict
+from contextlib import nullcontext
+from hashlib import sha256
+
+import requests
+import yt_dlp
+from yt_dlp.utils import download_range_func, parse_duration
 
 from ...utils.error import SuppressStdoutStderr
-from ...utils.system import buffer_keep_open, run_cmd
+from ...utils.system import run_cmd
 
 
 class FakeLogger(object):

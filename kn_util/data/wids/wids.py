@@ -2,35 +2,37 @@ import base64
 import gzip
 import hashlib
 import io
-import os, os.path as osp
-import random
+import os
+import os.path as osp
 import re
 import sqlite3
-import sys
 import uuid
-import warnings
 from functools import partial
-from typing import Any, BinaryIO, Dict, Optional, TypeVar, Union, List
-from urllib.parse import quote, urlparse
-from loguru import logger
-from hashlib import sha256
-import dill
 from glob import glob
+from hashlib import sha256
+from typing import Any, BinaryIO, Dict, List, Optional, TypeVar, Union, Callable
+from urllib.parse import quote, urlparse
 
+import dill
 import numpy as np
-import torch.distributed as dist
+from loguru import logger
 
+from kn_util.utils.io import load_jsonl, load_pickle, save_pickle
+from kn_util.utils.multiproc import map_async_with_thread
+from kn_util.utils.system import get_strhash, is_valid_file
+
+from ...dist import (
+    all_gather_object,
+    get_world_size,
+    is_main_process,
+    get_rank,
+)
 from .wids_dl import download_and_open
 from .wids_lru import LRUCache
 from .wids_mmtar import MMIndexedTar
-from .wids_specs import load_dsdesc_and_resolve, urldir
+from .wids_specs import urldir
 from .wids_tar import TarFileReader, find_index_file
-from .wids_utils import get_file_keys, get_file_meta
-from ...dist import get_world_size, is_main_process, broadcast_object_list
-
-from kn_util.utils.io import save_pickle, load_pickle, load_json
-from kn_util.utils.multiproc import map_async_with_thread
-from kn_util.utils.system import get_strhash, is_valid_file
+from .wids_utils import get_tarfile_keys
 
 try:
     from torch.utils.data import Dataset, Sampler
@@ -126,7 +128,7 @@ def group_by_key(names):
             logger.warning(f"Warning: Ignoring file {fname} (no '.')")
             continue
         if fname == ".":
-            logger.warning(f"Warning: Ignoring the '.' file.")
+            logger.warning("Warning: Ignoring the '.' file.")
             continue
         key, ext = splitname(fname)
         if key not in kmaps:
@@ -264,7 +266,9 @@ class IndexedTarSamples:
 
         # check that the number of samples is correct
         if expected_size is not None:
-            assert len(self) == expected_size, f"Expected {expected_size} samples, got {len(self)}"
+            assert (
+                len(self) == expected_size
+            ), f"Expected {expected_size} samples, got {len(self)}"
 
         self.uuid = str(uuid.uuid4())
 
@@ -306,19 +310,25 @@ def hash_localname(dldir="/tmp/_wids_cache"):
 
     connection = sqlite3.connect(os.path.join(dldir, "cache.db"))
     cursor = connection.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS cache (url TEXT PRIMARY KEY, path TEXT, checksum TEXT)")
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS cache (url TEXT PRIMARY KEY, path TEXT, checksum TEXT)"
+    )
     connection.commit()
 
     def f(shard):
         """Given a URL, return a local name for the shard."""
         if shard.startswith("pipe:"):
             # uuencode the entire URL string
-            hex32 = base64.urlsafe_b64encode(hashlib.sha256(shard.encode()).digest())[:32].decode()
+            hex32 = base64.urlsafe_b64encode(hashlib.sha256(shard.encode()).digest())[
+                :32
+            ].decode()
             return os.path.join(dldir, "pipe__" + hex32)
         else:
             # we hash the host and directory components into a 16 character string
             dirname = urldir(shard)
-            hex16 = base64.urlsafe_b64encode(hashlib.sha256(dirname.encode()).digest())[:16].decode()
+            hex16 = base64.urlsafe_b64encode(hashlib.sha256(dirname.encode()).digest())[
+                :16
+            ].decode()
             # the cache name is the concatenation of the hex16 string and the file name component of the URL
             cachename = "data__" + hex16 + "__" + os.path.basename(urlparse(shard).path)
             checksum = None
@@ -341,7 +351,6 @@ def get_cache_path(shard, cachedir):
 
 def cache_localname(cachedir):
     os.makedirs(cachedir, exist_ok=True)
-
     return partial(get_cache_path, cachedir=cachedir)
 
 
@@ -451,13 +460,13 @@ class ShardListDataset(Dataset[T]):
 
     def __init__(
         self,
-        shards=None,
+        tar_files,
         dataset_name=None,
         # cache args
         index_cache="/tmp/tar_index/",
         cache_size=int(1e12),
         cache_dir=None,
-        lru_size=10,
+        lru_size=20,
         localname=None,
         # other args
         transformations="PIL",
@@ -465,92 +474,58 @@ class ShardListDataset(Dataset[T]):
         base=None,
         options=None,
         verbose=False,
-        filter_keys: Dict[str, set[str]] = None,
-        tar_indexing_on_master=True,
     ):
         """Create a ShardListDataset.
 
         Args:
-            shards: a list of tar files
+            shards: a list of (url, nsamples) pairs
             cache_size: the number of shards to keep in the cache
             lru_size: the number of shards to keep in the LRU cache
             localname: a function that maps URLs to local filenames
 
         Note that there are two caches: an on-disk directory, and an in-memory LRU cache.
+
         """
         os.makedirs(index_cache, exist_ok=True)
-        if isinstance(shards, List) and isinstance(shards[0], str):
-            # only filenames are given, we need to compute the length
-            _shards = None
-            key_mapping_by_shard = None
-
-            if not tar_indexing_on_master or is_main_process():
-
-                # load/create file index
-                keys_by_file = get_file_keys(shards, cache_dir=index_cache)
-
-                print("Indexing complete")
-
-                key_mapping_by_shard, _shards = get_file_meta(shards, keys_by_file=keys_by_file, filter_keys=filter_keys)
-
-            if tar_indexing_on_master:
-                key_mapping_by_shard, shards = broadcast_object_list([key_mapping_by_shard, _shards])
-            self.key_mapping_by_shard = key_mapping_by_shard
-
-        # if options is None:
-        #     options = {}
+        assert isinstance(tar_files, List) and isinstance(
+            tar_files[0], str
+        ), "tar_files must be a list of paths."
+        # load/create file index
+        keys_by_shard: Dict[str, List[str]] = get_tarfile_keys(
+            tar_files, cache_dir=index_cache
+        )
+        print("Indexing complete")
+        self.keys_by_shard = keys_by_shard
+        shards = [(url, len(keys_by_shard[url])) for url in tar_files]
 
         super(ShardListDataset, self).__init__()
-        # shards is a list of (filename, length) pairs. We'll need to
-        # keep track of the lengths and cumulative lengths to know how
-        # to map indices to shards and indices within shards.
-        # if isinstance(shards, (str, io.IOBase)):
-        #     if base is None and isinstance(shards, str):
-        #         shards = osp.expanduser(shards)
-        #         base = urldir(shards)
-        #     self.base = base
-        #     self.spec = load_dsdesc_and_resolve(shards, options=options, base=base)
-        #     self.shards = self.spec.get("shardlist", [])
-        #     self.dataset_name = self.spec.get("name") or hash_dataset_name(str(shards))
-        if isinstance(shards, List):
-            if base is None and isinstance(shards, str):
-                shards = osp.abspath(osp.expanduser(shards[0][0]))
-                base = urldir(shards)
-            self.base = base
-            self.spec = {"shardlist": [{"url": url, "nsamples": nsamples} for url, nsamples in shards]}
-            if dataset_name is not None:
-                self.spec["name"] = dataset_name
-            self.shards = self.spec.get("shardlist", [])
-            self.dataset_name = dataset_name or hash_dataset_name(str(shards))
-        else:
-            raise NotImplementedError(
-                "Only support taking path/url to JSON descriptor file, list of (filename, length) pairs, or list of filenames."
-            )
-            self.base = None
-            self.spec = options
-            self.shards = shards
-            self.dataset_name = dataset_name or hash_dataset_name(str(shards))
+
+        assert isinstance(shards, list), "Shards must be a list"
+        if base is None and isinstance(shards, str):
+            shards = osp.abspath(osp.expanduser(shards[0][0]))
+            base = urldir(shards)
+        self.base = base
+        self.spec = {
+            "shardlist": [{"url": url, "nsamples": nsample} for url, nsample in shards]
+        }
+        if dataset_name is not None:
+            self.spec["name"] = dataset_name
+        self.shards = self.spec.get("shardlist", [])
+        self.dataset_name = dataset_name or hash_dataset_name(str(shards))
 
         self.lengths = [shard["nsamples"] for shard in self.shards]
         self.cum_lengths = np.cumsum(self.lengths)
         self.total_length = self.cum_lengths[-1]
 
-        if cache_dir is not None:
-            # when a cache dir is explicitly given, we download files into
-            # that directory without any changes
-            self.cache_dir = cache_dir
-            self.localname = cache_localname(cache_dir)
-        elif localname is not None:
-            # when a localname function is given, we use that
-            self.cache_dir = None
-            self.localname = localname
-        else:
-            import getpass
-
-            # when no cache dir or localname are given, use the cache from the environment
-            self.cache_dir = os.environ.get("WIDS_CACHE", f"~/.cache/_wids_cache")
-            self.cache_dir = osp.expanduser(self.cache_dir)
-            self.localname = default_localname(self.cache_dir)
+        ## build key2taridx: key -> (shard_idx, inner_idx)
+        ## note here inner_idx in the index for tar files
+        key2taridx = {}
+        for shard_idx in range(len(tar_files)):
+            tar_file = tar_files[shard_idx]
+            keys = self.keys_by_shard[tar_file]
+            for inner_idx, key in enumerate(keys):
+                key2taridx[key] = (shard_idx, inner_idx)
+        self.key2taridx = key2taridx
 
         if verbose or int(os.environ.get("WIDS_VERBOSE", 0)):
             nbytes = sum(shard.get("filesize", 0) for shard in self.shards)
@@ -572,13 +547,7 @@ class ShardListDataset(Dataset[T]):
             )
         self.transformations = interpret_transformations(transformations)
 
-        if lru_size > 200:
-            warnings.warn("LRU size is very large; consider reducing it to avoid running out of file descriptors")
-        self.cache = LRUShards(lru_size, localname=self.localname, keep=keep)
-
-    @property
-    def keys(self):
-        return self.key2idx.keys()
+        self.cache = LRUShards(lru_size, keep=keep)
 
     def add_transform(self, transform):
         """Add a transformation to the dataset."""
@@ -599,7 +568,11 @@ class ShardListDataset(Dataset[T]):
         if accesses > 100 and misses / accesses > 0.3:
             # output a warning only once
             self.check_cache_misses = lambda: None
-            logger.warning("Warning: ShardListDataset has a cache miss rate of {:.1%}%".format(misses * 100.0 / accesses))
+            logger.warning(
+                "Warning: ShardListDataset has a cache miss rate of {:.1%}%".format(
+                    misses * 100.0 / accesses
+                )
+            )
 
     def get_shard(self, index):
         """Get the shard and index within the shard corresponding to the given index."""
@@ -608,27 +581,12 @@ class ShardListDataset(Dataset[T]):
 
         # Figure out which index within the shard corresponds to the
         # given index.
-        if shard_idx == 0:
-            inner_idx = index
-        else:
-            inner_idx = index - self.cum_lengths[shard_idx - 1]
+        inner_idx = index - self.cum_lengths[shard_idx - 1] if shard_idx > 0 else index
 
         # Get the shard and return the corresponding element.
         desc = self.shards[shard_idx]
         url = desc["url"]
 
-        # ! Deprecated, I don't like this part
-        # if url.startswith(("https://", "http://", "gs://", "/", "~")):
-        #     # absolute path or url path
-        #     url = url
-        # else:
-        #     # concat relative path
-        #     if self.base is None and "base_path" not in self.spec:
-        #         raise FileNotFoundError("passing a relative path in shardlist but no base found.")
-        #     base_path = self.spec["base_path"] if "base_path" in self.spec else self.base
-        #     url = osp.abspath(osp.join(osp.expanduser(base_path), url))
-
-        desc["url"] = url
         try:
             shard = self.cache.get_shard(url)
         except UnicodeDecodeError as e:
@@ -636,15 +594,10 @@ class ShardListDataset(Dataset[T]):
             raise e
         return shard, inner_idx, desc
 
-    def get_by_key(self, key):
-        idx = self.key2idx[key]
-        return self[idx]
-
     def __getitem__(self, index):
         """Return the sample corresponding to the given index."""
         shard, inner_idx, desc = self.get_shard(index)
 
-        inner_idx = self.key_mapping_by_shard[desc["url"]][inner_idx]
         sample = shard[inner_idx]
 
         # Check if we're missing the cache too often.
@@ -674,98 +627,173 @@ def get_funchash(func):
     return sha256(func_str).hexdigest()[:16]
 
 
-def _load_keys_by_json(json_file, cache_dir="/tmp/json_index/", keys_filter=None):
+def _load_indices_by_jsonl(
+    jsonl_file,
+    cache_dir="/tmp/jsonl_index/",
+    sample_filter=None,
+):
     os.makedirs(cache_dir, exist_ok=True)
-    filehash = get_strhash(json_file)
-    keys_filter_hash = get_funchash(keys_filter)
-    cache_file = osp.join(cache_dir, filehash + keys_filter_hash + ".pkl")
+    filehash = get_strhash(jsonl_file)
+    sample_filter_hash = get_funchash(sample_filter)
+    cache_file = osp.join(cache_dir, filehash + sample_filter_hash + ".pkl")
     if is_valid_file(cache_file):
-        try:
-            return load_pickle(cache_file)
-        except:
-            from kn_util.utils.system import run_cmd
+        return load_pickle(cache_file)
 
-            run_cmd(f"rm -rf {cache_file}")
+    jsonl_content = load_jsonl(jsonl_file)
 
-    try:
-        json_dict = load_json(json_file)
-    except:
-        from kn_util.utils.system import run_cmd
-
-        run_cmd(f"rm -rf {json_file}")
-        import debugpy
-
-        debugpy.breakpoint()
-    if keys_filter is None:
-        json_index = set(json_dict.keys())
+    if sample_filter is None:
+        jsonl_index = list(range(len(jsonl_content)))
     else:
-        json_index = keys_filter(json_dict)
-    save_pickle(json_index, cache_file)
+        jsonl_index = [
+            idx
+            for idx in range(len(jsonl_content))
+            if sample_filter(jsonl_content[idx])
+        ]
 
-    return json_index
+    save_pickle(jsonl_index, cache_file)
+
+    return jsonl_index
 
 
-class ShardListDatasetWithAnnotations(ShardListDataset):
+class ShardListDatasetAnnotated(ShardListDataset):
+    """
+    1. build key2taridx: key -> (shard_idx, inner_idx)
+    2. index -> all valid keys -> key -> (shard_idx, inner_idx) -> sample
+    """
 
     def __init__(
         self,
-        json_files,
-        tar_root,
-        json_index_cache="/tmp/json_index/",
-        keys_filter=None,
-        json_indexing_on_master=True,
+        jsonl_files: str,
+        tar_files: str,
+        sample_filter: Callable[Dict[str, Any], bool] = None,
+        anno_key_column: str = None,
+        anno_index_cache: str = "/tmp/anno_index/",
         *args,
         **kwargs,
     ):
-        """ShardListDataset that also loads annotations from a JSON file.
-        the annotation will be loaded according to `__key__` of the sample given corresponding __shard__.
-        the index order will be the same as the original ShardListDataset.
+        """ShardListDataset that uses annotations from jsonl files.
+        image/video will be loaded according to the keys in the jsonl files.
+        Here jsonl_files and tar_files can be directory path or a list of paths.
         """
-        keys_in_json = [osp.basename(json_file).rsplit(".", 1)[0] for json_file in json_files]
-        keys_in_tar = set(osp.basename(tar_file).rsplit(".", 1)[0] for tar_file in glob(osp.join(tar_root, "*.tar")))
-        keys = [key for key in keys_in_json if key in keys_in_tar]
-        print(f"Found {len(keys)} pairs in both json and tar files.")
+        assert anno_key_column is not None, "anno_key_column must be provided."
 
-        json_mapping = {osp.basename(json_file).rsplit(".", 1)[0]: json_file for json_file in json_files}
+        if isinstance(jsonl_files, str):
+            jsonl_root = jsonl_files
+            jsonl_files = self.jsonl_files = glob(osp.join(jsonl_root, "*.jsonl"))
+        else:
+            jsonl_root = osp.dirname(jsonl_files[0])
+        assert isinstance(jsonl_files, list), "jsonl_files must be a list of paths."
 
-        # Note: the order of json_files and tar_files should be the same
-        json_files = [json_mapping[key] for key in keys]
-        tar_files = [osp.join(tar_root, key + ".tar") for key in keys]
-        dist.barrier()
+        if isinstance(tar_files, str):
+            tar_root = tar_files
+            tar_files = glob(osp.join(tar_root, "*.tar"))
+        else:
+            tar_root = osp.dirname(tar_files[0])
+        assert isinstance(tar_files, list), "tar_files must be a list of paths."
 
-        keys_by_json = None
-        if not json_indexing_on_master or is_main_process():
-            keys_by_json = map_async_with_thread(
-                iterable=json_files,
-                func=lambda f: _load_keys_by_json(f, cache_dir=json_index_cache, keys_filter=keys_filter),
-                verbose=True,
-                desc="Gathering keys from json files",
-                num_thread=16,
-            )
+        self.tar_files = tar_files
 
-        if json_indexing_on_master:
-            keys_by_json = broadcast_object_list([keys_by_json], src=0)[0]
+        shards_with_jsonl = [
+            osp.basename(jsonl_file).rsplit(".", 1)[0] for jsonl_file in jsonl_files
+        ]
+        shards_with_tar = set(
+            osp.basename(tar_file).rsplit(".", 1)[0]
+            for tar_file in glob(osp.join(tar_root, "*.tar"))
+        )
+        shards = set(shards_with_jsonl) & shards_with_tar
 
-        filter_keys = {tar_file: keys for tar_file, keys in zip(tar_files, keys_by_json)}
-        super().__init__(shards=tar_files, filter_keys=filter_keys, *args, **kwargs)
-        self.json_files = json_files
-        self.json_cache = LRUCache(capacity=self.cache.lru.capacity)
+        shards = sorted(list(shards))
+        if is_main_process():
+            print(f"Found {len(shards)} pairs in both jsonl and tar files.")
 
-    def get_json(self, shard_key):
-        if shard_key not in self.json_cache:
-            json_dir = osp.dirname(self.json_files[0])
-            json_filename = osp.join(json_dir, shard_key + ".json")
-            self.json_cache[shard_key] = load_json(json_filename)
-        return self.json_cache[shard_key]
+        tar_files = [osp.join(tar_root, shard + ".tar") for shard in shards]
+        jsonl_files = [osp.join(jsonl_root, shard + ".jsonl") for shard in shards]
 
-    def get_annotation(self, sample):
-        shard_key = osp.basename(sample["__shard__"]).rsplit(".", 1)[0]
-        key = sample["__key__"]
-        json_data = self.get_json(shard_key)
-        return json_data.get(key, None)
+        ## load keys from jsonl files
+        num_partitions = min(len(jsonl_files), get_world_size())
+        partition_idx = get_rank()
+        jsonl_files_at_rank = (
+            np.array_split(jsonl_files, num_partitions)[partition_idx]
+            if partition_idx < num_partitions
+            else []
+        )
+        indices_groupby_jsonl_at_rank = map_async_with_thread(
+            iterable=jsonl_files_at_rank,
+            func=lambda f: _load_indices_by_jsonl(
+                f,
+                cache_dir=anno_index_cache,
+                sample_filter=sample_filter,
+            ),
+            verbose=True,
+            desc="Gathering keys from json files",
+            num_thread=64,
+        )
+        indices_groupby_jsonl = all_gather_object(indices_groupby_jsonl_at_rank)
+        indices_groupby_jsonl = [
+            indices for sublist in indices_groupby_jsonl for indices in sublist
+        ]
+        # jsonl_files[i] -> indices_groupby_jsonl[i]
+
+        self.cum_lengths_jsonl = np.cumsum(
+            [len(indices) for indices in indices_groupby_jsonl]
+        )
+
+        self.indexing_pairs = [
+            (shards[i], idx)
+            for i in range(len(jsonl_files))
+            for idx in indices_groupby_jsonl[i]
+        ]  # all (shardname, inner_idx_in_jsonl) pairs after filtering
+
+        super().__init__(
+            tar_files=tar_files,
+            *args,
+            **kwargs,
+        )
+
+        self.jsonl_files = jsonl_files
+        self.jsonl_cache = LRUCache(capacity=self.cache.lru.capacity)
+        self.anno_key_column = anno_key_column
+
+    def get_jsonl(self, index):
+        shard, inner_idx_in_jsonl = self.indexing_pairs[index]
+
+        if shard not in self.jsonl_cache:
+            jsonl_dir = osp.dirname(self.jsonl_files[0])
+            jsonl_filename = osp.join(jsonl_dir, shard + ".jsonl")
+            self.jsonl_cache[shard] = load_jsonl(jsonl_filename)
+        return self.jsonl_cache[shard][inner_idx_in_jsonl]
+
+    def get_by_key(self, key):
+        shard_idx, inner_idx_in_tar = self.key2taridx[key]
+        desc = self.shards[shard_idx]
+        shard = self.cache.get_shard(desc["url"])
+
+        sample = shard[inner_idx_in_tar]
+        index = (
+            self.cum_lengths_jsonl[shard_idx - 1] + inner_idx_in_tar
+            if shard_idx > 0
+            else inner_idx_in_tar
+        )
+
+        # Check if we're missing the cache too often.
+        self.check_cache_misses()
+
+        sample["__dataset__"] = desc.get("dataset")
+        sample["__index__"] = index
+        sample["__shard__"] = desc["url"]
+        sample["__shardindex__"] = inner_idx_in_tar
+
+        # Apply transformations
+        for transform in self.transformations:
+            sample = transform(sample)
+
+        return sample
 
     def __getitem__(self, index):
-        sample = super().__getitem__(index)
-        annotation = self.get_annotation(sample)
+        anno_item = self.get_jsonl(index)
+        item = self.get_by_key(anno_item[self.anno_key_column])
 
-        return sample, annotation
+        return item, anno_item
+
+    def __len__(self):
+        return len(self.indexing_pairs)

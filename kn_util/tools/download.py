@@ -1,10 +1,17 @@
-from kn_util.utils.logger import setup_logger_loguru
-from ..utils.download import CommandDownloader
 import argparse
-from ..utils.download import get_hf_headers, get_random_headers, CoroutineDownloader, MultiThreadDownloader
-from fire import Fire
-import os.path as osp
 import os
+import os.path as osp
+
+
+from kn_util.utils.logger import setup_logger_loguru
+
+from ..utils.download import (
+    CommandDownloader,
+    CoroutineDownloader,
+    MultiThreadDownloader,
+    get_hf_headers,
+    get_random_headers,
+)
 
 
 def add_basic_parser(parser):

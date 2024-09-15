@@ -1,9 +1,10 @@
 import random
-import numpy as np
-from torch.utils.data import Sampler, Dataset
-import torch.distributed as dist
-from typing import Optional
 import warnings
+from typing import Optional
+
+import numpy as np
+import torch.distributed as dist
+from torch.utils.data import Dataset, Sampler
 
 from ...dist import get_world_size
 
@@ -288,7 +289,9 @@ def DistributedChunkedSampler(
     return sampler
 
 
-import torch, math
+import math
+
+import torch
 from torch.utils.data.distributed import DistributedSampler
 
 

@@ -4,23 +4,23 @@ A usage example is provided in https://github.com/li-js/gpu_memory_profiling/blo
 The debugging pytorch for cuda memory leaking is also discuessed in https://discuss.pytorch.org/t/how-to-debug-causes-of-gpu-memory-leaks/6741
 """
 
-import datetime
 import linecache
-from termcolor import colored
-import os, os.path as osp
+import os
+import os.path as osp
+
 import pandas as pd
+from termcolor import colored
 
 # Setting an environment variable to make CUDA operations synchronous, helpful for debugging
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
+
+import torch
+
 # Importing necessary libraries for GPU management and PyTorch
 from py3nvml import py3nvml
 
-import torch
-import socket
-
 from ...system import run_cmd
-from ....dist import synchronize
 
 _red_print = lambda x: print(colored(x, "red"))
 
@@ -221,6 +221,6 @@ def tensor_loader_gc(cuda_only=True):
             # Yield the tensor if it's on the GPU (if gpu_only is True)
             if not cuda_only or tensor.is_cuda:
                 yield tensor
-        except Exception as e:
+        except Exception:
             # In case of an exception, do nothing and just pass
             pass

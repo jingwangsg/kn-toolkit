@@ -1,12 +1,13 @@
-from kn_util.data.vocab import delete_noisy_char
-from kn_util.basic import global_set, global_get
-import torchtext
-import torch
-import numpy as np
 from types import SimpleNamespace
 
+import numpy as np
+import torch
+import torchtext
+from kn_util.basic import global_get, global_set
 from loguru import logger
 from torchtext.data.utils import get_tokenizer
+
+from kn_util.data.vocab import delete_noisy_char
 
 
 def extend_vocab(pretrained_vocab, token, vector):

@@ -1,6 +1,7 @@
-from typing import Any, Dict, Optional
-import os, os.path as osp
+import os
+import os.path as osp
 import random
+from typing import Optional
 
 import numpy as np
 

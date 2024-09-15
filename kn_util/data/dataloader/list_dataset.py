@@ -9,7 +9,7 @@ class ListDatasetWrapper(Dataset):
         return batch
 
     def __getitem__(self, index):
-        return self.data_list[index];
+        return self.data_list[index]
 
     def __len__(self):
         return len(self.data_list)

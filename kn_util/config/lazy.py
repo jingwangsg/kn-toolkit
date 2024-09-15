@@ -1,22 +1,23 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-from iopath.common.file_io import PathManager as PathManagerBase
-import pydoc
 import ast
 import builtins
 import collections.abc as abc
+import copy
 import importlib
 import inspect
 import logging
 import os
+import pydoc
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import is_dataclass
 from typing import List, Tuple, Union
+
 import cloudpickle
 import yaml
+from iopath.common.file_io import PathManager as PathManagerBase
 from omegaconf import DictConfig, ListConfig, OmegaConf, SCMode
-import copy
 
 PathManager = PathManagerBase()
 

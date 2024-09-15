@@ -4,8 +4,9 @@ from typing import Iterator, List, Optional, Sized, Union
 
 import numpy as np
 import torch
+from torch.utils.data import ConcatDataset, Sampler
+
 from ...dist import get_dist_info, sync_random_seed
-from torch.utils.data import Sampler, ConcatDataset
 
 
 class MultiSourceSampler(Sampler):

@@ -1,12 +1,13 @@
-import torch
-from torch import Tensor
-import warnings
-import sys
-import os
-from termcolor import colored
-import inspect
 import gc
-from typing import List, Tuple, Dict, Union, Any, Callable, Optional
+import inspect
+import sys
+import warnings
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import torch
+from termcolor import colored
+from torch import Tensor
+
 
 # https://discuss.pytorch.org/t/how-to-debug-causes-of-gpu-memory-leaks/6741/13
 def collect_tensor_infos_gc(only_cuda=False, omit_objs=[]):
@@ -70,7 +71,7 @@ def collect_tensor_infos_gc(only_cuda=False, omit_objs=[]):
                 warnings.simplefilter("ignore")
                 if hasattr(obj, "grad") and (id(obj.grad) not in omit_objs):
                     add_tensor(obj.grad)
-        except Exception as ex:
+        except Exception:
             pass
             # print("Exception: ", ex)
             # logger.debug(f"Exception: {str(ex)}")
@@ -761,7 +762,6 @@ def patch_tensor_with_register():
         old_func = getattr(torch, func_name)
         setattr(torch, func_name, new_func_builder(old_func))
 
-    import torch.nn.functional as F
 
     tensor_funcs = [
         "__abs__",

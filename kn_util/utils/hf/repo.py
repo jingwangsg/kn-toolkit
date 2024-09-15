@@ -1,7 +1,8 @@
-from huggingface_hub import list_repo_tree
-from fnmatch import fnmatch
 import os.path as osp
+from fnmatch import fnmatch
+
 from braceexpand import braceexpand
+from huggingface_hub import list_repo_tree
 
 
 def _maybe_expand_filenames(filenames):

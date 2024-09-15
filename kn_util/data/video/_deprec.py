@@ -1,17 +1,8 @@
-import numpy as np
-import os.path as osp
-import subprocess
-import os
-import glob
-from ...utils.multiproc import map_async
-import numpy as np
-import io
-from contextlib import redirect_stdout
-import ffmpeg
+
 import cv2
-from ...utils.error import SuppressStdoutStderr
-from collections import defaultdict
-import requests
+import ffmpeg
+import numpy as np
+
 
 
 class OpenCVVideoLoader:
@@ -103,11 +94,7 @@ class FFMPEGVideoLoader:
         return frames
 
 
-import yt_dlp
-import re
 
-
-import decord
 from decord import VideoReader
 
 # decord.bridge.set_bridge('numpy')

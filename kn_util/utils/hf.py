@@ -1,15 +1,15 @@
-import os, os.path as osp
-from diffusers import StableDiffusionXLPipeline
-from functools import wraps
+import os
+import os.path as osp
 from typing import Optional, Union
+
+from diffusers import StableDiffusionXLPipeline
 from huggingface_hub.utils import validate_hf_hub_args
 
 
 def patch_pretrained_from_local(local_dir=osp.expanduser("~/HF/")):
-    from transformers import PreTrainedModel, PreTrainedTokenizer, PretrainedConfig
-    from diffusers import DiffusionPipeline
     import diffusers
     import transformers
+    from transformers import PretrainedConfig
 
     def _patch(cls, validate_wrapper=False):
         assert hasattr(cls, "from_pretrained"), f"{cls} does not have a from_pretrained method"
@@ -64,7 +64,6 @@ def patch_pretrained_from_local(local_dir=osp.expanduser("~/HF/")):
 
 
 if __name__ == "__main__":
-    from transformers import AutoModel
 
     patch_pretrained_from_local()
     pipeline = StableDiffusionXLPipeline.from_pretrained("CompVis/stable-diffusion-v1-3")

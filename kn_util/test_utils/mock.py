@@ -1,6 +1,7 @@
 import random
+
 import numpy as np
-from PIL import Image
+
 
 def generate_timestamps(num_timestamps: int, duration: float):
     timestamps = []

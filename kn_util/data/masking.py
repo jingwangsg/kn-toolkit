@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def mask_safe(mask):
     """ generate 0/1 that make sure at least one 0 and one 1 exist in the mask
     """

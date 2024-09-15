@@ -1,12 +1,12 @@
 from rich.progress import (
+    BarColumn,
+    Console,
+    DownloadColumn,
+    MofNCompleteColumn,
     Progress,
     TextColumn,
-    BarColumn,
     TimeRemainingColumn,
-    MofNCompleteColumn,
-    DownloadColumn,
     TransferSpeedColumn,
-    Console,
 )
 
 

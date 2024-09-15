@@ -1,11 +1,8 @@
-import torch.nn as nn
-from termcolor import colored
-from loguru import logger
-from termcolor import colored
+import pandas as pd
 import torch
 import torch.nn as nn
-import torch.distributed as torch_dist
-import pandas as pd
+from loguru import logger
+from termcolor import colored
 
 from kn_util.dist import get_rank
 
@@ -119,8 +116,10 @@ def get_dtype(model):
 
 def cast_according_to(model, tensor):
     dtype = get_dtype(model)
+    device = get_device(model)
     if isinstance(tensor, torch.Tensor):
         tensor = tensor.to(dtype) if tensor.dtype in (torch.float32, torch.float64) else tensor
+    tensor = tensor.to(device)
     return tensor
 
 

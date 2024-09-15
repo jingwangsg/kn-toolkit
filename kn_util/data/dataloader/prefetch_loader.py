@@ -1,4 +1,5 @@
 import torch
+
 from ..collection_ops import nested_to
 
 
@@ -78,7 +79,7 @@ class PrefetchLoader(object):
     def next(self, it):
         torch.cuda.current_stream().wait_stream(self.stream)
         batch = self.batch
-        if batch is not None and batch is not {}:
+        if batch is not None and batch != {}:
             record_cuda_stream(batch)
         self.preload(it)
         return batch

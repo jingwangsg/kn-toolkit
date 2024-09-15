@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 def gaussian(mean, sigma, n_position):
     """
     discrete gaussian over `n_position` indices

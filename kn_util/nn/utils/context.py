@@ -18,5 +18,4 @@ class TorchInitDisabled:
         return self
     
     def __exit__(self, *args, **kwargs):
-        import torch
         self.enable_reset_params()

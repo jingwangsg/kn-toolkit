@@ -1,13 +1,13 @@
-import subprocess
-import socket
-import os.path as osp
-import os
-from tqdm import tqdm
-from contextlib import contextmanager
-import psutil
 import io
+import os
+import os.path as osp
+import socket
+import subprocess
 import traceback
+from contextlib import contextmanager
 from hashlib import sha256
+
+import psutil
 
 from .mail import send_email
 from .multiproc import map_async_with_thread

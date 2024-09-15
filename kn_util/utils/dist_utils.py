@@ -8,11 +8,10 @@
 import datetime
 import functools
 import os
+import pickle
 
 import torch
 import torch.distributed as dist
-from loguru import logger
-import pickle
 
 
 def setup_print_for_distributed(is_master):

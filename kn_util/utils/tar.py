@@ -1,10 +1,9 @@
-from .system import run_cmd
-from .multiproc import map_async
-import tarfile
-from tqdm import tqdm
-import os.path as osp
-import numpy as np
 import multiprocessing as mp
+import os.path as osp
+import tarfile
+
+
+from .system import run_cmd
 
 
 class TarTool:

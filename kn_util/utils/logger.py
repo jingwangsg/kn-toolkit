@@ -7,19 +7,18 @@
 
 import datetime
 import logging
+import sys
 import time
 from collections import defaultdict, deque
-import sys
-from termcolor import colored
 
-from collections import defaultdict
 from loguru import logger
-
+from termcolor import colored
 
 try:
     import torch
-    from ..dist import is_main_process
     import torch.distributed as torch_dist
+
+    from ..dist import is_main_process
     torch_avail = True
 except:
     torch_avail = False
@@ -47,9 +46,10 @@ class SmoothedValue(object):
         """
         Warning: does not synchronize the deque!
         """
-        from .dist_utils import is_dist_avail_and_initialized, is_main_process
         import torch
         import torch.distributed as dist
+
+        from .dist_utils import is_dist_avail_and_initialized
 
         if not is_dist_avail_and_initialized():
             return

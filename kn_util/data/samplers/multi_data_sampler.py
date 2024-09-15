@@ -3,8 +3,9 @@ import math
 from typing import Iterator, Optional, Sequence, Sized
 
 import torch
-from ...dist import get_dist_info, sync_random_seed
 from torch.utils.data import Sampler
+
+from ...dist import get_dist_info, sync_random_seed
 
 
 class MultiDataSampler(Sampler):

@@ -1,9 +1,7 @@
-import torch
 from torch.utils.data import DataLoader, default_collate
 
-from ...utils.misc import default
-from ..wids import DistributedChunkedSampler, ShardListDataset
 from ...dist import DistributedSampler
+from ..wids import DistributedChunkedSampler, ShardListDataset
 
 
 def build_dataloader(

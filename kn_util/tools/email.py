@@ -1,7 +1,8 @@
 import argparse
-from ..utils.system import run_cmd
+from datetime import datetime, timedelta, timezone
+
 from ..utils.mail import send_email
-from datetime import datetime, timezone, timedelta
+from ..utils.system import run_cmd
 
 
 def main():
@@ -32,7 +33,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Send email")
     parser.add_argument("--to", type=str, help="To email address")
-    parser.add_argument("--subject", type=str, help="Subject of the email", default=f"Message from GPU Cluster")
+    parser.add_argument("--subject", type=str, help="Subject of the email", default="Message from GPU Cluster")
     parser.add_argument("-m", "--message", help="Body of the email", nargs="+", default=[], type=str)
     args = parser.parse_args()
 

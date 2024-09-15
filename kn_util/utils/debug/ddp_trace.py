@@ -1,8 +1,9 @@
-from ...dist import synchronize, get_rank
-from contextlib import contextmanager
-import ast
 import inspect
+from contextlib import contextmanager
+
 import torch.distributed as dist
+
+from ...dist import get_rank, synchronize
 
 ignored = False
 

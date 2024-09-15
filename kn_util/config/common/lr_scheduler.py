@@ -1,4 +1,5 @@
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 from kn_util.config import LazyCall as L
 
 

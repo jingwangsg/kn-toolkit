@@ -1,14 +1,15 @@
-import numpy as np
+import os
+from contextlib import nullcontext
+from fractions import Fraction
+from io import BytesIO
+
+import av
 import ffmpeg
 import imageio
+import numpy as np
 import torch
 import torchvision
 from einops import rearrange
-import os, os.path as osp
-from contextlib import nullcontext
-from io import BytesIO
-import av
-from fractions import Fraction
 
 from ...utils.error import SuppressStdoutStderr
 
@@ -46,7 +47,7 @@ def save_video_imageio(array, video_path, fps=2, input_format="thwc", vcodec="li
     assert array.shape[-1] == 3, "Last dim of array should be 3 (RGB)"
 
     # suppress all error from opencv and ffmpeg
-    maybe_quiet = nullcontext
+    maybe_quiet = nullcontext()
     if quiet:
         maybe_quiet = SuppressStdoutStderr()
 

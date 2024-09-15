@@ -1,11 +1,12 @@
-from fire import Fire
-from ...utils.io import save_json
-from ...utils import default
 import glob
-import os
 import os.path as osp
-from webdataset import WebLoader
+
+from fire import Fire
 from tqdm import tqdm
+from webdataset import WebLoader
+
+from ...utils import default
+from ...utils.io import save_json
 
 """
 Example of json file
@@ -49,7 +50,7 @@ def main(input_dir, dataset, name=None, num_workers=8, output_file=None):
     input_dir = osp.abspath(input_dir)
 
     if output_file is None:
-        output_file = osp.join(input_dir, f"wids_meta.json")
+        output_file = osp.join(input_dir, "wids_meta.json")
     elif not output_file.startswith("/"):
         output_file = osp.join(input_dir, output_file)
     else:

@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 import torch
-import numpy as np
+
 from ..utils.debug import explore_content as EC
+
 
 def _to_numpy(x):
     if torch.is_tensor(x):

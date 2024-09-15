@@ -1,40 +1,13 @@
 try:
-    import torch
-    import torch.nn as nn
     import numpy as np
-    from torch import Tensor, memory_format
+    import torch
 
 except:
     pass
 
-from torch.types import (
-    _bool,
-    _complex,
-    _device,
-    _dtype,
-    _float,
-    _int,
-    _layout,
-    _qscheme,
-    _size,
-    Device,
-    Number,
-)
-
-from IPython import embed
-from ipdb import set_trace as ipdb_set_trace
-from pdb import set_trace as pdb_set_trace
 import sys
 
-from typing import Any, Mapping, Sequence, List
-from icecream import argumentToString, ic
-import gc
-import inspect
-import copy
-from termcolor import colored
-import warnings
-import functools
-from typing import Union, Optional, Tuple, Callable, Dict
+from icecream import argumentToString
 
 
 def install_pdb_handler():
@@ -43,8 +16,8 @@ def install_pdb_handler():
     2. pdb gets launched on exception.
     """
 
-    import signal
     import pdb
+    import signal
 
     def handler(_signum, _frame):
         pdb.set_trace()
@@ -60,7 +33,6 @@ def install_pdb_handler():
             sys.__excepthook__(type_, value, tb)
         else:
             import traceback
-            import pdb
 
             # we are NOT in interactive mode, print the exception...
             traceback.print_exception(type_, value, tb)
@@ -72,8 +44,8 @@ def install_pdb_handler():
 
 def install_pudb_handler():
     import signal
+
     import pudb
-    import pudb.remote as pudb_remote
 
     def handler(_signum, _frame):
         pudb.set_trace()

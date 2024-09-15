@@ -1,6 +1,6 @@
-import torch
-from torch.utils.data import default_collate
 from functools import partial
+
+from torch.utils.data import default_collate
 
 from .collection_ops import collection_extend_multikeys
 

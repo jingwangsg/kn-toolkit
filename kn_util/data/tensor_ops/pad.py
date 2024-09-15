@@ -1,6 +1,7 @@
-from kn_util.data.seq import slice_by_axis
 import numpy as np
 import torch
+
+from kn_util.data.seq import slice_by_axis
 
 
 def general_pad_pt_tensor(arr, axis, to_length=None, fill_value=None, return_mask=False):

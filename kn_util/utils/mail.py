@@ -1,7 +1,7 @@
+import smtplib
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import formataddr
-import smtplib
 
 
 def send_email(to_addr, subject, text="", from_addr="scsegpu@163.com"):

@@ -1,11 +1,11 @@
-import os
 import argparse
-import os.path as osp
-import subprocess
 import glob
-import sys
-from kn_util.utils.multiproc import map_async_with_thread, map_async
+import os
+import os.path as osp
 from functools import partial
+
+from kn_util.utils.multiproc import map_async
+
 from ..utils.system import run_cmd
 
 

@@ -5,14 +5,5 @@
 # flake8: noqa
 import torch
 
-from .wids import (
-    ShardListDataset,
-    ShardListDatasetWithAnnotations,
-)
-
-from .wids_sampler import (
-    DistributedChunkedSampler,
-    ChunkedSamplerV2,
-    ChunkedSampler,
-)
-
+from .wids import ShardListDataset, ShardListDatasetAnnotated
+from .wids_sampler import ChunkedSampler, ChunkedSamplerV2, DistributedChunkedSampler

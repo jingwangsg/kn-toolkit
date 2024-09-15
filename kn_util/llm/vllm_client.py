@@ -1,6 +1,7 @@
-from ..utils.multiproc import map_async_with_thread
-from transformers import AutoTokenizer
 import requests
+from transformers import AutoTokenizer
+
+from ..utils.multiproc import map_async_with_thread
 
 
 class ResponseUnwrapMixin:

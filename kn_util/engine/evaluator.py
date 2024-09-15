@@ -1,9 +1,9 @@
 import torch
 from loguru import logger
 
+from ..data.collection_ops import groupby, nested_to
+from ..dist import all_gather_object
 from ..utils.logger import MetricLogger
-from ..data.collection_ops import nested_to, groupby
-from ..dist import all_gather_object, is_main_process, synchronize
 
 
 class Evaluator:

@@ -1,7 +1,8 @@
-import streamlit as st
 import glob
+import os.path as osp
 from argparse import ArgumentParser
-import os, os.path as osp
+
+import streamlit as st
 
 parser = ArgumentParser()
 parser.add_argument("video_root", type=str)

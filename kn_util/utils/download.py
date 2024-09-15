@@ -1,32 +1,30 @@
-from kn_util.utils.logger import setup_logger_loguru
-from concurrent.futures import ThreadPoolExecutor, wait
-import httpx
-from tqdm import tqdm
+import copy
+import io
 import json
-from huggingface_hub.utils._headers import build_hf_headers
-from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
-from loguru import logger
+import os
+import os.path as osp
+import random
+import socket
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, wait
 
 # from transformers.utils.hub import http_user_agent
 from contextlib import nullcontext
-import io
-import os
-import os.path as osp
-import tempfile
-import random
 from functools import lru_cache
-from queue import Queue
-from queue import Empty as EmptyQueue
-import socket
 from io import BytesIO
-import copy
+from queue import Empty as EmptyQueue
+from queue import Queue
 
-from ..utils.system import run_cmd, force_delete, clear_process
-from ..utils.io import save_json, load_json
-from ..utils.rich import get_rich_progress_download, add_tasks
-from ..utils.system import buffer_keep_open
-
+import httpx
+from huggingface_hub.utils._headers import _http_user_agent as http_user_agent
+from huggingface_hub.utils._headers import build_hf_headers
+from loguru import logger
 from rich.progress import Progress
+
+
+from ..utils.io import load_json, save_json
+from ..utils.rich import get_rich_progress_download
+from ..utils.system import buffer_keep_open, clear_process, force_delete, run_cmd
 
 # https://www.iamhippo.com/2021-08/1546.html
 USER_AGENT_LIST = [
@@ -626,8 +624,9 @@ class CommandDownloader(Downloader):
             return buffer
 
 
-import aiohttp
 import asyncio
+
+import aiohttp
 
 
 class CoroutineDownloader(Downloader):

@@ -1,8 +1,7 @@
-from typing import Mapping, Sequence, List
+from typing import List
 
 try:
     import torch
-    from torch.utils.data import default_collate
 except:
     pass
 

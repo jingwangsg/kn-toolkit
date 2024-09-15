@@ -2,34 +2,34 @@
 Modified from https://github.com/m-bain/frozen-in-time/blob/22a91d78405ec6032fdf521ae1ff5573358e632f/base/base_dataset.py
 """
 
-import random
 import io
+import random
 
 try:
     import torch
 except:
     pass
 
+import json
+import math
+
 # import av
 import cv2
 import decord
 import imageio
-from decord import VideoReader
 import numpy as np
-import math
-from loguru import logger
+from decord import VideoReader
 from einops import rearrange
-import json
-
-from .download import download_youtube_as_bytes
+from loguru import logger
 
 from ...utils.download import MultiThreadDownloaderInMem
-from ...utils.system import buffer_keep_open, run_cmd
+from ...utils.system import run_cmd
+from .download import download_youtube_as_bytes
 
 # ======================== FFMPEG ========================
 
 try:
-    from ffmpy import FFprobe, FFmpeg
+    from ffmpy import FFmpeg, FFprobe
 except ImportError:
     print("ffmpy not installed, some functionalities will not work")
 
@@ -64,7 +64,7 @@ def probe_meta_ffprobe(video_path):
         fps = probe_dict["streams"][0]["r_frame_rate"]
         duration = probe_dict["streams"][0]["duration"]
         num_frames = probe_dict["streams"][0]["nb_frames"]
-    except Exception as e:
+    except Exception:
         print(f"Error parsing probe_strs: {probe_str}")
         return None
 

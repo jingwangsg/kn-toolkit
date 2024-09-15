@@ -1,21 +1,18 @@
-import os, os.path as osp
-from PIL import Image
-from dataclasses import dataclass
+import copy
+import io
+import os
+import os.path as osp
+from tempfile import NamedTemporaryFile
+
 import cv2
 import numpy as np
-import copy
-from enum import Enum
-import os.path as osp
-import ffmpeg
-import numpy as np
-from tempfile import NamedTemporaryFile
-import io
 import torch
+from PIL import Image
 from torchvision.utils import make_grid
 
-from .text import draw_text, draw_text_line
-from .utils import color_val
 from ..data.video import read_frames_decord
+from .text import draw_text_line
+from .utils import color_val
 
 
 def plt_to_image(fig):
@@ -228,12 +225,10 @@ def _vis_image_tensors(image_tensors):
 
 
 def vis_images(image_files):
-    from torchvision.utils import make_grid
 
     if len(image_files) == 1:
         image = image_files[0]
-        os.system(f"termvisage --query-timeout 1 {image} -H left --height 12")
-
+        os.system(f"termvisage --query-timeout 1 {image} -H left -S iterm2 --force-style")
     else:
         images = [Image.open(image).convert("RGB") for image in image_files]
         image_tensors = [torch.from_numpy(np.array(image)) for image in images]

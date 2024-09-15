@@ -7,7 +7,6 @@ from collections import deque
 from datetime import datetime
 from urllib.parse import urlparse
 
-from ...utils.download import MultiThreadDownloader
 
 recent_downloads = deque(maxlen=1000)
 

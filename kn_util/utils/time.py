@@ -1,8 +1,10 @@
-import torch
 import time
-from loguru import logger
 from contextlib import contextmanager
-from kn_util.dist import dist
+
+import torch
+from loguru import logger
+
+import kn_util.dist as dist
 
 
 class Timer:

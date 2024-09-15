@@ -1,6 +1,6 @@
 import os
-import time
 import sys
+import time
 
 
 # thanks https://stackoverflow.com/questions/11130156/suppress-stdout-stderr-print-from-python-functions

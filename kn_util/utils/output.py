@@ -1,12 +1,9 @@
-from typing import Sequence, Mapping
-import numpy as np
-import torch
 
-import torch.nn as nn
-from termcolor import colored
-from omegaconf import OmegaConf
-from kn_util.config.lazy import _convert_target_to_string
+import torch
 import yaml
+from omegaconf import OmegaConf
+
+from kn_util.config.lazy import _convert_target_to_string
 
 
 def dict2str(x, delim=": ", sep="\n", fmt=".2f", exclude_keys=[]):
@@ -43,7 +40,6 @@ def max_memory_allocated():
     int
         Maximum memory allocated by pytorch
     """
-    import torch
     return torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
 
 
